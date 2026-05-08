@@ -26,7 +26,7 @@ jobs:
           python -m build --wheel
           mkdir -p ../../../dist/lambdas
           cp dist/*.whl ../../../dist/lambdas/quantum-api.whl
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: backend-${{ inputs.environment }}-quantum-api
           path: dist/lambdas/quantum-api.whl
