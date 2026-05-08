@@ -1,0 +1,35 @@
+name: Spectra - Build seq-api (.NET) [placeholder]
+
+# Polyglot placeholder: the .NET build for seq-api will go here once the
+# runtime ships. Disabled by `if: false` so contributors can find it but it
+# never runs.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+jobs:
+  build:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: dotnet publish
+        working-directory: apps/services/seq-api
+        run: dotnet publish -c Release -o publish
+      - name: Package
+        working-directory: apps/services/seq-api
+        run: |
+          mkdir -p ../../../dist/lambdas
+          cd publish && zip -qr ../../../../dist/lambdas/seq-api.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ inputs.environment }}-seq-api
+          path: dist/lambdas/seq-api.zip

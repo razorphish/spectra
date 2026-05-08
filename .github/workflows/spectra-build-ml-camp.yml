@@ -1,0 +1,35 @@
+name: Spectra - Build ml-camp (container) [placeholder]
+
+# Polyglot placeholder: ml-camp will be a container image pushed to ECR for
+# ECS / Batch. Disabled by `if: false`.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      image_tag:
+        required: false
+        type: string
+        default: 'latest'
+
+jobs:
+  build:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION || 'us-west-2' }}
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build & push image
+        run: |
+          ECR="${{ steps.ecr.outputs.registry }}"
+          REPO="spectra-${{ inputs.environment }}-ml-camp"
+          docker build -t "$ECR/$REPO:${{ inputs.image_tag }}" apps/services/ml-camp
+          docker push "$ECR/$REPO:${{ inputs.image_tag }}"

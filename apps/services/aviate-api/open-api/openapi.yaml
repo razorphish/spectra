@@ -1,0 +1,123 @@
+openapi: 3.0.3
+info:
+  title: aviate-api
+  version: 0.0.1
+paths:
+  /v1/platform/health:
+    get:
+      tags: [System]
+      summary: Liveness
+      responses:
+        '200':
+          description: OK
+  /v1/platform/ready:
+    get:
+      tags: [System]
+      summary: Readiness
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Dependency degraded
+  /v1/platform/info:
+    get:
+      tags: [System]
+      summary: Service metadata
+      responses:
+        '200':
+          description: OK
+  /v1/platform/stats:
+    get:
+      tags: [System]
+      summary: Control-plane table row counts (MVP; authenticate in production)
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Database unavailable
+
+  /v1/platform/uploads/init:
+    post:
+      tags: [Uploads]
+      summary: Initialize an object upload (returns presigned PUT URL)
+      description: |
+        Creates an `uploads` row in Neon and returns a single-part PUT URL
+        scoped to the env's uploads bucket. The client must `PUT` the
+        payload using the same `Content-Type` (and `Content-Length` if
+        provided) used in this request. Default cap: 1 GiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitUploadRequest'
+      responses:
+        '201':
+          description: Upload initialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitUploadResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Uploads not configured (missing bucket env var).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    InitUploadRequest:
+      type: object
+      required: [orgId, bytesExpected]
+      properties:
+        orgId:
+          type: string
+          format: uuid
+          description: Organization that owns the upload.
+        applicationId:
+          type: string
+          format: uuid
+          description: Optional developer application owning the upload.
+        bytesExpected:
+          type: integer
+          minimum: 1
+          maximum: 1073741824
+          description: Expected byte size; capped at 1 GiB.
+        contentType:
+          type: string
+          description: MIME type the client will PUT.
+        filename:
+          type: string
+          description: Optional original filename (stored as metadata only).
+    InitUploadResponse:
+      type: object
+      required: [uploadId, s3Bucket, s3Key, presignedPutUrl, expiresAt]
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        s3Bucket:
+          type: string
+        s3Key:
+          type: string
+        presignedPutUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        message:
+          type: string

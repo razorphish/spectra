@@ -1,0 +1,222 @@
+name: Spectra - Deploy
+
+# Orchestrator: detect -> ci-gates -> tf-apply -> db-migrate -> build-lambdas
+# -> deploy-lambdas -> build-frontends -> sync-spas -> verify.
+#
+# Auto deploys for branches: dev*, qa*, hotfix*. Manual dispatch is required
+# for staging/prod (use environment protection rules).
+
+on:
+  push:
+    branches:
+      - 'dev**'
+      - 'qa**'
+      - 'hotfix**'
+      - 'staging**'
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Branch to deploy (defaults to ref_name)'
+        required: false
+        type: string
+      force_deploy:
+        description: 'Skip deploy gates'
+        required: false
+        type: boolean
+        default: false
+      skip_tests:
+        description: 'Skip CI gates (lint/test/build)'
+        required: false
+        type: boolean
+        default: false
+      force_invalidate:
+        description: 'Force CloudFront invalidation even if SPA unchanged'
+        required: false
+        type: boolean
+        default: false
+      run_seeding:
+        description: 'Run optional seed script after migrations'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: spectra-deploy-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  detect:
+    uses: ./.github/workflows/spectra-detect-environment.yml
+    with:
+      branch_name: ${{ inputs.target_branch || github.ref_name }}
+      base_domain: ${{ vars.BASE_DOMAIN || 'spectra.com' }}
+      project_name: ${{ vars.PROJECT_NAME || 'spectra' }}
+
+  ci-gates:
+    if: ${{ !inputs.skip_tests }}
+    needs: detect
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ vars.NODE_VERSION || '20.19.5' }}
+          cache: 'npm'
+      - run: npm ci --no-audit --no-fund
+      - run: npx nx run-many --target=lint --all --parallel=3
+      - run: npx nx run-many --target=test --all --parallel=3 --passWithNoTests
+      - run: npx nx run-many --target=build --all --parallel=3
+
+  tf-apply:
+    needs: [detect, ci-gates]
+    if: ${{ always() && needs.detect.result == 'success' && (needs.ci-gates.result == 'success' || needs.ci-gates.result == 'skipped' || inputs.force_deploy) }}
+    uses: ./.github/workflows/spectra-terraform.yml
+    with:
+      main_env: ${{ needs.detect.outputs.main_env }}
+      environment: ${{ needs.detect.outputs.environment }}
+      gh_environment: ${{ needs.detect.outputs.gh_environment }}
+      action: apply
+      aws_region: ${{ vars.AWS_REGION || 'us-west-2' }}
+      base_domain: ${{ vars.BASE_DOMAIN || 'spectra.com' }}
+      project_name: ${{ vars.PROJECT_NAME || 'spectra' }}
+    secrets: inherit
+
+  db-migrate:
+    needs: [detect, tf-apply]
+    uses: ./.github/workflows/spectra-db-migrate.yml
+    with:
+      gh_environment: ${{ needs.detect.outputs.gh_environment }}
+      node_version: ${{ vars.NODE_VERSION || '20.19.5' }}
+    secrets: inherit
+
+  build-lambdas:
+    needs: [detect, db-migrate]
+    uses: ./.github/workflows/spectra-build-lambdas.yml
+    with:
+      environment: ${{ needs.detect.outputs.environment }}
+      node_version: ${{ vars.NODE_VERSION || '20.19.5' }}
+
+  deploy-lambdas:
+    needs: [detect, build-lambdas]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: ${{ needs.detect.outputs.gh_environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - aviate-api
+          - admin-ui-api
+          - seq-api
+          - quantum-api
+          - corridor-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION || 'us-west-2' }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' && secrets.AWS_ACCESS_KEY_ID != '' }}
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-west-2' }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-${{ needs.detect.outputs.environment }}-${{ matrix.service }}
+          path: dist/lambdas
+      - name: Upload zip + update Lambda code
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+        run: |
+          set -euo pipefail
+          source ./scripts/ci/lib/lambda-helpers.sh
+          source ./scripts/ci/lib/aws-helpers.sh
+          MAIN_ENV="${{ needs.detect.outputs.main_env }}"
+          ENV_LABEL="${{ needs.detect.outputs.environment }}"
+          SERVICE="${{ matrix.service }}"
+          BUCKET="$(lambda_deploy_bucket "$MAIN_ENV" "$ENV_LABEL")"
+          HASH="$(cat dist/lambdas/${SERVICE}.hash)"
+          KEY="$(lambda_deploy_key "$SERVICE" "$ENV_LABEL" "$HASH")"
+          aws s3 cp "dist/lambdas/${SERVICE}.zip" "s3://${BUCKET}/${KEY}"
+          FUNCTION_NAME="$(lambda_function_name "$MAIN_ENV" "$ENV_LABEL" "$SERVICE")"
+          if lambda_exists "$FUNCTION_NAME"; then
+            update_lambda_code_from_s3 "$FUNCTION_NAME" "$BUCKET" "$KEY"
+            aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+            VERSION="$(aws lambda publish-version --function-name "$FUNCTION_NAME" --query 'Version' --output text)"
+            aws lambda update-alias --function-name "$FUNCTION_NAME" --name live --function-version "$VERSION" \
+              || aws lambda create-alias --function-name "$FUNCTION_NAME" --name live --function-version "$VERSION"
+            echo "Deployed $FUNCTION_NAME -> v$VERSION (hash $HASH)"
+          else
+            echo "::warning::Lambda $FUNCTION_NAME does not exist yet (Terraform may need to create it first)."
+          fi
+
+  build-frontends:
+    needs: [detect, ci-gates]
+    if: ${{ always() && needs.detect.result == 'success' && (needs.ci-gates.result == 'success' || needs.ci-gates.result == 'skipped' || inputs.force_deploy) }}
+    uses: ./.github/workflows/spectra-build-frontends.yml
+    with:
+      environment: ${{ needs.detect.outputs.environment }}
+      node_version: ${{ vars.NODE_VERSION || '20.19.5' }}
+      public_api_url: ${{ needs.detect.outputs.public_api_url }}
+      staff_api_url: ${{ needs.detect.outputs.staff_api_url }}
+
+  sync-spas:
+    needs: [detect, build-frontends, deploy-lambdas]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ needs.detect.outputs.gh_environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: spectra-ui
+            bucket: ${{ needs.detect.outputs.spa_bucket_spectra_ui }}
+          - app: sandbox-ui
+            bucket: ${{ needs.detect.outputs.spa_bucket_sandbox_ui }}
+          - app: admin-ui
+            bucket: ${{ needs.detect.outputs.spa_bucket_admin_ui }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION || 'us-west-2' }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' && secrets.AWS_ACCESS_KEY_ID != '' }}
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-west-2' }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-${{ needs.detect.outputs.environment }}-${{ matrix.app }}
+          path: dist/apps/${{ matrix.app }}
+      - name: Sync ${{ matrix.app }}
+        env:
+          FORCE_INVALIDATE: ${{ inputs.force_invalidate }}
+        run: ./scripts/ci/sync-spa.sh "${{ matrix.app }}" "${{ matrix.bucket }}"
+
+  verify:
+    needs: [detect, deploy-lambdas, sync-spas]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ needs.detect.outputs.gh_environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify health/ready
+        run: |
+          ./scripts/ci/verify-deployment.sh \
+            "${{ needs.detect.outputs.public_api_url }}" \
+            "${{ needs.detect.outputs.staff_api_url }}" || true
+          # Soft-fail until Terraform actually wires the API Gateway custom
+          # domains in steps 2-3; once they exist, drop the trailing "|| true".

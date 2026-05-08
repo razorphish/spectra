@@ -1,0 +1,19 @@
+openapi: 3.0.3
+info:
+  title: quantum-api
+  version: 0.0.1
+paths:
+  /v1/quantum/health:
+    get:
+      tags: [System]
+      summary: Liveness
+      responses:
+        '200':
+          description: OK
+  /v1/quantum/ready:
+    get:
+      tags: [System]
+      summary: Readiness
+      responses:
+        '200':
+          description: OK

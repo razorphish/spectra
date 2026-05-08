@@ -1,0 +1,32 @@
+name: Spectra - Build quantum-api (Python) [placeholder]
+
+# Polyglot placeholder: the Python build for quantum-api will go here once
+# the runtime ships. Disabled by `if: false`.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+jobs:
+  build:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build wheel / zip
+        working-directory: apps/services/quantum-api
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          mkdir -p ../../../dist/lambdas
+          cp dist/*.whl ../../../dist/lambdas/quantum-api.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ inputs.environment }}-quantum-api
+          path: dist/lambdas/quantum-api.whl

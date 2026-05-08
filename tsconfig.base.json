@@ -1,0 +1,26 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "es2015",
+    "module": "esnext",
+    "lib": ["es2020", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "paths": {
+      "@spectra/auth": ["./packages/auth/src/index.ts"],
+      "@spectra/database": ["./packages/database/src/index.ts"],
+      "@spectra/logger": ["./packages/logger/src/index.ts"],
+      "@spectra/openapi": ["./packages/openapi/src/index.ts"],
+      "@spectra/upload": ["./packages/upload/src/index.ts"],
+      "@spectra/shared-ui": ["./packages/shared-ui/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}

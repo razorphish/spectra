@@ -1,0 +1,19 @@
+openapi: 3.0.3
+info:
+  title: ml-camp
+  version: 0.0.1
+paths:
+  /v1/ml/health:
+    get:
+      tags: [System]
+      summary: Liveness
+      responses:
+        '200':
+          description: OK
+  /v1/ml/ready:
+    get:
+      tags: [System]
+      summary: Readiness
+      responses:
+        '200':
+          description: OK

@@ -1,0 +1,63 @@
+name: Spectra - Rollback
+
+# Manual rollback: flip the `live` Lambda alias for one or more services back
+# to a known-good S3 zip key. For DB rollback see docs/runbooks/rollback.md
+# (Neon branch + drizzle re-migrate).
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Stage label (dev01, prod, ...)'
+        required: true
+        type: string
+      service:
+        description: 'Service name (api-gateway, aviate-api, admin-ui-api, ...)'
+        required: true
+        type: string
+      target_s3_key:
+        description: 'S3 key in the lambda deploy bucket (deployments/<service>/<env>/<service>-<ts>-<hash>.zip)'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' && secrets.AWS_ACCESS_KEY_ID != '' }}
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Parse main env
+        id: parse
+        run: |
+          ENV="${{ inputs.environment }}"
+          if [ "$ENV" = "prod" ]; then
+            MAIN_ENV="prod"
+          else
+            MAIN_ENV="${ENV%%[0-9]*}"
+          fi
+          echo "main_env=$MAIN_ENV" >> "$GITHUB_OUTPUT"
+      - name: Rollback Lambda
+        run: |
+          ./scripts/ci/rollback-lambda.sh \
+            "${{ steps.parse.outputs.main_env }}" \
+            "${{ inputs.environment }}" \
+            "${{ inputs.service }}" \
+            "${{ inputs.target_s3_key }}"

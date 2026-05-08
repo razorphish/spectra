@@ -1,0 +1,131 @@
+name: Spectra - Terraform
+
+# Reusable: terraform fmt -check + validate always; plan on PR; apply on push
+# / workflow_dispatch. Caller passes in main_env, environment, and the GitHub
+# Environment whose secrets contain Neon URLs and OIDC role.
+
+on:
+  workflow_call:
+    inputs:
+      main_env:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      gh_environment:
+        required: true
+        type: string
+      action:
+        description: 'plan or apply'
+        required: false
+        type: string
+        default: 'apply'
+      aws_region:
+        required: false
+        type: string
+        default: 'us-west-2'
+      base_domain:
+        required: false
+        type: string
+        default: 'spectra.com'
+      project_name:
+        required: false
+        type: string
+        default: 'spectra'
+    secrets:
+      AWS_ROLE_TO_ASSUME:
+        required: false
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      TF_STATE_BUCKET:
+        required: true
+      TF_STATE_LOCK_TABLE:
+        required: false
+      NEON_DATABASE_URL:
+        required: true
+      JWT_ISSUER:
+        required: false
+      JWT_AUDIENCE_PUBLIC:
+        required: false
+      JWT_AUDIENCE_STAFF:
+        required: false
+      JWT_JWKS_URI:
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.gh_environment }}
+    env:
+      AWS_REGION: ${{ inputs.aws_region }}
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      TF_STATE_LOCK_TABLE: ${{ secrets.TF_STATE_LOCK_TABLE }}
+      TF_VAR_neon_database_url: ${{ secrets.NEON_DATABASE_URL }}
+      TF_VAR_base_domain: ${{ inputs.base_domain }}
+      TF_VAR_project_name: ${{ inputs.project_name }}
+      TF_VAR_jwt_issuer: ${{ secrets.JWT_ISSUER }}
+      TF_VAR_jwt_audience_public: ${{ secrets.JWT_AUDIENCE_PUBLIC }}
+      TF_VAR_jwt_audience_staff: ${{ secrets.JWT_AUDIENCE_STAFF }}
+      TF_VAR_jwt_jwks_uri: ${{ secrets.JWT_JWKS_URI }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Configure AWS credentials (static keys fallback)
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME == '' && secrets.AWS_ACCESS_KEY_ID != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive terraform/
+
+      - name: Run apply-terraform.sh (plan or apply)
+        run: |
+          set -euo pipefail
+          ./scripts/ci/apply-terraform.sh \
+            "${{ inputs.main_env }}" \
+            "${{ inputs.environment }}" \
+            "${{ inputs.action }}"
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request' && inputs.action == 'plan'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const planPath = 'terraform/environments/sandbox/tfplan.txt';
+            let body = '### Spectra Terraform plan\n_(no plan output captured)_';
+            if (fs.existsSync(planPath)) {
+              const txt = fs.readFileSync(planPath, 'utf8').slice(0, 60000);
+              body = '### Spectra Terraform plan\n```\n' + txt + '\n```';
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

@@ -1,0 +1,71 @@
+name: Spectra - Build Lambdas
+
+# Reusable: Nx-build the Node API services and package each as a zip artifact
+# named "backend-<environment>-<service>". Caller wires this into the
+# orchestrator (spectra-deploy.yml) and reuses the artifacts across stages.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Stage label (dev01, prod, ...)'
+        required: true
+        type: string
+      services:
+        description: 'JSON array of service names'
+        required: false
+        type: string
+        default: '["api-gateway","aviate-api","admin-ui-api","seq-api","quantum-api","corridor-api"]'
+      node_version:
+        required: false
+        type: string
+        default: '20.19.5'
+    outputs:
+      artifact_name_prefix:
+        description: 'Prefix used for the per-service artifacts'
+        value: ${{ jobs.package.outputs.artifact_name_prefix }}
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      artifact_name_prefix: backend-${{ inputs.environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(inputs.services) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build ${{ matrix.service }}
+        run: npx nx build ${{ matrix.service }} --configuration=production
+
+      - name: Package zip
+        id: pkg
+        run: |
+          set -euo pipefail
+          mkdir -p dist/lambdas
+          ./scripts/ci/package-lambda.sh "${{ matrix.service }}" dist/lambdas
+          HASH="$(cat dist/lambdas/${{ matrix.service }}.hash)"
+          echo "backend_hash=$HASH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ inputs.environment }}-${{ matrix.service }}
+          path: |
+            dist/lambdas/${{ matrix.service }}.zip
+            dist/lambdas/${{ matrix.service }}.hash
+          retention-days: 14
+          if-no-files-found: error

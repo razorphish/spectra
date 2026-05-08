@@ -1,0 +1,45 @@
+name: Spectra - DB Migrate
+
+# Reusable: drizzle-kit migrate against the per-environment Neon branch.
+# The caller is responsible for selecting the right GitHub Environment so
+# secrets stay isolated from prod.
+
+on:
+  workflow_call:
+    inputs:
+      gh_environment:
+        required: true
+        type: string
+      node_version:
+        required: false
+        type: string
+        default: '20.19.5'
+    secrets:
+      NEON_DATABASE_URL:
+        required: true
+      DATABASE_DIRECT_URL:
+        required: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.gh_environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Run migrations
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          DATABASE_DIRECT_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+        run: ./scripts/ci/run-migrations.sh

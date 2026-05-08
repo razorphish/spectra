@@ -1,0 +1,26 @@
+{
+  "name": "upload",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/upload/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/packages/upload",
+        "main": "packages/upload/src/index.ts",
+        "tsConfig": "packages/upload/tsconfig.lib.json",
+        "assets": ["packages/upload/*.md"]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "packages/upload/jest.config.cts"
+      }
+    }
+  }
+}

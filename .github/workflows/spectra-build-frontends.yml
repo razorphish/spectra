@@ -1,0 +1,92 @@
+name: Spectra - Build Frontends
+
+# Reusable: matrix-build the Angular SPAs (spectra-ui, sandbox-ui, admin-ui)
+# with per-environment configuration so embedded API base URLs point at the
+# right stage. Each app is uploaded as its own artifact for the deploy job.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Stage label (dev01, prod, ...)'
+        required: true
+        type: string
+      apps:
+        description: 'JSON array of UI app names'
+        required: false
+        type: string
+        default: '["spectra-ui","sandbox-ui","admin-ui"]'
+      node_version:
+        required: false
+        type: string
+        default: '20.19.5'
+      public_api_url:
+        required: true
+        type: string
+      staff_api_url:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(inputs.apps) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Build ${{ matrix.app }}
+        env:
+          PUBLIC_API_URL: ${{ inputs.public_api_url }}
+          STAFF_API_URL: ${{ inputs.staff_api_url }}
+          SPECTRA_ENV: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          # Prefer an Angular --configuration matching the env if present;
+          # otherwise fall back to production. Apps can read SPECTRA_ENV /
+          # PUBLIC_API_URL / STAFF_API_URL via environment.ts fileReplacements.
+          if npx nx show project ${{ matrix.app }} --json 2>/dev/null \
+              | grep -q '"${{ inputs.environment }}"'; then
+            CONFIG="${{ inputs.environment }}"
+          else
+            CONFIG="production"
+          fi
+          npx nx build ${{ matrix.app }} --configuration="$CONFIG"
+
+      - name: Locate build output
+        id: out
+        run: |
+          set -euo pipefail
+          for c in \
+            "dist/apps/${{ matrix.app }}/browser" \
+            "dist/apps/${{ matrix.app }}" \
+            "dist/${{ matrix.app }}/browser" \
+            "dist/${{ matrix.app }}"; do
+            if [ -d "$c" ]; then
+              echo "path=$c" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "::error::No dist directory found for ${{ matrix.app }}" >&2
+          exit 1
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-${{ inputs.environment }}-${{ matrix.app }}
+          path: ${{ steps.out.outputs.path }}
+          retention-days: 14
+          if-no-files-found: error

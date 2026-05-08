@@ -1,0 +1,37 @@
+openapi: 3.0.3
+info:
+  title: admin-ui-api
+  version: 0.0.1
+paths:
+  /v1/admin/health:
+    get:
+      tags: [System]
+      summary: Liveness
+      responses:
+        '200':
+          description: OK
+  /v1/admin/ready:
+    get:
+      tags: [System]
+      summary: Readiness
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Dependency degraded
+  /v1/admin/info:
+    get:
+      tags: [System]
+      summary: Service metadata
+      responses:
+        '200':
+          description: OK
+  /v1/admin/stats:
+    get:
+      tags: [System]
+      summary: Control-plane row counts (staff API; authenticate in production)
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Database unavailable

@@ -1,0 +1,28 @@
+{
+  "name": "platform",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/platform",
+  "projectType": "application",
+  "tags": [],
+  "// targets": "Build is overridden to run `expo export` (static web bundle). The default @nx/expo:build target requires eas-cli + auth, which is unsuitable for local + CI builds. Use `nx run platform:eas-build` (executor @nx/expo:build) when a native EAS build is needed.",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        { "externalDependencies": ["expo"] }
+      ],
+      "outputs": ["{workspaceRoot}/dist/apps/platform/web"],
+      "options": {
+        "cwd": "apps/platform",
+        "command": "expo export --platform web --output-dir ../../dist/apps/platform/web"
+      }
+    },
+    "eas-build": {
+      "executor": "@nx/expo:build",
+      "options": {}
+    }
+  }
+}

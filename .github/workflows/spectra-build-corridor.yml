@@ -1,0 +1,31 @@
+name: Spectra - Build corridor-api (Go) [placeholder]
+
+# Polyglot placeholder: the Go build for corridor-api will go here once the
+# runtime ships. Disabled by `if: false`.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+jobs:
+  build:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: go build
+        working-directory: apps/services/corridor-api
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
+          mkdir -p ../../../dist/lambdas
+          zip -qr ../../../dist/lambdas/corridor-api.zip bootstrap
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ inputs.environment }}-corridor-api
+          path: dist/lambdas/corridor-api.zip

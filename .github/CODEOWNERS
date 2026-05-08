@@ -1,0 +1,30 @@
+# Spectra CODEOWNERS
+# Order matters: later patterns override earlier ones.
+#
+# TODO(platform-leads): replace these with concrete GitHub teams/users
+# (e.g. @spectra/platform, @spectra/db) before enabling branch protection.
+
+* @spectra/platform
+
+# CI/CD
+/.github/                @spectra/platform
+/.github/workflows/      @spectra/platform
+/scripts/ci/             @spectra/platform
+
+# Infrastructure
+/terraform/              @spectra/platform
+
+# Database / migrations
+/packages/database/      @spectra/platform
+/packages/database/drizzle/ @spectra/platform
+
+# Developer-facing platform packages
+/packages/auth/          @spectra/platform
+/packages/upload/        @spectra/platform
+/packages/openapi/       @spectra/platform
+
+# UIs
+/apps/spectra-ui/        @spectra/frontend
+/apps/sandbox-ui/        @spectra/frontend
+/apps/admin-ui/          @spectra/frontend
+/packages/shared-ui/     @spectra/frontend

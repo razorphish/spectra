@@ -1,0 +1,71 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+.angular/
+npm-full-install.log
+
+# local secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# dependencies
+node_modules
+
+# npm concurrent-install guard (see scripts/npm-one-at-a-time.cjs)
+.npm-install.running
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+.nx/cache
+.nx/workspace-data
+.claude/worktrees
+.claude/settings.local.json
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfplan
+*.tfplan.txt
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

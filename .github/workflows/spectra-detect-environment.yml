@@ -1,0 +1,195 @@
+name: Spectra - Detect Environment
+
+# Reusable workflow that maps a branch name to a Spectra deployment stage and
+# emits all of the canonical naming outputs (DNS, S3 buckets, Lambda prefix,
+# Terraform state key) per DEVELOPER-API-PLATFORM-PLAN.md §8.
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: 'Branch name (typically github.ref_name)'
+        required: true
+        type: string
+      base_domain:
+        description: 'Base domain for Spectra (e.g. spectra.com)'
+        required: false
+        type: string
+        default: 'spectra.com'
+      project_name:
+        description: 'Project slug used in resource names'
+        required: false
+        type: string
+        default: 'spectra'
+    outputs:
+      environment:
+        description: 'Stage label (dev01, qa01, staging01, hotfix01, prod)'
+        value: ${{ jobs.detect.outputs.environment }}
+      main_env:
+        description: 'Main env family (dev, qa, staging, hotfix, prod)'
+        value: ${{ jobs.detect.outputs.main_env }}
+      should_deploy:
+        description: 'Whether the branch triggers an automatic deploy'
+        value: ${{ jobs.detect.outputs.should_deploy }}
+      is_numbered_env:
+        description: 'True for dev*/qa*/staging*/hotfix* branches'
+        value: ${{ jobs.detect.outputs.is_numbered_env }}
+      public_api_host:
+        description: 'Public Edge / API hostname (api.<label>.<base>)'
+        value: ${{ jobs.detect.outputs.public_api_host }}
+      staff_api_host:
+        description: 'Staff Edge hostname (admin.api.<label>.<base>)'
+        value: ${{ jobs.detect.outputs.staff_api_host }}
+      public_api_url:
+        description: 'https://<public_api_host>'
+        value: ${{ jobs.detect.outputs.public_api_url }}
+      staff_api_url:
+        description: 'https://<staff_api_host>'
+        value: ${{ jobs.detect.outputs.staff_api_url }}
+      spectra_ui_host:
+        description: 'spectra-ui hostname (developers.<label>.<base>)'
+        value: ${{ jobs.detect.outputs.spectra_ui_host }}
+      sandbox_ui_host:
+        description: 'sandbox-ui hostname (sandbox.<label>.<base>)'
+        value: ${{ jobs.detect.outputs.sandbox_ui_host }}
+      admin_ui_host:
+        description: 'admin-ui hostname (admin.<label>.<base>)'
+        value: ${{ jobs.detect.outputs.admin_ui_host }}
+      lambda_prefix:
+        description: 'Lambda name prefix (spectra-<main_env>-<env>)'
+        value: ${{ jobs.detect.outputs.lambda_prefix }}
+      lambda_deploy_bucket:
+        description: 'S3 bucket for Lambda zips'
+        value: ${{ jobs.detect.outputs.lambda_deploy_bucket }}
+      spa_bucket_spectra_ui:
+        description: 'S3 bucket hosting spectra-ui'
+        value: ${{ jobs.detect.outputs.spa_bucket_spectra_ui }}
+      spa_bucket_sandbox_ui:
+        description: 'S3 bucket hosting sandbox-ui'
+        value: ${{ jobs.detect.outputs.spa_bucket_sandbox_ui }}
+      spa_bucket_admin_ui:
+        description: 'S3 bucket hosting admin-ui'
+        value: ${{ jobs.detect.outputs.spa_bucket_admin_ui }}
+      uploads_bucket:
+        description: 'S3 bucket for object uploads'
+        value: ${{ jobs.detect.outputs.uploads_bucket }}
+      tf_state_key:
+        description: 'Terraform state key under TF_STATE_BUCKET'
+        value: ${{ jobs.detect.outputs.tf_state_key }}
+      gh_environment:
+        description: 'GitHub Environment name to scope secrets to'
+        value: ${{ jobs.detect.outputs.gh_environment }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      main_env: ${{ steps.env.outputs.main_env }}
+      should_deploy: ${{ steps.env.outputs.should_deploy }}
+      is_numbered_env: ${{ steps.env.outputs.is_numbered_env }}
+      public_api_host: ${{ steps.env.outputs.public_api_host }}
+      staff_api_host: ${{ steps.env.outputs.staff_api_host }}
+      public_api_url: ${{ steps.env.outputs.public_api_url }}
+      staff_api_url: ${{ steps.env.outputs.staff_api_url }}
+      spectra_ui_host: ${{ steps.env.outputs.spectra_ui_host }}
+      sandbox_ui_host: ${{ steps.env.outputs.sandbox_ui_host }}
+      admin_ui_host: ${{ steps.env.outputs.admin_ui_host }}
+      lambda_prefix: ${{ steps.env.outputs.lambda_prefix }}
+      lambda_deploy_bucket: ${{ steps.env.outputs.lambda_deploy_bucket }}
+      spa_bucket_spectra_ui: ${{ steps.env.outputs.spa_bucket_spectra_ui }}
+      spa_bucket_sandbox_ui: ${{ steps.env.outputs.spa_bucket_sandbox_ui }}
+      spa_bucket_admin_ui: ${{ steps.env.outputs.spa_bucket_admin_ui }}
+      uploads_bucket: ${{ steps.env.outputs.uploads_bucket }}
+      tf_state_key: ${{ steps.env.outputs.tf_state_key }}
+      gh_environment: ${{ steps.env.outputs.gh_environment }}
+    steps:
+      - name: Map branch to environment
+        id: env
+        env:
+          BRANCH_NAME: ${{ inputs.branch_name }}
+          BASE_DOMAIN: ${{ inputs.base_domain }}
+          PROJECT_NAME: ${{ inputs.project_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$BRANCH_NAME" == "main" ]]; then
+            ENVIRONMENT="prod"
+            MAIN_ENV="prod"
+            SHOULD_DEPLOY="false"
+            IS_NUMBERED_ENV="false"
+          elif [[ "$BRANCH_NAME" =~ ^dev[0-9]{2}$ ]]; then
+            ENVIRONMENT="$BRANCH_NAME"; MAIN_ENV="dev"; SHOULD_DEPLOY="true"; IS_NUMBERED_ENV="true"
+          elif [[ "$BRANCH_NAME" =~ ^qa[0-9]{2}$ ]]; then
+            ENVIRONMENT="$BRANCH_NAME"; MAIN_ENV="qa"; SHOULD_DEPLOY="true"; IS_NUMBERED_ENV="true"
+          elif [[ "$BRANCH_NAME" =~ ^staging[0-9]{2}$ ]]; then
+            ENVIRONMENT="$BRANCH_NAME"; MAIN_ENV="staging"; SHOULD_DEPLOY="true"; IS_NUMBERED_ENV="true"
+          elif [[ "$BRANCH_NAME" =~ ^hotfix[0-9]{2}$ ]]; then
+            ENVIRONMENT="$BRANCH_NAME"; MAIN_ENV="hotfix"; SHOULD_DEPLOY="true"; IS_NUMBERED_ENV="true"
+          else
+            echo "::error::Branch '$BRANCH_NAME' does not map to a known Spectra stage" >&2
+            exit 1
+          fi
+
+          # Hostnames per plan §8 (sandbox uses 'sandbox.' suffix; prod is bare).
+          if [[ "$MAIN_ENV" == "prod" ]]; then
+            HOST_SUFFIX="$BASE_DOMAIN"
+            BUCKET_SUFFIX="prod"
+          else
+            HOST_SUFFIX="${ENVIRONMENT}.sandbox.${BASE_DOMAIN}"
+            BUCKET_SUFFIX="${MAIN_ENV}-${ENVIRONMENT}"
+          fi
+
+          PUBLIC_API_HOST="api.${HOST_SUFFIX}"
+          STAFF_API_HOST="admin.api.${HOST_SUFFIX}"
+          SPECTRA_UI_HOST="developers.${HOST_SUFFIX}"
+          SANDBOX_UI_HOST="sandbox.${HOST_SUFFIX}"
+          ADMIN_UI_HOST="admin.${HOST_SUFFIX}"
+
+          LAMBDA_PREFIX="${PROJECT_NAME}-${MAIN_ENV}-${ENVIRONMENT}"
+          LAMBDA_DEPLOY_BUCKET="${BUCKET_SUFFIX}-${PROJECT_NAME}-lambda-deployments"
+          SPA_BUCKET_SPECTRA="${BUCKET_SUFFIX}-${PROJECT_NAME}-spectra-ui"
+          SPA_BUCKET_SANDBOX="${BUCKET_SUFFIX}-${PROJECT_NAME}-sandbox-ui"
+          SPA_BUCKET_ADMIN="${BUCKET_SUFFIX}-${PROJECT_NAME}-admin-ui"
+          UPLOADS_BUCKET="${BUCKET_SUFFIX}-${PROJECT_NAME}-uploads"
+
+          TF_STATE_KEY="${PROJECT_NAME}/${MAIN_ENV}/${ENVIRONMENT}/terraform.tfstate"
+          GH_ENVIRONMENT="$ENVIRONMENT"
+
+          {
+            echo "environment=$ENVIRONMENT"
+            echo "main_env=$MAIN_ENV"
+            echo "should_deploy=$SHOULD_DEPLOY"
+            echo "is_numbered_env=$IS_NUMBERED_ENV"
+            echo "public_api_host=$PUBLIC_API_HOST"
+            echo "staff_api_host=$STAFF_API_HOST"
+            echo "public_api_url=https://$PUBLIC_API_HOST"
+            echo "staff_api_url=https://$STAFF_API_HOST"
+            echo "spectra_ui_host=$SPECTRA_UI_HOST"
+            echo "sandbox_ui_host=$SANDBOX_UI_HOST"
+            echo "admin_ui_host=$ADMIN_UI_HOST"
+            echo "lambda_prefix=$LAMBDA_PREFIX"
+            echo "lambda_deploy_bucket=$LAMBDA_DEPLOY_BUCKET"
+            echo "spa_bucket_spectra_ui=$SPA_BUCKET_SPECTRA"
+            echo "spa_bucket_sandbox_ui=$SPA_BUCKET_SANDBOX"
+            echo "spa_bucket_admin_ui=$SPA_BUCKET_ADMIN"
+            echo "uploads_bucket=$UPLOADS_BUCKET"
+            echo "tf_state_key=$TF_STATE_KEY"
+            echo "gh_environment=$GH_ENVIRONMENT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Print summary
+        run: |
+          {
+            echo "## Spectra - Environment"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Branch | \`${{ inputs.branch_name }}\` |"
+            echo "| Environment | \`${{ steps.env.outputs.environment }}\` |"
+            echo "| Main env | \`${{ steps.env.outputs.main_env }}\` |"
+            echo "| Should deploy | \`${{ steps.env.outputs.should_deploy }}\` |"
+            echo "| Public API | ${{ steps.env.outputs.public_api_url }} |"
+            echo "| Staff API | ${{ steps.env.outputs.staff_api_url }} |"
+            echo "| TF state key | \`${{ steps.env.outputs.tf_state_key }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
