@@ -14,6 +14,7 @@
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"],
       "sourceMaps": true,
+      "preLaunchTask": "db-migrate-local",
       "outFiles": [
         "${workspaceFolder}/apps/api-gateway/dist/**/*.(m|c|)js",
         "!**/node_modules/**"
@@ -23,6 +24,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug aviate-api with Nx",
+      "preLaunchTask": "kill-local-dev-ports",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["nx", "serve", "aviate-api"],
       "env": {
@@ -41,6 +43,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug admin-ui-api with Nx",
+      "preLaunchTask": "kill-local-dev-ports",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["nx", "serve", "admin-ui-api"],
       "env": {
@@ -59,6 +62,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug seq-api with Nx",
+      "preLaunchTask": "kill-local-dev-ports",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["nx", "serve", "seq-api"],
       "env": {
@@ -77,6 +81,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug quantum-api with Nx",
+      "preLaunchTask": "kill-local-dev-ports",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["nx", "serve", "quantum-api"],
       "env": {
@@ -95,6 +100,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug corridor-api with Nx",
+      "preLaunchTask": "kill-local-dev-ports",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["nx", "serve", "corridor-api"],
       "env": {
@@ -113,6 +119,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug ml-camp with Nx",
+      "preLaunchTask": "kill-local-dev-ports",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["nx", "serve", "ml-camp"],
       "env": {
@@ -128,7 +135,41 @@
       ]
     },
     {
+      "type": "node",
+      "request": "launch",
+      "name": "Serve spectra-ui",
+      "preLaunchTask": "kill-local-dev-ports",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "spectra-ui"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Serve sandbox-ui",
+      "preLaunchTask": "kill-local-dev-ports",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "sandbox-ui"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Serve admin-ui",
+      "preLaunchTask": "kill-local-dev-ports",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "admin-ui"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "name": "Backend (Launch)",
+      "preLaunchTask": "kill-local-dev-ports",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npx",
@@ -142,6 +183,7 @@
     },
     {
       "name": "Backend (Debug)",
+      "preLaunchTask": "kill-local-dev-ports",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "npx",
@@ -155,7 +197,36 @@
       }
     },
     {
+      "name": "admin-ui-api (Launch)",
+      "preLaunchTask": "kill-local-dev-ports",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "admin-ui-api"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "NODE_ENV": "development",
+        "PORT": "3002"
+      }
+    },
+    {
+      "name": "ml-camp (Launch)",
+      "preLaunchTask": "kill-local-dev-ports",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "ml-camp"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "NODE_ENV": "development",
+        "PORT": "3006"
+      }
+    },
+    {
       "name": "Platform (Expo)",
+      "preLaunchTask": "kill-local-dev-ports",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}/apps/platform",
@@ -172,6 +243,7 @@
     },
     {
       "name": "Platform (Expo Web)",
+      "preLaunchTask": "kill-local-dev-ports",
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}/apps/platform",
@@ -190,18 +262,96 @@
   "compounds": [
     {
       "name": "📱 Launch Expo Platform",
-      "configurations": ["Backend (Launch)", "Platform (Expo)"],
+      "preLaunchTask": "db-migrate-local",
+      "configurations": [
+        "Backend (Launch)",
+        "admin-ui-api (Launch)",
+        "ml-camp (Launch)",
+        "Serve admin-ui",
+        "Serve sandbox-ui",
+        "Platform (Expo)"
+      ],
       "presentation": { "group": "expo", "order": 1 }
     },
     {
       "name": "🐛 Debug Expo Platform",
-      "configurations": ["Backend (Debug)", "Platform (Expo)"],
+      "preLaunchTask": "db-migrate-local",
+      "configurations": [
+        "Backend (Debug)",
+        "Debug admin-ui-api with Nx",
+        "Debug ml-camp with Nx",
+        "Serve admin-ui",
+        "Serve sandbox-ui",
+        "Platform (Expo)"
+      ],
       "presentation": { "group": "expo", "order": 2 }
     },
     {
       "name": "🌐 Debug Expo Web Only",
-      "configurations": ["Backend (Debug)", "Platform (Expo Web)"],
+      "preLaunchTask": "db-migrate-local",
+      "configurations": [
+        "Backend (Debug)",
+        "Debug admin-ui-api with Nx",
+        "Debug ml-camp with Nx",
+        "Serve admin-ui",
+        "Serve sandbox-ui",
+        "Platform (Expo Web)"
+      ],
       "presentation": { "group": "expo", "order": 3 }
+    },
+    {
+      "name": "🛠 Launch Admin stack",
+      "preLaunchTask": "db-migrate-local",
+      "configurations": ["admin-ui-api (Launch)", "Serve admin-ui"],
+      "presentation": { "group": "focused", "order": 1 }
+    },
+    {
+      "name": "🐛 Debug Admin stack",
+      "preLaunchTask": "db-migrate-local",
+      "configurations": ["Debug admin-ui-api with Nx", "Serve admin-ui"],
+      "presentation": { "group": "focused", "order": 2 }
+    },
+    {
+      "name": "🛠 Launch Sandbox stack",
+      "preLaunchTask": "db-migrate-local",
+      "configurations": ["Backend (Launch)", "Serve sandbox-ui"],
+      "presentation": { "group": "focused", "order": 3 }
+    },
+    {
+      "name": "🐛 Debug Sandbox stack",
+      "preLaunchTask": "db-migrate-local",
+      "configurations": ["Backend (Debug)", "Serve sandbox-ui"],
+      "presentation": { "group": "focused", "order": 4 }
+    },
+    {
+      "name": "🛠 Launch Platform only",
+      "preLaunchTask": "db-migrate-local",
+      "configurations": ["Backend (Launch)", "Platform (Expo)"],
+      "presentation": { "group": "focused", "order": 5 }
+    },
+    {
+      "name": "🐛 Debug Platform only",
+      "preLaunchTask": "db-migrate-local",
+      "configurations": ["Backend (Debug)", "Platform (Expo)"],
+      "presentation": { "group": "focused", "order": 6 }
+    },
+    {
+      "name": "🟢 Full Stack (Local)",
+      "preLaunchTask": "db-migrate-local",
+      "configurations": [
+        "Debug api-gateway with Nx",
+        "Debug aviate-api with Nx",
+        "Debug admin-ui-api with Nx",
+        "Debug seq-api with Nx",
+        "Debug quantum-api with Nx",
+        "Debug corridor-api with Nx",
+        "Debug ml-camp with Nx",
+        "Serve spectra-ui",
+        "Serve sandbox-ui",
+        "Serve admin-ui",
+        "Platform (Expo Web)"
+      ],
+      "presentation": { "group": "fullstack", "order": 1 }
     }
   ]
 }

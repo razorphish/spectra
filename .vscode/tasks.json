@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "kill-local-dev-ports",
+      "type": "shell",
+      "command": "node \"${workspaceFolder}/scripts/kill-local-dev-ports.cjs\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": false
+      }
+    },
+    {
+      "label": "compose-up-postgres",
+      "type": "shell",
+      "command": "docker compose up -d --wait postgres",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "db-migrate-local",
+      "type": "shell",
+      "command": "DATABASE_URL=postgresql://spectra:spectra@localhost:5432/spectra DATABASE_DIRECT_URL=postgresql://spectra:spectra@localhost:5432/spectra DATABASE_DRIVER=pg npx drizzle-kit migrate",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": ["kill-local-dev-ports", "compose-up-postgres"],
+      "dependsOrder": "sequence",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ]
+}

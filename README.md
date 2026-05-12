@@ -2,7 +2,7 @@
 
 Developer API platform monorepo (Angular UIs, Node/Express APIs, `@spectra/*` packages). Canonical plan: Vital Woman Reset `.cursor/plans/DEVELOPER-API-PLATFORM-PLAN.md` (mirror `SPECTRA-PLATFORM-PLAN.md`).
 
-**Node:** use `.nvmrc` (20.19.x+) — `nvm use` before `npm install` / `nx`.
+**Node:** use `.nvmrc` (20.19.x+) — `nvm use` before `npm install` / `nx`. Angular 21’s toolchain expects Node’s experimental `require(esm)` path for `@angular/compiler-cli`; the repo sets `NODE_OPTIONS=--experimental-require-module` in **committed** `.local.env` (loaded by Nx) and uses [`scripts/run-with-require-esm.cjs`](scripts/run-with-require-esm.cjs) for `npm run build` / `npm run nx` / `dev:*` so CI and local shells behave the same. If you call `nx`/`npx nx` directly without going through those scripts, ensure that flag is present or builds may fail with `ERR_REQUIRE_ESM`.
 
 **Layout:** `apps/spectra-ui`, `apps/sandbox-ui`, `apps/admin-ui`, `apps/api-gateway`, `apps/services/{aviate-api,admin-ui-api,seq-api,quantum-api,corridor-api,ml-camp}`, `packages/{auth,database,logger,openapi,upload,shared-ui}`.
 
@@ -13,6 +13,83 @@ Developer API platform monorepo (Angular UIs, Node/Express APIs, `@spectra/*` pa
 **CI/CD:** see [`docs/cicd/README.md`](docs/cicd/README.md) for required GitHub Vars/Secrets, branch→stage table, and the workflow inventory under [`.github/workflows/`](.github/workflows/). Helper scripts live in [`scripts/ci/`](scripts/ci/). Runbooks: [`rollback.md`](docs/runbooks/rollback.md), [`neon-pre-migration-branch.md`](docs/runbooks/neon-pre-migration-branch.md), [`new-subenv.md`](docs/runbooks/new-subenv.md).
 
 **Infrastructure:** Terraform lives under [`terraform/environments/{sandbox,production}`](terraform/) with reusable modules in [`terraform/modules/`](terraform/modules/). State key per stage: `spectra/${main_env}/${environment}/terraform.tfstate`.
+
+## Local development
+
+Bring up the entire stack — three Angular UIs, the Expo platform UI, every Node API, and a local Postgres — on one machine.
+
+**Prereqs:** Docker (Compose v2), Node 20.19+ (`nvm use`).
+
+**One-time setup:**
+
+```sh
+cp .env.local.example .env.local       # local Postgres URL + DATABASE_DRIVER=pg
+npm install
+npm run dev:db                          # starts postgres container + applies drizzle migrations
+```
+
+**Run everything (two equivalent paths):**
+
+- **CLI:** `npm run dev:all` — boots Postgres, runs migrations, then `dev:apis` and `dev:uis` in parallel via `concurrently`.
+- **VS Code (with breakpoints):** Run & Debug — pick **`🟢 Full Stack (Local)`** for every API and UI (including Expo Web), or use the smaller compounds below. Each launch clears typical dev ports first (`kill-local-dev-ports`) so leftover `nx serve` processes do not hit `EADDRINUSE`.
+
+### VS Code: Run & Debug compounds
+
+**Hybrid local model:** Postgres runs in **Docker** ([`docker-compose.yml`](docker-compose.yml)); Node APIs, Angular apps, and Expo run **on the host** via Nx (same idea as `npm run dev:all`).
+
+**Database bootstrap:** Compounds that start **`aviate-api`** and/or **`admin-ui-api`** (Expo compounds, focused Admin/Sandbox/Platform stacks, and **`🟢 Full Stack (Local)`**) set a compound-level **`preLaunchTask`** of **`db-migrate-local`**, which runs `kill-local-dev-ports` → `docker compose up -d --wait postgres` → Drizzle migrate against **localhost:5432** (see [`.vscode/tasks.json`](.vscode/tasks.json)). **Docker must be running** or that task fails before any app starts. Do not repoint that task’s `DATABASE_URL` at Neon or another remote DB; migrations are intended for **local Docker Postgres** only.
+
+**Duplicate work:** Individual launch configs may still run **`kill-local-dev-ports`** (and **`Debug api-gateway with Nx`** still chains **`db-migrate-local`** on its own). Starting a compound can therefore run kill/migrate more than once; that is intentional so solo launches keep working.
+
+**Expo-focused compounds (`expo` group):** **`📱 Launch Expo Platform`** starts **aviate-api**, **admin-ui-api**, **ml-camp**, **admin-ui**, **sandbox-ui**, and **Platform (Expo)** without extra `--inspect` ports on the three APIs (Launch configs only). **`🐛 Debug Expo Platform`** / **`🌐 Debug Expo Web Only`** use the debuggable API entries (inspectors **9230**, **9231**, **9235**). **`ml-camp`** is included for parity with `dev:apis`; the Expo app only calls **aviate-api** (**3001**) today, not **3006**.
+
+**Focused stacks (`focused` group):** **`🛠 Launch Admin stack`** / **`🐛 Debug Admin stack`** (admin API + admin UI), **`🛠 Launch Sandbox stack`** / **`🐛 Debug Sandbox stack`** (aviate + sandbox UI), **`🛠 Launch Platform only`** / **`🐛 Debug Platform only`** (aviate + Expo native). **`🌐 Debug Expo Web Only`** remains the Expo **web** entry. **`api-gateway`**, **`seq-api`**, **`quantum-api`**, and **`corridor-api`** are not part of those slices; use **`🟢 Full Stack (Local)`** or start services individually. **`spectra-ui`** (gateway **:3000**) is a separate workflow from the Expo-focused compounds.
+
+**Parallel startup:** VS Code starts compound members in parallel. If a UI shows an error on first load, wait for APIs to listen and **refresh** once.
+
+**Many debug sessions:** Large compounds open many integrated terminals and multiple **`--inspect`** listeners; pick the correct process in the debugger when setting breakpoints.
+
+**Compound `preLaunchTask`:** Requires a current **VS Code** or **Cursor** build. If the task never runs, run **`npm run dev:db`** manually, then start the compound again.
+
+**Angular breakpoints:** The **`Serve *`** entries run **`nx serve`** only. For component/TypeScript breakpoints in the browser, use the built-in **JavaScript Debugger**: attach to `http://localhost:4200`, `http://localhost:4201`, or `http://localhost:4202`, or use **Launch Chrome** against that URL.
+
+**Expo / Metro:** See [Expo debugging tools](https://docs.expo.dev/debugging/tools/) for dev client and editor workflows. This repo’s **`Platform (Expo)`** config runs **`npm start`** under [`apps/platform`](apps/platform).
+
+**Expo on a device or emulator:** `EXPO_PUBLIC_API_URL=http://localhost:3001` is correct for **Expo Web / same machine**. On a **phone or emulator**, `localhost` refers to the device; use your host machine’s LAN IP or tunneling so the client can reach **aviate-api** on the host.
+
+**Uploads:** APIs can start without **`SPECTRA_UPLOADS_BUCKET`**; upload routes still need the env described in the **Uploads** section at the top of this README.
+
+**Stop:** `Ctrl+C` the dev script, then `npm run dev:down` to stop the Postgres container. To wipe data: `docker volume rm spectra-pgdata`.
+
+**Port map:**
+
+| Layer    | Project          | URL                            | Inspect |
+| -------- | ---------------- | ------------------------------ | ------- |
+| UI       | `spectra-ui`     | <http://localhost:4200>        | —       |
+| UI       | `sandbox-ui`     | <http://localhost:4201>        | —       |
+| UI       | `admin-ui`       | <http://localhost:4202>        | —       |
+| UI       | `platform` (Expo)| <http://localhost:8081>        | —       |
+| Service  | `api-gateway`    | <http://localhost:3000>        | 9229    |
+| Service  | `aviate-api`     | <http://localhost:3001>        | 9230    |
+| Service  | `admin-ui-api`   | <http://localhost:3002>        | 9231    |
+| Service  | `seq-api` (stub) | <http://localhost:3003>        | 9232    |
+| Service  | `quantum-api` (stub) | <http://localhost:3004>    | 9233    |
+| Service  | `corridor-api` (stub)| <http://localhost:3005>    | 9234    |
+| Service  | `ml-camp` (stub) | <http://localhost:3006>        | 9235    |
+| Database | Postgres (Docker)| `postgresql://spectra:spectra@localhost:5432/spectra` | — |
+
+**Angular → API (local dev):** `nx serve` uses `environment.development.ts` for each app — `spectra-ui` calls **api-gateway** at `http://127.0.0.1:3000`, `sandbox-ui` → **aviate-api** at `3001`, `admin-ui` → **admin-ui-api** at `3002`. Those three services enable permissive CORS so browser requests from `:4200`–`:4202` succeed.
+
+**Switching DB targets:** `@spectra/database` selects its driver lazily — `node-postgres` (`pg`) when `DATABASE_DRIVER=pg` or the URL host is loopback, otherwise `@neondatabase/serverless` HTTP. So the same code path works for local Docker Postgres and prod Neon without per-callsite branching. See [`packages/database/src/lib/connection.ts`](packages/database/src/lib/connection.ts).
+
+**Per-service env:** copy each `apps/.../.env.development.example` to `.env.development` (gitignored) if you want to override port/host per service. Nx's executor loads `.env.development` automatically when serving the default `development` configuration.
+
+**Troubleshooting:**
+
+- Port already in use → another `nx serve` is still running; check `ps -ef | grep nx`.
+- `db:migrate` complains about Neon WebSocket → `dev:db` already overrides `DATABASE_URL` to the local Postgres so this should not happen; if it does, ensure your shell is bash/sh.
+- `GET /v1/platform/ready` shows `database: fail` with Docker up → ensure `apps/services/aviate-api/.env.development` exists (copy from `.env.development.example`); the app loads workspace `.env`, then `.env.local`, then that file so local Postgres overrides Neon in a root `.env`.
+- Reset the schema: `docker compose down && docker volume rm spectra-pgdata && npm run dev:db`.
 
 ---
 

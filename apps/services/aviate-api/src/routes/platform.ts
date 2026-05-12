@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import type { RequestHandler } from 'express';
 
+import {
+  getControlPlaneRowCounts,
+  getDb,
+  pingDatabase,
+} from '@spectra/database';
+
 const SEGMENT = 'platform';
 
 const health: RequestHandler = (_req, res) => {
@@ -17,7 +23,6 @@ const ready: RequestHandler = async (_req, res) => {
     return;
   }
   try {
-    const { getDb, pingDatabase } = await import('@spectra/database');
     await pingDatabase(getDb());
     checks.database = 'ok';
     res.status(200).json({ status: 'ok', checks });
@@ -46,9 +51,6 @@ const stats: RequestHandler = async (_req, res) => {
     return;
   }
   try {
-    const { getDb, getControlPlaneRowCounts } = await import(
-      '@spectra/database'
-    );
     const counts = await getControlPlaneRowCounts(getDb());
     res.status(200).json({ database: 'ok', counts });
   } catch {

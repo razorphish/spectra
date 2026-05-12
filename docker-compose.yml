@@ -1,0 +1,28 @@
+# Local development stack — only Postgres for now.
+# Brought up by `npm run dev:db` (and as a preLaunchTask from VS Code).
+#
+# Connection string for app code (note: drivers/connection.ts will pick the
+# `pg` driver instead of Neon HTTP when DATABASE_DRIVER=pg or the host is local):
+#   DATABASE_URL=postgresql://spectra:spectra@localhost:5432/spectra
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spectra-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: spectra
+      POSTGRES_PASSWORD: spectra
+      POSTGRES_DB: spectra
+    ports:
+      - '5432:5432'
+    volumes:
+      - spectra-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U spectra -d spectra']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  spectra-pgdata:
+    name: spectra-pgdata

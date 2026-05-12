@@ -2,6 +2,10 @@ import { Router } from 'express';
 import type { RequestHandler } from 'express';
 
 import {
+  createUploadRow,
+  getDb,
+} from '@spectra/database';
+import {
   DEFAULT_MAX_BYTES,
   prepareInitUpload,
 } from '@spectra/upload';
@@ -80,7 +84,6 @@ const initUpload: RequestHandler = async (req, res) => {
     const dbUrl = process.env['DATABASE_URL'] ?? process.env['NEON_DATABASE_URL'];
     if (dbUrl) {
       try {
-        const { getDb, createUploadRow } = await import('@spectra/database');
         await createUploadRow(getDb(), {
           uploadId: init.uploadId,
           orgId,
