@@ -1,0 +1,61 @@
+<div class="main-content layout-trimmed profile-page position-relative">
+  <div class="profile-page-header-underlay bg-info-gradient bg-info-500"></div>
+
+  <div class="container-xl position-relative">
+    <div class="profile-page-header rounded-3 body-bg shadow-3 mb-4">
+      <app-profile-info/>
+
+      <div class="profile-page-nav border-top">
+        <ul [(activeId)]="activeId" ngbNav #nav="ngbNav" class="nav nav-tabs-clean">
+          <li ngbNavItem="about">
+            <a ngbNavLink>
+              <svg class="sa-icon me-2">
+                <use href="/assets/icons/sprite.svg#user"></use>
+              </svg>
+              About
+            </a>
+            <ng-template ngbNavContent>
+              <app-about/>
+            </ng-template>
+          </li>
+          <li ngbNavItem="news">
+            <a ngbNavLink>
+              <svg class="sa-icon me-2">
+                <use href="/assets/icons/sprite.svg#rss"></use>
+              </svg>
+              News
+            </a>
+            <ng-template ngbNavContent>
+              <app-news/>
+            </ng-template>
+          </li>
+          <li ngbNavItem="projects">
+            <a ngbNavLink>
+              <svg class="sa-icon me-2">
+                <use href="/assets/icons/sprite.svg#folder"></use>
+              </svg>
+              Projects
+            </a>
+            <ng-template ngbNavContent>
+              <app-projects/>
+            </ng-template>
+          </li>
+          <li ngbNavItem="contact">
+            <a ngbNavLink>
+              <svg class="sa-icon me-2">
+                <use href="/assets/icons/sprite.svg#mail"></use>
+              </svg>
+              Contact
+            </a>
+            <ng-template ngbNavContent>
+              <app-contact/>
+            </ng-template>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="tab-content" [ngbNavOutlet]="nav">
+    </div>
+  </div>
+</div>

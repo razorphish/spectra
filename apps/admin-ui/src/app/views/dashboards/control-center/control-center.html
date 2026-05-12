@@ -1,0 +1,47 @@
+
+  <div class="d-flex align-items-end mb-4">
+    <app-page-breadcrumb title="Control Center" subTitle1="Insights" subTitle2="Dashboards"/>
+
+    <div class="ms-auto d-none d-sm-flex align-items-center ">
+      <div class="d-flex align-items-center">
+        <div class="d-inline-flex flex-column justify-content-center me-2">
+                                    <span class="fw-500 fs-xs d-block">
+                                        <small>EXPENSES</small>
+                                    </span>
+          <span class="fw-500 fs-xl d-block text-primary"> $47,000 </span>
+        </div>
+        <div class="d-none d-md-inline-flex">
+          <app-apexchart [getOptions]="expenseChartOptions"/>
+        </div>
+      </div>
+      <div class="d-flex align-items-center border border-top-0 border-bottom-0 border-end-0 ms-3 ps-3">
+        <div class="d-inline-flex flex-column justify-content-center me-2">
+                                    <span class="fw-500 fs-xs d-block">
+                                        <small>PROFIT</small>
+                                    </span>
+          <span class="fw-500 fs-xl d-block text-danger"> $38,500 </span>
+        </div>
+        <div class="d-none d-md-inline-flex">
+          <app-apexchart [getOptions]="profitChartOptions"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="row">
+      <div class="col-xl-12">
+        <app-live-feeds/>
+      </div>
+      <div class="col-xl-6">
+        <app-group-chat/>
+        <app-calendar/>
+      </div>
+      <div class="col-xl-6">
+        <app-global-view/>
+        <app-subscriptions-hourly/>
+        <app-session-scale/>
+      </div>
+    </div>
+  </div>
+

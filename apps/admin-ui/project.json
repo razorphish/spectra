@@ -2,7 +2,7 @@
   "name": "admin-ui",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "prefix": "admin",
+  "prefix": "app",
   "sourceRoot": "apps/admin-ui/src",
   "tags": [],
   "targets": {
@@ -12,27 +12,53 @@
       "options": {
         "outputPath": "dist/apps/admin-ui",
         "browser": "apps/admin-ui/src/main.ts",
+        "polyfills": ["@angular/localize/init"],
         "tsConfig": "apps/admin-ui/tsconfig.app.json",
         "assets": [
           {
             "glob": "**/*",
             "input": "apps/admin-ui/public"
+          },
+          {
+            "glob": "**/*",
+            "input": "apps/admin-ui/src/assets",
+            "output": "/assets"
           }
         ],
-        "styles": ["apps/admin-ui/src/styles.css"]
+        "styles": ["apps/admin-ui/src/styles.scss"],
+        "inlineStyleLanguage": "scss",
+        "stylePreprocessorOptions": {
+          "sass": {
+            "silenceDeprecations": [
+              "color-functions",
+              "global-builtin",
+              "import",
+              "mixed-decls"
+            ]
+          }
+        },
+        "allowedCommonJsDependencies": [
+          "node-waves",
+          "jsvectormap/dist/maps/world.js",
+          "jsvectormap/dist/maps/world-merc",
+          "lodash.merge",
+          "jsvectormap",
+          "vanta/dist/vanta.halo.min",
+          "apexcharts"
+        ]
       },
       "configurations": {
         "production": {
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "500kb",
-              "maximumError": "1mb"
+              "maximumWarning": "3mb",
+              "maximumError": "5mb"
             },
             {
               "type": "anyComponentStyle",
-              "maximumWarning": "4kb",
-              "maximumError": "8kb"
+              "maximumWarning": "6kb",
+              "maximumError": "12kb"
             }
           ],
           "outputHashing": "all"

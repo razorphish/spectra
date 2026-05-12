@@ -1,0 +1,31 @@
+<nav
+  class="navbar navbar-expand-lg navbar-dark position-fixed w-100 py-3"
+  style="z-index: 1000"
+>
+  <div class="container">
+    <a class="navbar-brand" [routerLink]="'/'">
+      <img src="/assets/img/logo-light.svg" alt="logo" />
+    </a>
+    <div class="ms-auto d-flex gap-2">
+      <a
+        [routerLink]="'/auth/login'"
+        class="btn btn-link text-white border-0 text-decoration-none"
+      >
+        Login
+      </a>
+      <a
+        [routerLink]="'/auth/register'"
+        class="btn btn-link text-white border-0 text-decoration-none"
+      >
+        Register
+      </a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero-section position-relative overflow-hidden">
+  <div class="container" style="position: relative; z-index: 1">
+    <router-outlet></router-outlet>
+  </div>
+  <app-background-animation/>
+</section>

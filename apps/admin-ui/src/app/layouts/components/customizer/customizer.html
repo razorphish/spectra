@@ -1,0 +1,136 @@
+<aside class="js-drawer-settings p-0">
+  <div class="offcanvas-header app-drawer-header">
+    <div class="h4 mb-0">
+      App Builder
+    </div>
+    <button type="button" class="btn btn-system ms-auto" (click)="close()">
+      <svg class="sa-icon sa-icon-2x">
+        <use href="/assets/icons/sprite.svg#x"></use>
+      </svg>
+    </button>
+  </div>
+
+  <ngx-simplebar class="offcanvas-body h-100" style="max-height: 100%">
+
+    <div class="info-container">
+      Unlock limitless design potential with 16+ layout combinations and extensive customization options—tailor your
+      dashboard to fit your exact needs.
+      <button type="button" class="btn btn-sm btn-outline-secondary ms-1" data-action="playsound"
+              data-soundpath="media/sound/" data-soundfile="settings-voice.mp3" aria-label="Play Settings Voice">
+        <svg class="sa-icon">
+          <use href="/assets/icons/sprite.svg#volume-2"></use>
+        </svg>
+      </button>
+    </div>
+
+    <div class="d-flex justify-content-spaced w-100 app-fob-showcase-text" data-prefix="Preview">
+      <div class="app-fob app-fob-lg app-fob-showcase">
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+    </div>
+
+    <div class="mod-status primary-mod" data-prefix="Primary Settings">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="actionHeaderFixed"
+               [checked]="layout.state().headerFixed"
+               (change)="toggle('headerFixed', $event)"
+        >
+        <label class="form-check-label" for="actionHeaderFixed">
+          Header position fixed
+        </label>
+      </div>
+      <div class="form-check d-none d-lg-block d-xl-block d-xxl-block">
+        <input class="form-check-input" type="checkbox" id="actionNavFull"
+               [checked]="layout.state().navFull"
+               (change)="toggle('navFull', $event)"
+        >
+        <label class="form-check-label" for="actionNavFull">
+          Navigation full height
+        </label>
+      </div>
+    </div>
+
+    <div class="mod-status d-none d-lg-block d-xl-block d-xxl-block" data-prefix="Addon Settings">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="actionNavFixed" [checked]="layout.state().navFixed"
+               (change)="toggle('navFixed', $event)">
+        <label class="form-check-label" for="actionNavFixed">
+          Navigation position fixed
+        </label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="actionNavCollapsed"
+               [checked]="layout.state().navCollapsed"
+               (change)="toggle('navCollapsed', $event)">
+        <label class="form-check-label" for="actionNavCollapsed">
+          Navigation collapsed
+        </label>
+      </div>
+    </div>
+
+    <div class="mod-status" data-prefix="Misc Settings">
+      <div class="form-check d-none d-lg-block d-xl-block d-xxl-block">
+        <input class="form-check-input" type="checkbox" id="actionNavMinified" [checked]="layout.state().navMinified"
+               (change)="toggle('navMinified', $event)" [disabled]="layout.state().navCollapsed">
+        <label class="form-check-label" for="actionNavMinified">
+          Navigation Minified
+        </label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="darkNavigation" [checked]="layout.state().darkNavigation"
+               (change)="toggle('darkNavigation', $event)">
+        <label class="form-check-label" for="darkNavigation">
+          Dark Navigation
+        </label>
+      </div>
+    </div>
+
+    <div class="mod-status" data-prefix="Aria Settings">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="actionColorblindMode"
+               [checked]="layout.state().colorblindMode"
+               (change)="toggle('colorblindMode', $event)">
+        <label class="form-check-label" for="actionColorblindMode">
+          Colorblind Mode
+        </label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="actionHighContrastMode"
+               [checked]="layout.state().highContrastMode"
+               (change)="toggle('highContrastMode', $event)">
+        <label class="form-check-label" for="actionHighContrastMode">
+          High Contrast Mode
+        </label>
+      </div>
+    </div>
+
+    <div class="mod-status app-themes" data-prefix="Themes">
+      <div class="clickable-boxes">
+        @for (skin of skins; track $index; let i = $index) {
+          <input
+            type="radio"
+            [id]="'skin-' + i"
+            name="skins"
+            [value]="skin"
+            [checked]="layout.skin === skin"
+            (change)="setThemeStyle(skin)"
+          >
+          <label
+            [for]="'skin-' + i"
+            [attr.data-prefix]="skin | titlecase"
+            [style.background]="getSkinGradient(skin)"
+          ></label>
+        }
+      </div>
+    </div>
+
+    <div class="d-flex" style="gap:10px">
+      <button type="button" (click)="resetAll()" class="btn reset-button btn-outline-danger flex-grow-1"><i
+        class="sa sa-reload align-base me-1"></i> Factory Reset
+      </button>
+    </div>
+  </ngx-simplebar>
+</aside>
+

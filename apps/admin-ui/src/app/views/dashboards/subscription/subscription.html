@@ -1,0 +1,37 @@
+<div class="d-flex align-items-end mb-4">
+  <div>
+    <app-page-breadcrumb title="Subscription Dashboard" subTitle1="Insights" subTitle2="Dashboards"/>
+
+  </div>
+  <div class="ms-auto d-none d-sm-flex align-items-center ">
+    <app-build-campaign/>
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="row sortable-off">
+
+    @for (item of statistics; track $index) {
+      <div class="col-xs-12 col-sm-6 col-xl-3 mb-g">
+        <app-statistic-widget [item]="item"/>
+      </div>
+    }
+
+  </div>
+
+
+  <div class="row">
+    <div class="col-lg-12">
+      <app-subscription-feed/>
+    </div>
+    <div class="col-lg-4">
+      <app-user-activity/>
+    </div>
+    <div class="col-lg-4">
+      <app-data-stream/>
+    </div>
+    <div class="col-lg-4">
+      <app-demographic-marketing/>
+    </div>
+  </div>
+</div>

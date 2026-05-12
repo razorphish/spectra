@@ -1,5 +1,8 @@
 # See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
+# Vendored SmartAdmin template (keep locally; do not commit purchased assets)
+apps/admin-ui/.template/
+
 # compiled output
 dist
 tmp
@@ -50,6 +53,8 @@ testem.log
 # System Files
 .DS_Store
 Thumbs.db
+# Windows alternate data stream markers (often created when copying into WSL)
+*:Zone.Identifier
 
 .nx/cache
 .nx/workspace-data

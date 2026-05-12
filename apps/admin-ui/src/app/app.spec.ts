@@ -1,14 +1,14 @@
 import { TestBed } from '@angular/core/testing';
-import { HomeComponent } from './pages/home.component';
+import { provideRouter } from '@angular/router';
+import { App } from './app';
 
-describe('admin-ui shell', () => {
-  it('should render home heading', async () => {
+describe('App', () => {
+  it('should create', async () => {
     await TestBed.configureTestingModule({
-      imports: [HomeComponent],
+      imports: [App],
+      providers: [provideRouter([])],
     }).compileComponents();
-    const fixture = TestBed.createComponent(HomeComponent);
-    await fixture.whenStable();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Admin');
+    const fixture = TestBed.createComponent(App);
+    expect(fixture.componentInstance).toBeTruthy();
   });
 });

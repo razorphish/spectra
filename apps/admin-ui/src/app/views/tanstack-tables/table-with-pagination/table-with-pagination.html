@@ -1,0 +1,51 @@
+<app-page-breadcrumb title="Table with Pagination" subTitle1="Data Visualization" subTitle2="Tanstack Table"
+                     subText="Loading the table with minimal settings & static data."/>
+<div class="main-content">
+  <div class="row">
+    <div class="col-lg-12">
+      <div class="st-wrapper">
+        <div class="st-toolbar row mb-4">
+          <div class="col-12 col-sm-6 col-lg-6 col-xl-5 col-xxl-4 order-1 order-sm-0 mt-4 mt-sm-0">
+            <div class="st-search-wrapper">
+              <div class="input-group flex-nowrap" role="search">
+                  <span class="input-group-text px-2" id="search-icon">
+                  <svg class="sa-icon sa-bold">
+                    <use href="/assets/icons/sprite.svg#search"></use>
+                  </svg>
+                  </span>
+                <input type="text"
+                       (input)="table().setGlobalFilter($any($event.target).value)"
+                       class="form-control"
+                       id="addon-wrapping-left"
+                       placeholder="Search..."
+                       aria-label="Search input"
+                       aria-describedby="search-icon"
+                       autocomplete="off"/>
+              </div>
+            </div>
+          </div>
+          <div class="col d-flex justify-content-end gap-2"></div>
+        </div>
+        <app-tanstack-table [table]="table"/>
+        <app-table-pagination
+          [totalItems]="table.getFilteredRowModel().rows.length"
+          [start]="table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1"
+          [end]="Math.min(((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize > table.getFilteredRowModel().rows.length
+         ? table.getFilteredRowModel().rows.length
+         : (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize))"
+          [itemsName]="'entries'"
+          (previousPage)="this.table.previousPage();"
+          [canPreviousPage]="table.getCanPreviousPage()"
+          [pageCount]="table.getPageCount()"
+          [pageIndex]="table.getState().pagination.pageIndex"
+          (setPageIndex)="table.setPageIndex($event)"
+          (nextPage)="this.table.nextPage()"
+          [showInfo]="true"
+          [pageSize]="table.getState().pagination.pageSize"
+          (onPageSizeChange)="table.setPageSize($event)"
+          [canNextPage]="table.getCanNextPage()"
+        ></app-table-pagination>
+      </div>
+    </div>
+  </div>
+</div>

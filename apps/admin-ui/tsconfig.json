@@ -10,7 +10,14 @@
     "target": "es2022",
     "moduleResolution": "bundler",
     "emitDecoratorMetadata": false,
-    "module": "preserve"
+    "module": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@app/components/*": ["src/app/components/*"],
+      "@core/*": ["src/app/core/*"],
+      "@layouts/*": ["src/app/layouts/*"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

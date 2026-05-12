@@ -1,0 +1,81 @@
+<ul class="nav-menu d-flex">
+
+  @for (item of menuItems; track $index) {
+
+    @if (item.isTitle) {
+      <li class="nav-title"> <span> {{ item.label }}</span></li>
+    }
+    @if (!item.isTitle) {
+      <!-- menu item without any child -->
+      @if (!hasSubMenu(item)) {
+
+        <ng-container *ngTemplateOutlet="MenuItem;context:{item}"/>
+      }
+      <!-- menu item with child -->
+      @if (hasSubMenu(item)) {
+
+        <ng-container *ngTemplateOutlet="MenuItemWithChildren;context: { item: item, siblings: menuItems }"/>
+      }
+
+    }
+
+  }
+
+</ul>
+
+<ng-template #MenuItemWithChildren let-item="item"  let-siblings="siblings">
+  <li class="nav-item has-ul" [ngClass]="{'active': (item.isCollapsed && isChildActive(item))}">
+    <a  (click)="toggleCollaspe(item, siblings)"
+            [attr.aria-expanded]="!item.isCollapsed">
+      @if (item.icon) {
+        <svg class="sa-icon">
+          <use [attr.href]="item.icon"></use>
+        </svg>
+      }
+      <span class="nav-link-text">{{ item.label }}</span>
+      @if (item.badge) {
+        <span [class]="`badge ms-auto me-4 bg-${item.badge.variant}-700`">{{ item.badge.text }}</span>
+      }
+        <span class="collapse-sign">
+            <i class="sa sa-chevron-up"></i>
+          </span>
+    </a>
+    <div   #collapse="ngbCollapse" [(ngbCollapse)]="item.isCollapsed!" class="collapse">
+      <ul class="sub-menu d-flex">
+        @for (child of item.children; track $index) {
+          <!-- menu item without any child -->
+          @if (!hasSubMenu(child)) {
+            <ng-container *ngTemplateOutlet="MenuItem;context:{item:child}"/>
+          }
+          <!-- menu item with child -->
+          @if (hasSubMenu(child)) {
+            <ng-container *ngTemplateOutlet="MenuItemWithChildren;context: { item: child, siblings: item.children }"/>
+          }
+        }
+
+      </ul>
+    </div>
+  </li>
+</ng-template>
+
+<ng-template #MenuItem let-item="item">
+  <li  [ngClass]="{'active': isActive(item)}">
+    @if (item.url) {
+      <a [routerLink]="item.url" [target]="item.target"
+         [ngClass]="{'disabled': item.isDisabled,'special-menu': item.isSpecial, 'active': isActive(item)}"
+         [attr.data-active-link]="isActive(item)"
+      >
+        @if (item.icon) {
+          <svg class="sa-icon">
+            <use [attr.href]="item.icon"></use>
+          </svg>
+        }
+        <span class="nav-link-text">{{ item.label }}</span>
+        @if (item.badge) {
+          <span [ngClass]="`badge text-bg-${item.badge.variant} opacity-50`"
+                [innerHTML]="item.badge.text"></span>
+        }
+      </a>
+    }
+  </li>
+</ng-template>

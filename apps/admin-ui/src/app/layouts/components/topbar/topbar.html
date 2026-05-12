@@ -1,0 +1,37 @@
+<div class="d-flex flex-grow-1 w-100 me-auto align-items-center">
+
+    <app-app-logo/>
+
+
+  <app-toggle-mobile-menu/>
+
+  <app-toggle-sidenav/>
+
+  <form class="app-search" role="search" autocomplete="off">
+    <input type="text" class="form-control" placeholder="Search for anything">
+  </form>
+</div>
+
+<button type="button" class="btn btn-system hidden-mobile"
+        aria-label="Open Settings" (click)="layoutStore.toggleCustomizer()">
+  <svg class="sa-icon sa-icon-2x">
+    <use href="/assets/icons/sprite.svg#settings"></use>
+  </svg>
+</button>
+
+<button type="button" class="btn btn-system" (click)="toggleTheme()">
+  <svg class="sa-icon sa-icon-2x sa-mode-light">
+    <use href="/assets/icons/sprite.svg#sun"></use>
+  </svg>
+  <svg class="sa-icon sa-icon-2x sa-mode-dark">
+    <use href="/assets/icons/sprite.svg#moon"></use>
+  </svg>
+</button>
+
+<app-virtual-assistant class="d-none d-lg-block"/>
+
+<app-toggle-fullscreen class="d-none  d-lg-block"/>
+
+<app-notification-dropdown/>
+
+<app-profile-dropdown/>
