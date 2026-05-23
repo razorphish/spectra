@@ -1,0 +1,68 @@
+<app-content-with-right-penal>
+  <div class="content-wrapper" left>
+    <app-page-breadcrumb title="Table Style Generator" subTitle1="Tables" subTitle2="Table Style Generator" subText="Create custom Bootstrap table styles with live preview."/>
+    <div class="main-content">
+      <div class="info-container mb-4">
+        This tool helps you generate Bootstrap table styles by selecting different styling options. The table updates in real-time as you make selections. Copy the generated classes to use in your project.
+      </div>
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="card-title">Table Preview</div>
+          <div class="btn-group btn-group-sm">
+            @for (opt of COLUMN_LAYOUTS; track $index) {
+              <input type="radio" class="btn-check" name="columnsDisplay"
+                     [(ngModel)]="state.columnsDisplay" [value]="opt.id"
+                     [id]="opt.id"/>
+              <label class="btn btn-outline-secondary" [for]="opt.id">{{ opt.label }}</label>
+            }
+          </div>
+        </div>
+        <div class="card-body">
+          <div [class.table-responsive]="state.tableStyles.includes('table-responsive')">
+            <table [class]="getGeneratedClasses()">
+              <caption [class]="state.captionPosition">List of users and their details</caption>
+              <thead [class]="state.headerAccent">
+              <tr>
+                @for (col of columns; track $index) {
+                  <th scope="col">{{ col.label }}</th>
+                }
+              </tr>
+              </thead>
+              <tbody>
+                @for (user of rows; track $index) {
+                  <tr [class]="user.rowClass">
+                    <th scope="row">{{ user.id }}</th>
+                    <td>{{ user.name }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.phone }}</td>
+                    @if (state.columnsDisplay === 'expandColumnsBtn') {
+                      <td>{{ user.address }}</td>
+                      <td>{{ user.city }}</td>
+                      <td>{{ user.state }}</td>
+                      <td>{{ user.country }}</td>
+                    }
+                    <td><a href="javascript:void(0);">Edit</a></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-3">
+            <h6>Configuration Code</h6>
+            <pre class="body-bg p-3 border rounded">
+             <code>{{ buildCodeSnippet() }}</code>
+          </pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <app-table-setting-panel
+    [state]="state"
+    [codeClasses]="getGeneratedClasses()"
+    (stateChange)="state = $event" right>
+  </app-table-setting-panel>
+</app-content-with-right-penal>
+

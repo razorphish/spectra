@@ -19,7 +19,10 @@
 	@if not $n {
 	  @error "breakpoint `#{$name}` not found in `#{$breakpoints}`";
 	}
-	@return if($n < length($breakpoint-names), nth($breakpoint-names, $n + 1), null);
+	@if $n < length($breakpoint-names) {
+	  @return nth($breakpoint-names, $n + 1);
+	}
+	@return null;
   }
   
   // Minimum breakpoint width. Null for the smallest (first) breakpoint.
@@ -28,7 +31,10 @@
   //    576px
   @function breakpoint-min($name, $breakpoints: $grid-breakpoints) {
 	$min: map-get($breakpoints, $name);
-	@return if($min != 0, $min, null);
+	@if $min != 0 {
+	  @return $min;
+	}
+	@return null;
   }
   
   // Maximum breakpoint width.
@@ -42,7 +48,10 @@
   //    767.98px
   @function breakpoint-max($name, $breakpoints: $grid-breakpoints) {
 	$max: map-get($breakpoints, $name);
-	@return if($max and $max > 0, $max - .02, null);
+	@if $max and $max > 0 {
+	  @return $max - 0.02;
+	}
+	@return null;
   }
   
   // Returns a blank string if smallest breakpoint, otherwise returns the name with a dash in front.
@@ -53,7 +62,10 @@
   //    >> breakpoint-infix(sm, (xs: 0, sm: 576px, md: 768px, lg: 992px, xl: 1200px, xxl: 1400px))
   //    "-sm"
   @function breakpoint-infix($name, $breakpoints: $grid-breakpoints) {
-	@return if(breakpoint-min($name, $breakpoints) == null, "", "-#{$name}");
+	@if breakpoint-min($name, $breakpoints) == null {
+	  @return "";
+	}
+	@return "-#{$name}";
   }
   
   // Media of at least the minimum breakpoint width. No query for the smallest breakpoint.
@@ -540,13 +552,21 @@ Color brightness is determined by the following formula:
 //   https://msdn.microsoft.com/library/dn265027(v=vs.85).aspx
 
 @mixin flexbox ($important: false) {
-  display: unquote("-ms-flexbox #{if($important, '!important', null)}");
-  display: unquote("flex #{if($important, '!important', null)}");
+  $imp: "";
+  @if $important {
+    $imp: " !important";
+  }
+  display: unquote("-ms-flexbox#{$imp}");
+  display: unquote("flex#{$imp}");
 }
 
 @mixin inline-flexbox ($important: false) {
-  display: unquote("-ms-inline-flexbox #{if($important, '!important', null)}");
-  display: unquote("inline-flex #{if($important, '!important', null)}");
+  $imp: "";
+  @if $important {
+    $imp: " !important";
+  }
+  display: unquote("-ms-inline-flexbox#{$imp}");
+  display: unquote("inline-flex#{$imp}");
 }
 
 @mixin align-content ($value) {

@@ -19,17 +19,14 @@ export const menuItems: MenuItemType[] = [
     label: 'Blank Page',
     url: '/blank-page',
   },
-  {
-    label: 'Layouts',
-    isTitle: true,
-  },
+  { label: 'Layouts', isTitle: true },
   {
     icon: '/assets/icons/sprite.svg#slash',
     isCollapsed: true,
     label: 'Authentication Pages',
     children: [
-      { label: 'Login', url: '/auth/login' },
-      { label: 'Register', url: '/auth/register' },
+      { label: 'Login', url: '/auth/login?auth0=1' },
+      { label: 'Register', url: '/auth/register?auth0=signup' },
       { label: 'Forget Password', url: '/auth/forgot-password' },
       { label: '2FA', url: '/auth/two-factor' },
       { label: 'Lock Screen', url: '/auth/lockscreen' },
@@ -39,12 +36,41 @@ export const menuItems: MenuItemType[] = [
     isCollapsed: true,
     icon: '/assets/icons/sprite.svg#alert-triangle',
     label: 'Error Pages',
-    children: [{ label: '404 Not Found', url: '/error/404' }],
+    children: [
+      { label: '404 Not Found', url: '/error/404' },
+      { label: '404 Not Found 2', url: '/error/404-2' },
+      { label: '500 Internal Server', url: '/error/500' },
+    ],
   },
   {
     icon: '/assets/icons/sprite.svg#user',
     label: 'User Profile',
     url: '/user-profile',
+  },
+  {
+    label: 'Landing',
+    icon: '/assets/icons/sprite.svg#zap',
+    url: '/landing',
+    target: '_blank',
+  },
+  {
+    isCollapsed: true,
+    icon: '/assets/icons/sprite.svg#heart',
+    label: 'Iconography',
+    children: [
+      { label: 'System Icons', url: '/icons/system' },
+      { label: 'FontAwesome', url: '/icons/font-awesome' },
+      { label: 'Smart Admin Icons', url: '/icons/smart-admin' },
+    ],
+  },
+  {
+    icon: '/assets/icons/sprite.svg#table',
+    isCollapsed: true,
+    label: 'Tables',
+    children: [
+      { label: 'Basic Tables', url: '/tables/basic' },
+      { label: 'Table Style Generator', url: '/tables/style-generator' },
+    ],
   },
   {
     isCollapsed: true,
@@ -58,6 +84,15 @@ export const menuItems: MenuItemType[] = [
       { label: 'Table With Delete Buttons', url: '/tanstack-tables/delete-buttons' },
       { label: 'Table With Filters', url: '/tanstack-tables/filters' },
       { label: 'Table With Sorting', url: '/tanstack-tables/sorting' },
+    ],
+  },
+  {
+    isCollapsed: true,
+    icon: '/assets/icons/sprite.svg#settings',
+    label: 'Settings',
+    children: [
+      { label: 'Migrations', url: '/settings/migrations' },
+      { label: 'Logging', url: '/settings/logging' },
     ],
   },
 ];

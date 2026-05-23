@@ -1,0 +1,141 @@
+<div class="migrations-panel">
+  @if (state.loadError(); as err) {
+    <div class="alert alert-danger small mb-3" role="alert">
+      {{ err }}
+    </div>
+  }
+  <div class="card shadow-sm border mb-0">
+    <div class="card-body">
+      <h6 class="text-uppercase text-muted small fw-semibold mb-3 letter-spacing-1">
+        Analytics
+      </h6>
+      <div class="row g-3 text-center mb-3">
+        <div class="col-md-4">
+          <div class="text-muted small">Total Applied</div>
+          <div class="fs-3 fw-semibold text-body">{{ state.status().totalApplied }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-muted small">Total Available</div>
+          <div class="fs-3 fw-semibold text-body">{{ state.status().totalAvailable }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-muted small">Pending</div>
+          <div
+            class="fs-3 fw-semibold"
+            [class.text-warning]="state.status().pending > 0"
+            [class.text-body]="state.status().pending === 0"
+          >
+            {{ state.status().pending }}
+          </div>
+        </div>
+      </div>
+
+      @if (state.status().lastMigrationAt) {
+        <p class="text-muted small mb-3 mb-md-4">
+          Last migration:
+          {{ state.status().lastMigrationAt | date: 'medium' }}
+        </p>
+      }
+
+      @if (state.status().paths; as paths) {
+        <div class="border-top pt-3 mb-3">
+          <div class="fw-semibold small text-body mb-2">Folder locations</div>
+          <div class="small text-muted font-monospace">
+            <div><span class="text-secondary">Migrations:</span> {{ paths.migrationsFolder }}</div>
+            <div><span class="text-secondary">Journal:</span> {{ paths.journalPath }}</div>
+            <div><span class="text-secondary">Snapshots:</span> {{ paths.snapshotFolder }}</div>
+          </div>
+        </div>
+      }
+
+      @if (state.checkStatus(); as chk) {
+        <div
+          class="rounded border px-3 py-2 mb-3 d-flex align-items-start gap-2"
+          [class.border-success-subtle]="chk.isValid"
+          [class.bg-success-subtle]="chk.isValid"
+          [class.border-warning-subtle]="!chk.isValid"
+          [class.bg-warning-subtle]="!chk.isValid"
+        >
+          <svg class="sa-icon flex-shrink-0 mt-1" aria-hidden="true">
+            <use
+              [attr.href]="
+                chk.isValid
+                  ? '/assets/icons/sprite.svg#check-circle'
+                  : '/assets/icons/sprite.svg#alert-circle'
+              "
+            ></use>
+          </svg>
+          <div class="small">
+            @if (chk.isValid) {
+              <span class="fw-semibold">Migration status: Valid</span>
+            } @else {
+              <span class="fw-semibold">
+                Migration status: Issues detected ({{ chk.method }})
+              </span>
+            }
+            @if (chk.hasGaps) {
+              <div class="text-warning-emphasis mt-1">Gaps detected in migration sequence</div>
+            }
+            @if (chk.message) {
+              <div class="text-muted mt-2">{{ chk.message }}</div>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="d-flex flex-wrap gap-2 pt-2 border-top">
+        <button
+          type="button"
+          class="btn btn-primary d-inline-flex align-items-center gap-2"
+          (click)="state.runPending()"
+          [disabled]="state.runPendingBusy()"
+        >
+          @if (state.runPendingBusy()) {
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          } @else {
+            <svg class="sa-icon" aria-hidden="true">
+              <use href="/assets/icons/sprite.svg#play"></use>
+            </svg>
+          }
+          Run Pending
+        </button>
+        <button
+          type="button"
+          class="btn btn-warning text-dark d-inline-flex align-items-center gap-2"
+          (click)="state.runAll()"
+          [disabled]="state.runAllBusy()"
+        >
+          @if (state.runAllBusy()) {
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          } @else {
+            <svg class="sa-icon" aria-hidden="true">
+              <use href="/assets/icons/sprite.svg#play-circle"></use>
+            </svg>
+          }
+          Run All
+        </button>
+        <button type="button" class="btn btn-secondary d-inline-flex align-items-center gap-2" (click)="state.check()">
+          <svg class="sa-icon" aria-hidden="true">
+            <use href="/assets/icons/sprite.svg#check-circle"></use>
+          </svg>
+          Check
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
+          (click)="state.refresh()"
+          [disabled]="state.refreshing()"
+          title="Refresh"
+        >
+          @if (state.refreshing()) {
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          } @else {
+            <svg class="sa-icon" aria-hidden="true">
+              <use href="/assets/icons/sprite.svg#refresh-cw"></use>
+            </svg>
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

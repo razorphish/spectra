@@ -1,5 +1,10 @@
-import {Component} from '@angular/core';
-import {NgbDropdownModule} from '@ng-bootstrap/ng-bootstrap';
+import { Component, inject, Injector } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '@auth0/auth0-angular';
+import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
+import { AdminSessionService } from '../../../../core/services/admin-session.service';
+import { isAuth0RuntimeConfigured, auth0LogoutReturnToUrl } from '../../../../core/auth/auth0-env';
+import { STAFF_PROFILE_SYNCED_SESSION_KEY } from '../../../../core/auth/staff-profile-sync';
 
 @Component({
   selector: 'app-profile-dropdown',
@@ -78,7 +83,12 @@ import {NgbDropdownModule} from '@ng-bootstrap/ng-bootstrap';
 
         <div class="dropdown-divider m-0"></div>
 
-        <a class="dropdown-item py-3 fw-500 d-flex justify-content-between" href="/auth/login">
+        <a
+          class="dropdown-item py-3 fw-500 d-flex justify-content-between"
+          href="javascript:void(0)"
+          role="button"
+          (click)="onLogout($event)"
+        >
           <span class="text-danger" data-i18n="drpdwn.page-logout">Logout</span>
           <span class="d-block text-truncate text-truncate-sm">&#64;sunnyahmed</span>
         </a>
@@ -88,8 +98,36 @@ import {NgbDropdownModule} from '@ng-bootstrap/ng-bootstrap';
   styles: ``
 })
 export class ProfileDropdown {
+  private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
+  private readonly adminSession = inject(AdminSessionService);
+
   print() {
     window.print();
+  }
+
+  onLogout(event: Event): void {
+    event.preventDefault();
+    this.adminSession.clear();
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(STAFF_PROFILE_SYNCED_SESSION_KEY);
+    }
+    if (!isAuth0RuntimeConfigured()) {
+      void this.router.navigateByUrl('/auth/login');
+      return;
+    }
+    void Promise.resolve().then(() => {
+      const auth = this.injector.get(AuthService, null, { optional: true });
+      if (!auth) {
+        void this.router.navigateByUrl('/auth/login');
+        return;
+      }
+      void auth.logout({
+        logoutParams: {
+          returnTo: auth0LogoutReturnToUrl(),
+        },
+      });
+    });
   }
 
   toggleFullscreen() {

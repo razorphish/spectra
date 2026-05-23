@@ -1,0 +1,301 @@
+import type { RequestHandler, Router } from 'express';
+
+import {
+  clearAdminMigrationsUseSharedHttpClient,
+  deleteMigrationRecordByHash,
+  getAdminMigrationsRunnerSource,
+  getDb,
+  getFirstPendingTag,
+  getMigrationInventory,
+  getAdminMigrationsUseSharedHttpClient,
+  readMigrationSqlFile,
+  resolveMigrationHashForTag,
+  resolveSpectraDatabaseUrl,
+  runDrizzleMigrationsWithRunnerMode,
+  setAdminMigrationsUseSharedHttpClient,
+} from '@spectra/database';
+
+import { createRequireAuth0AccessToken } from '../middleware/require-auth0-access-token';
+import { workspaceRoot } from '../workspace-root';
+
+const requireAuth0AccessToken = createRequireAuth0AccessToken();
+
+const listMigrations: RequestHandler = async (_req, res) => {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+
+  try {
+    const root = workspaceRoot();
+    const inventory = await getMigrationInventory(getDb(), root);
+    res.status(200).json(inventory);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({
+      error: 'migrations_inventory_failed',
+      message,
+    });
+  }
+};
+
+const getSql: RequestHandler = async (req, res) => {
+  const tag =
+    typeof req.query['tag'] === 'string' && req.query['tag'].length > 0 ?
+      req.query['tag']
+    : '';
+  if (!tag) {
+    res.status(400).json({ error: 'missing_tag', message: 'Query tag is required.' });
+    return;
+  }
+
+  try {
+    const root = workspaceRoot();
+    const { relativePath, sql } = readMigrationSqlFile(root, tag);
+    res.status(200).json({ path: relativePath, sql });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(400).json({ error: 'migration_sql_failed', message });
+  }
+};
+
+const getRollbackGuide: RequestHandler = async (req, res) => {
+  const tag =
+    typeof req.query['tag'] === 'string' && req.query['tag'].length > 0 ?
+      req.query['tag']
+    : '';
+  if (!tag) {
+    res.status(400).json({ error: 'missing_tag', message: 'Query tag is required.' });
+    return;
+  }
+
+  let sqlPreview: string | null = null;
+  try {
+    const root = workspaceRoot();
+    const { sql } = readMigrationSqlFile(root, tag);
+    sqlPreview = sql.slice(0, 1200).trimEnd();
+  } catch {
+    sqlPreview = null;
+  }
+
+  res.status(200).json({
+    tag,
+    bullets: [
+      'Drizzle does not auto-rollback applied migrations.',
+      'Restore from a snapshot taken before this migration, or ship a forward migration that reverses the change.',
+      'Use a database branch or clone for rehearsal before production.',
+    ],
+    sqlPreview,
+  });
+};
+
+const postRun: RequestHandler = async (req, res) => {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+
+  const body = req.body as { scope?: unknown; tag?: unknown };
+  const scope = typeof body.scope === 'string' ? body.scope : '';
+  const tag = typeof body.tag === 'string' && body.tag.length > 0 ? body.tag : undefined;
+
+  if (scope !== 'pending' && scope !== 'all' && scope !== 'single') {
+    res.status(400).json({
+      error: 'invalid_scope',
+      message: 'scope must be pending, all, or single.',
+    });
+    return;
+  }
+
+  const root = workspaceRoot();
+  const db = getDb();
+
+  if (scope === 'single') {
+    if (!tag) {
+      res.status(400).json({
+        error: 'missing_tag',
+        message: 'tag is required when scope is single.',
+      });
+      return;
+    }
+    try {
+      const inventory = await getMigrationInventory(db, root);
+      const first = getFirstPendingTag(inventory.rows);
+      if (!first) {
+        res.status(409).json({
+          error: 'nothing_pending',
+          message: 'No pending migrations to run.',
+        });
+        return;
+      }
+      if (first !== tag) {
+        res.status(409).json({
+          error: 'not_next_pending',
+          message: `Only the next pending migration can be run individually: "${first}". Run Pending applies migrations in journal order.`,
+          nextPendingTag: first,
+        });
+        return;
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      res.status(500).json({ error: 'migrations_precheck_failed', message });
+      return;
+    }
+  }
+
+  try {
+    const useShared = await getAdminMigrationsUseSharedHttpClient(db);
+    await runDrizzleMigrationsWithRunnerMode(db, root, useShared);
+    const inventory = await getMigrationInventory(db, root);
+    res.status(200).json({ ok: true, inventory });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({
+      error: 'migrate_failed',
+      message,
+    });
+  }
+};
+
+const deleteRecord: RequestHandler = async (req, res) => {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+
+  const body = req.body as { tag?: unknown };
+  const tag = typeof body.tag === 'string' && body.tag.length > 0 ? body.tag : '';
+  if (!tag) {
+    res.status(400).json({ error: 'missing_tag', message: 'tag is required.' });
+    return;
+  }
+
+  const root = workspaceRoot();
+  const db = getDb();
+
+  try {
+    const { hash } = resolveMigrationHashForTag(root, tag);
+    const inventory = await getMigrationInventory(db, root);
+    const row = inventory.rows.find((r) => r.tag === tag);
+    if (!row || row.status !== 'applied') {
+      res.status(409).json({
+        error: 'not_applied',
+        message: 'Can only delete a migration record that is currently applied.',
+      });
+      return;
+    }
+    if (row.hash !== hash) {
+      res.status(500).json({
+        error: 'hash_mismatch',
+        message: 'On-disk migration file hash does not match inventory row.',
+      });
+      return;
+    }
+
+    await deleteMigrationRecordByHash(db, hash);
+    const next = await getMigrationInventory(db, root);
+    res.status(200).json({ ok: true, inventory: next });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({
+      error: 'delete_migration_record_failed',
+      message,
+    });
+  }
+};
+
+const getRunnerConfig: RequestHandler = async (_req, res) => {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+  try {
+    const cfg = await getAdminMigrationsRunnerSource(getDb());
+    res.status(200).json(cfg);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({
+      error: 'migrations_runner_config_failed',
+      message,
+    });
+  }
+};
+
+const putRunnerConfig: RequestHandler = async (req, res) => {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+  const body = req.body as { useSharedHttpClient?: unknown };
+  if (typeof body.useSharedHttpClient !== 'boolean') {
+    res.status(400).json({
+      error: 'invalid_body',
+      message: 'JSON body must include useSharedHttpClient (boolean).',
+    });
+    return;
+  }
+  try {
+    await setAdminMigrationsUseSharedHttpClient(getDb(), body.useSharedHttpClient);
+    const cfg = await getAdminMigrationsRunnerSource(getDb());
+    res.status(200).json(cfg);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({
+      error: 'migrations_runner_config_update_failed',
+      message,
+    });
+  }
+};
+
+const deleteRunnerConfig: RequestHandler = async (_req, res) => {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+  try {
+    await clearAdminMigrationsUseSharedHttpClient(getDb());
+    const cfg = await getAdminMigrationsRunnerSource(getDb());
+    res.status(200).json(cfg);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({
+      error: 'migrations_runner_config_delete_failed',
+      message,
+    });
+  }
+};
+
+export function registerAdminMigrationsRoutes(r: Router): void {
+  r.get('/migrations', requireAuth0AccessToken, listMigrations);
+  r.get('/migrations/sql', requireAuth0AccessToken, getSql);
+  r.get('/migrations/rollback-guide', requireAuth0AccessToken, getRollbackGuide);
+  r.get('/migrations/runner-config', requireAuth0AccessToken, getRunnerConfig);
+  r.put('/migrations/runner-config', requireAuth0AccessToken, putRunnerConfig);
+  r.delete('/migrations/runner-config', requireAuth0AccessToken, deleteRunnerConfig);
+  r.post('/migrations/run', requireAuth0AccessToken, postRun);
+  r.delete('/migrations/record', requireAuth0AccessToken, deleteRecord);
+}

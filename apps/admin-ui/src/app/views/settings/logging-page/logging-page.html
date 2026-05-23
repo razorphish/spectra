@@ -1,0 +1,263 @@
+<div class="main-content">
+  <div class="container-xl py-4">
+    <app-page-breadcrumb
+      title="Logging"
+      subTitle1="System"
+      subText="Application audit trail and logging configuration (Spectra admin-ui-api; Vital Woman Reset–style admin logs / logging settings)."
+    />
+
+    <ul
+      [(activeId)]="activeId"
+      ngbNav
+      #nav="ngbNav"
+      class="nav nav-tabs-clean logging-page-nav mt-4"
+      (navChange)="onNavChange($event)"
+    >
+      <li ngbNavItem="logs">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#file-text"></use>
+          </svg>
+          Logs
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            <div class="card shadow-sm border mb-3">
+              <div class="card-body">
+                <h6 class="fw-semibold mb-3">Filters</h6>
+                <div class="row g-3">
+                  <div class="col-md-6 col-lg-4">
+                    <label class="form-label small text-muted" for="logSearch">Search</label>
+                    <input
+                      id="logSearch"
+                      type="search"
+                      class="form-control"
+                      [(ngModel)]="searchInput"
+                      name="logSearch"
+                      placeholder="Message, action, resource…"
+                    />
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <label class="form-label small text-muted" for="logModule">Module</label>
+                    <input
+                      id="logModule"
+                      type="text"
+                      class="form-control"
+                      [(ngModel)]="moduleInput"
+                      name="logModule"
+                      placeholder="control-plane…"
+                    />
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <label class="form-label small text-muted" for="logUserId">User ID</label>
+                    <input
+                      id="logUserId"
+                      type="text"
+                      class="form-control font-monospace"
+                      [(ngModel)]="userIdInput"
+                      name="logUserId"
+                      placeholder="UUID"
+                    />
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <label class="form-label small text-muted" for="logStart">Start (ISO)</label>
+                    <input
+                      id="logStart"
+                      type="text"
+                      class="form-control font-monospace"
+                      [(ngModel)]="startDateInput"
+                      name="logStart"
+                      placeholder="2026-01-01T00:00:00.000Z"
+                    />
+                  </div>
+                  <div class="col-md-6 col-lg-4">
+                    <label class="form-label small text-muted" for="logEnd">End (ISO)</label>
+                    <input
+                      id="logEnd"
+                      type="text"
+                      class="form-control font-monospace"
+                      [(ngModel)]="endDateInput"
+                      name="logEnd"
+                      placeholder="2026-12-31T23:59:59.999Z"
+                    />
+                  </div>
+                  <div class="col-12 d-flex flex-wrap gap-2 align-items-end">
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      (click)="applyFilters()"
+                      [disabled]="logsLoading()"
+                    >
+                      Apply filters
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      (click)="loadLogs()"
+                      [disabled]="logsLoading()"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            @if (logsError(); as err) {
+              <div class="alert alert-danger" role="alert">{{ err }}</div>
+            }
+
+            @if (logsLoading()) {
+              <div class="text-center text-muted py-5">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Loading logs…
+              </div>
+            }
+
+            @if (!logsLoading()) {
+              <div class="card border shadow-sm">
+                <div class="table-responsive">
+                  <table class="table table-hover table-striped mb-0 align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th scope="col" class="text-nowrap">Time</th>
+                        <th scope="col" class="text-nowrap">Level</th>
+                        <th scope="col" class="text-nowrap">Module</th>
+                        <th scope="col">Message</th>
+                        <th scope="col" class="text-nowrap">User</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of logs(); track row.id) {
+                        <tr>
+                          <td class="text-muted small text-nowrap">
+                            {{ row.createdAt | date: 'medium' }}
+                          </td>
+                          <td>
+                            <span class="badge text-bg-secondary">{{ row.level }}</span>
+                          </td>
+                          <td class="small">{{ row.module }}</td>
+                          <td class="small">{{ row.message }}</td>
+                          <td class="small font-monospace">
+                            @if (row.user) {
+                              {{ row.user.email }}
+                            } @else {
+                              —
+                            }
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td colspan="5" class="text-center text-muted py-4">
+                            No audit log rows returned.
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              @if (pagination(); as pg) {
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+                  <div class="text-muted small">
+                    Page {{ pg.page }} of {{ pg.totalPages }} · {{ pg.total }} total
+                  </div>
+                  <div class="btn-group">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-sm"
+                      (click)="prevPage()"
+                      [disabled]="pg.page <= 1 || logsLoading()"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-sm"
+                      (click)="nextPage()"
+                      [disabled]="pg.page >= pg.totalPages || logsLoading()"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </ng-template>
+      </li>
+      <li ngbNavItem="settings">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#settings"></use>
+          </svg>
+          Settings
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            @if (settingsError(); as sErr) {
+              <div class="alert alert-danger" role="alert">{{ sErr }}</div>
+            }
+            @if (settingsLoading()) {
+              <div class="text-muted py-4">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Loading…
+              </div>
+            } @else {
+              <div class="card shadow-sm border">
+                <div class="card-body">
+                  <h6 class="fw-semibold mb-3">Logging settings</h6>
+                  <p class="text-muted small mb-4">
+                    Keys <code>logging_level</code> and <code>log_to_console</code> in
+                    <code>spectra.platform_settings</code> (same intent as Vital Woman Reset
+                    <code>LoggingSettingsTab</code>).
+                  </p>
+                  <div class="row g-4">
+                    <div class="col-md-6">
+                      <label class="form-label" for="loggingLevel">Default log level</label>
+                      <select
+                        id="loggingLevel"
+                        class="form-select"
+                        name="loggingLevel"
+                        [(ngModel)]="loggingLevel"
+                      >
+                        @for (lvl of logLevels; track lvl) {
+                          <option [value]="lvl">{{ lvl }}</option>
+                        }
+                      </select>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-center">
+                      <div class="form-check form-switch mt-md-4">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          id="logToConsole"
+                          name="logToConsole"
+                          [(ngModel)]="logToConsole"
+                        />
+                        <label class="form-check-label" for="logToConsole">Log to console</label>
+                      </div>
+                    </div>
+                    <div class="col-12">
+                      <button
+                        type="button"
+                        class="btn btn-primary"
+                        (click)="saveSettings()"
+                        [disabled]="settingsLoading()"
+                      >
+                        Save settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </li>
+    </ul>
+
+    <div class="tab-content pt-4" [ngbNavOutlet]="nav"></div>
+  </div>
+</div>

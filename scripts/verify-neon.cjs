@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Quick check that DATABASE_URL (or NEON_DATABASE_URL) reaches Neon.
+ * Quick check that a Neon URL (e.g. NEON_DATABASE_URL or legacy DATABASE_URL) works.
+ * For remote testing set `SPECTRA_DB_TARGET=neon` and put the pooled string in NEON_DATABASE_URL.
  * Usage: from repo root, `node scripts/verify-neon.cjs` (loads `.env` via dotenv if present)
  */
 require('dotenv').config();

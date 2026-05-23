@@ -1,0 +1,93 @@
+<app-page-breadcrumb
+  title="System Icons"
+  subTitle1="Icons"
+  subTitle2="Design"
+  subText="Fully customizable system icons with a variety of weights, colors, and styles.">
+</app-page-breadcrumb>
+
+<div class="main-content">
+  <div class="card">
+    <div class="card-body" style="min-height: calc(100vh - 340px);">
+
+      <div class="input-group mb-3">
+        <input
+          type="text"
+          id="searchIcons"
+          class="form-control form-control-lg"
+          placeholder="Search icons..."
+          autocomplete="off"
+          [(ngModel)]="search"
+          (ngModelChange)="filterIcons()"
+        />
+
+        <select
+          id="iconSetSelect"
+          class="form-select pe-2 ps-3"
+          style="max-width: 110px;"
+          [(ngModel)]="weight"
+        >
+          <option value="sa-thin">Thin</option>
+          <option value="sa-regular">Normal</option>
+          <option value="sa-medium">Medium</option>
+          <option value="sa-bold">Bold</option>
+        </select>
+
+        <div class="input-group-text px-3">
+          <input
+            type="checkbox"
+            id="fillIcons"
+            class="form-check-input mt-0"
+            [(ngModel)]="noFill"
+          />
+          <label for="fillIcons" class="form-check-label ps-2">
+            No Fill
+          </label>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-sm-6 d-flex flex-wrap gap-2"></div>
+        <p class="results-count text-muted mb-0 col-sm-6 text-sm-end">
+          Showing {{ filteredIcons.length }} of {{ systemIcons.length }} icons
+        </p>
+      </div>
+
+      <ul class="list-unstyled row g-4">
+        @for (icon of filteredIcons; track $index) {
+          <li
+
+            class="col-4 col-sm-3 col-md-3 col-lg-2 col-xl-2 col-xxl-1 d-flex justify-content-center align-items-center mb-g"
+            [attr.data-icon-name]="icon"
+          >
+            <a
+              (click)="handleCopy(icon); $event.preventDefault()"
+              class="js-showcase-icon rounded color-fusion-300 p-0 m-0 d-flex flex-column w-100 shadow-hover-2 has-svg cursor-pointer"
+            >
+              <div class="icon-preview rounded-top w-100 position-relative">
+                <div
+                  class="icon-container rounded-top d-flex align-items-center justify-content-center w-100 pt-3 pb-3 pe-2 ps-2 position-absolute">
+                  <svg
+                    [ngClass]="['sa-icon', weight, noFill ? 'sa-nofill' : '']"
+                    style="height: 40px; width: 40px;"
+                  >
+                    <use [attr.href]="'/assets/icons/sprite.svg#' + icon"></use>
+                  </svg>
+                </div>
+              </div>
+              <div
+                class="rounded-bottom p-1 w-100 d-flex justify-content-center align-items-center text-center mt-auto">
+                <span class="nav-link-text small text-muted text-truncate">{{ icon }}</span>
+              </div>
+            </a>
+          </li>
+        }
+        @if (filteredIcons.length === 0) {
+          <div class="no-results-msg pt-3">
+            <h5 class="mb-4">No icons found. Try searching with different keywords</h5>
+          </div>
+        }
+      </ul>
+
+    </div>
+  </div>
+</div>

@@ -13,8 +13,53 @@ type Schema = typeof schema;
  * - `node-postgres` (`pg`) for local dev when `DATABASE_DRIVER=pg` or the URL
  *   host is loopback.
  * - `@neondatabase/serverless` HTTP for everything else (default).
+ *
+ * Active URL: {@link resolveSpectraDatabaseUrl} (`SPECTRA_DB_TARGET`, `DATABASE_URL`, etc.).
  */
 export type SpectraDb = NeonHttpDatabase<Schema> | NodePgDatabase<Schema>;
+
+/** Default Docker Compose Postgres (see repo `docker-compose.yml` / `npm run dev:db`). */
+export const DEFAULT_LOCAL_DATABASE_URL =
+  'postgresql://spectra:spectra@localhost:5432/spectra';
+
+/**
+ * Picks the active Postgres URL from env. Used by `getDb()`, HTTP readiness
+ * checks, and drizzle config.
+ *
+ * - `SPECTRA_DB_TARGET=local` → `LOCAL_DATABASE_URL` ?? {@link DEFAULT_LOCAL_DATABASE_URL}
+ * - `SPECTRA_DB_TARGET=neon` → `NEON_DATABASE_URL` ?? `DATABASE_URL`
+ * - unset / unknown → `DATABASE_URL` ?? `NEON_DATABASE_URL` (legacy)
+ */
+export function resolveSpectraDatabaseUrl(): string | undefined {
+  const raw = process.env['SPECTRA_DB_TARGET']?.trim().toLowerCase();
+  if (raw === 'local') {
+    return (
+      process.env['LOCAL_DATABASE_URL']?.trim() || DEFAULT_LOCAL_DATABASE_URL
+    );
+  }
+  if (raw === 'neon') {
+    return (
+      process.env['NEON_DATABASE_URL']?.trim() ||
+      process.env['DATABASE_URL']?.trim() ||
+      undefined
+    );
+  }
+  if (
+    raw &&
+    raw !== '' &&
+    process.env['NODE_ENV'] !== 'production' &&
+    !process.env['CI']
+  ) {
+    console.warn(
+      `[spectra/database] Ignoring invalid SPECTRA_DB_TARGET="${process.env['SPECTRA_DB_TARGET']}" — use local, neon, or omit.`
+    );
+  }
+  return (
+    process.env['DATABASE_URL']?.trim() ||
+    process.env['NEON_DATABASE_URL']?.trim() ||
+    undefined
+  );
+}
 
 function shouldUsePg(connectionString: string): boolean {
   const explicit = process.env['DATABASE_DRIVER'];
@@ -55,11 +100,10 @@ export function createDb(connectionString: string): SpectraDb {
 }
 
 function resolveConnectionString(): string {
-  const url =
-    process.env['DATABASE_URL'] ?? process.env['NEON_DATABASE_URL'];
+  const url = resolveSpectraDatabaseUrl();
   if (!url) {
     throw new Error(
-      'Missing DATABASE_URL or NEON_DATABASE_URL — set one for Postgres.'
+      'Missing Postgres URL — set DATABASE_URL or NEON_DATABASE_URL, or SPECTRA_DB_TARGET=local|neon with the matching vars (see .env.example).'
     );
   }
   return url;

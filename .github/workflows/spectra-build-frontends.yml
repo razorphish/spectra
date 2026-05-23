@@ -64,6 +64,10 @@ jobs:
           else
             CONFIG="production"
           fi
+          if [ "${{ matrix.app }}" = "admin-ui" ] && [ "$CONFIG" = "production" ]; then
+            node scripts/write-admin-ui-build-environment.mjs
+            CONFIG="ci-staff"
+          fi
           npx nx build ${{ matrix.app }} --configuration="$CONFIG"
 
       - name: Locate build output

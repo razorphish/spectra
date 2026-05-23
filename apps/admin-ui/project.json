@@ -6,7 +6,23 @@
   "sourceRoot": "apps/admin-ui/src",
   "tags": [],
   "targets": {
+    "env-sync": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/.env",
+        "{projectRoot}/.env.local",
+        "{workspaceRoot}/.env",
+        "{workspaceRoot}/scripts/sync-admin-ui-env.mjs"
+      ],
+      "outputs": ["{projectRoot}/src/environments/environment.auth0.local.ts"],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "node ../../scripts/sync-admin-ui-env.mjs"
+      }
+    },
     "build": {
+      "dependsOn": ["env-sync"],
       "executor": "@angular/build:application",
       "outputs": ["{options.outputPath}"],
       "options": {
@@ -32,8 +48,7 @@
             "silenceDeprecations": [
               "color-functions",
               "global-builtin",
-              "import",
-              "mixed-decls"
+              "import"
             ]
           }
         },
@@ -63,6 +78,27 @@
           ],
           "outputHashing": "all"
         },
+        "ci-staff": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "3mb",
+              "maximumError": "5mb"
+            },
+            {
+              "type": "anyComponentStyle",
+              "maximumWarning": "6kb",
+              "maximumError": "12kb"
+            }
+          ],
+          "outputHashing": "all",
+          "fileReplacements": [
+            {
+              "replace": "apps/admin-ui/src/environments/environment.ts",
+              "with": "apps/admin-ui/src/environments/environment.generated.ts"
+            }
+          ]
+        },
         "development": {
           "optimization": false,
           "extractLicenses": false,
@@ -79,6 +115,7 @@
     },
     "serve": {
       "continuous": true,
+      "dependsOn": ["env-sync"],
       "executor": "@angular/build:dev-server",
       "options": {
         "port": 4202
@@ -97,6 +134,7 @@
       "executor": "@nx/eslint:lint"
     },
     "test": {
+      "dependsOn": ["env-sync"],
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {

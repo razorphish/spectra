@@ -4,17 +4,19 @@
 >
   <div class="container">
     <a class="navbar-brand" [routerLink]="'/'">
-      <img src="/assets/img/logo-light.svg" alt="logo" />
+      <img src="/assets/img/logo-light.svg" alt="Spectra Admin" />
     </a>
     <div class="ms-auto d-flex gap-2">
       <a
         [routerLink]="'/auth/login'"
+        [queryParams]="{ auth0: '1' }"
         class="btn btn-link text-white border-0 text-decoration-none"
       >
         Login
       </a>
       <a
         [routerLink]="'/auth/register'"
+        [queryParams]="{ auth0: 'signup' }"
         class="btn btn-link text-white border-0 text-decoration-none"
       >
         Register

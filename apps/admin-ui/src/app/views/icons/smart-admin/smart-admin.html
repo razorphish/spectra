@@ -1,0 +1,78 @@
+<app-page-breadcrumb
+  title="SmartAdmin Icons"
+  subTitle1="Design"
+  subTitle2="Iconography"
+  subText="An extremely lightweight icon set, to meet your basic needs.">
+</app-page-breadcrumb>
+
+<div class="main-content">
+  <div class="card">
+    <div class="card-body" style="min-height: calc(100vh - 340px);">
+
+      <div class="input-group mb-3">
+        <input
+          type="text"
+          class="form-control form-control-lg"
+          placeholder="Search icons..."
+          autocomplete="off"
+          [(ngModel)]="search"
+          (ngModelChange)="filterIcons()"
+        />
+
+        <select
+          class="form-select pe-2 ps-3"
+          style="max-width: 140px;"
+          [(ngModel)]="iconSet"
+          (ngModelChange)="filterIcons()"
+        >
+          <option value="smart-admin">Smart Admin</option>
+          <option value="sa-base">Base</option>
+        </select>
+
+        <span class="input-group-text px-3">
+            <i class="sa sa-magnifier"></i>
+          </span>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-sm-6"></div>
+        <p class="results-count text-muted mb-0 col-sm-6 text-sm-end">
+          Showing {{ filteredIcons.length }} of {{ currentIconList.length }} icons
+        </p>
+      </div>
+
+      <ul class="list-unstyled row g-4">
+        @for (icon of filteredIcons; track $index) {
+          <li
+
+            class="col-4 col-sm-3 col-md-3 col-lg-2 col-xl-2 col-xxl-1 d-flex justify-content-center align-items-center mb-g"
+          >
+            <a
+              href="#"
+              (click)="handleCopy(icon); $event.preventDefault()"
+              class="js-showcase-icon rounded color-fusion-300 p-0 m-0 d-flex flex-column w-100 shadow-hover-2 cursor-pointer"
+            >
+              <div class="icon-preview rounded-top w-100 position-relative">
+                <div
+                  class="icon-container rounded-top d-flex align-items-center justify-content-center w-100 pt-3 pb-3 pe-2 ps-2 position-absolute">
+                  <i [class]="'sa sa-' + icon"></i>
+                </div>
+              </div>
+              <div
+                class="rounded-bottom p-1 w-100 d-flex justify-content-center align-items-center text-center mt-auto">
+                <span class="nav-link-text small text-muted text-truncate">{{ icon }}</span>
+              </div>
+            </a>
+          </li>
+        }
+
+        @if (filteredIcons.length === 0) {
+          <div class="no-results-msg pt-3">
+            <h5 class="mb-4">No icons found. Try searching with different keywords</h5>
+          </div>
+        }
+      </ul>
+
+    </div>
+  </div>
+</div>

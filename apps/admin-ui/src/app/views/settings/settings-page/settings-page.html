@@ -1,0 +1,52 @@
+<div class="main-content">
+  <div class="container-xl py-4">
+    <app-page-breadcrumb
+      title="Settings"
+      subTitle1="System"
+      subText="Configure platform-wide settings, migration runner mode, and database migrations."
+    />
+
+    <ul
+      [(activeId)]="activeId"
+      ngbNav
+      #nav="ngbNav"
+      class="nav nav-tabs-clean settings-migrations-nav mt-4"
+    >
+      <li ngbNavItem="info">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#database"></use>
+          </svg>
+          Info
+        </a>
+        <ng-template ngbNavContent>
+          <app-migrations-info-panel />
+        </ng-template>
+      </li>
+      <li ngbNavItem="migrations">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#layers"></use>
+          </svg>
+          Migrations
+        </a>
+        <ng-template ngbNavContent>
+          <app-migrations-list-panel />
+        </ng-template>
+      </li>
+      <li ngbNavItem="runner">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#sliders"></use>
+          </svg>
+          Runner
+        </a>
+        <ng-template ngbNavContent>
+          <app-migrations-runner-settings-panel />
+        </ng-template>
+      </li>
+    </ul>
+
+    <div class="tab-content pt-4" [ngbNavOutlet]="nav"></div>
+  </div>
+</div>

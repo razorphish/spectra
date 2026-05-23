@@ -12,9 +12,24 @@ export const VIEWS_ROUTES: Routes = [
   {
     path: '',
     loadChildren: () =>
+      import('./icons/icons.route').then((m) => m.ICONS_ROUTES),
+  },
+  {
+    path: '',
+    loadChildren: () =>
+      import('./tables/tables.route').then((m) => m.TABLES_ROUTES),
+  },
+  {
+    path: '',
+    loadChildren: () =>
       import('./tanstack-tables/tanstack-tables.route').then(
         (m) => m.TANSTACK_TABLES_ROUTES,
       ),
+  },
+  {
+    path: '',
+    loadChildren: () =>
+      import('./settings/settings.route').then((m) => m.SETTINGS_ROUTES),
   },
   {
     path: 'blank-page',

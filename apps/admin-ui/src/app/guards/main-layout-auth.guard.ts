@@ -1,24 +1,42 @@
-import { inject } from '@angular/core';
+import { inject, Injector } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '@auth0/auth0-angular';
-import { map, take } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { from, map, of, switchMap, take } from 'rxjs';
+import { isAuth0EnvIncomplete, isAuth0RuntimeConfigured } from '../core/auth/auth0-env';
+import { AdminSessionService } from '../core/services/admin-session.service';
 
-const auth0Configured = () =>
-  environment.auth0.enabled &&
-  !!environment.auth0.domain &&
-  !!environment.auth0.clientId;
+const auth0RuntimeReady = () => isAuth0RuntimeConfigured();
 
 export const mainLayoutAuthGuard: CanActivateFn = () => {
-  if (!auth0Configured()) {
+  const router = inject(Router);
+  const injector = inject(Injector);
+  const session = inject(AdminSessionService);
+
+  if (auth0RuntimeReady()) {
+    // Defer `AuthService` until after the current synchronous router work. `AuthService`
+    // pulls `Router` via `AbstractNavigator`; resolving it during activation causes NG0200.
+    return from(Promise.resolve()).pipe(
+      switchMap(() => {
+        const auth = injector.get(AuthService);
+        return auth.isAuthenticated$.pipe(
+          take(1),
+          map((loggedIn) =>
+            loggedIn ? true : router.createUrlTree(['/auth/login']),
+          ),
+        );
+      }),
+    );
+  }
+
+  if (isAuth0EnvIncomplete()) {
+    if (session.isLoggedIn()) {
+      session.clear();
+    }
+    return of(router.createUrlTree(['/auth/login']));
+  }
+
+  if (session.isLoggedIn()) {
     return true;
   }
-  const auth = inject(AuthService);
-  const router = inject(Router);
-  return auth.isAuthenticated$.pipe(
-    take(1),
-    map((loggedIn) =>
-      loggedIn ? true : router.createUrlTree(['/auth/login']),
-    ),
-  );
+  return of(router.createUrlTree(['/auth/login']));
 };

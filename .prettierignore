@@ -4,3 +4,4 @@
 /.nx/cache
 /.nx/workspace-data
 .angular
+apps/admin-ui/src/environments/environment.auth0.local.ts

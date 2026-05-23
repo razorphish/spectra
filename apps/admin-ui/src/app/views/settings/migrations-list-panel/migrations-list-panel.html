@@ -1,0 +1,329 @@
+<div class="migrations-panel">
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <button
+      type="button"
+      class="btn btn-primary btn-sm waves-effect d-inline-flex align-items-center gap-2"
+      (click)="state.runPending()"
+      [disabled]="state.runPendingBusy()"
+    >
+      @if (state.runPendingBusy()) {
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      } @else {
+        <i class="sa sa-control-play" aria-hidden="true"></i>
+      }
+      Run Pending
+    </button>
+    <button
+      type="button"
+      class="btn btn-warning text-dark btn-sm waves-effect d-inline-flex align-items-center gap-2"
+      (click)="state.runAll()"
+      [disabled]="state.runAllBusy()"
+    >
+      @if (state.runAllBusy()) {
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      } @else {
+        <i class="sa sa-control-forward" aria-hidden="true"></i>
+      }
+      Run All
+    </button>
+    <button type="button" class="btn btn-secondary btn-sm waves-effect d-inline-flex align-items-center gap-2" (click)="state.check()">
+      <i class="sa sa-check" aria-hidden="true"></i>
+      Check
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline-secondary btn-sm waves-effect d-inline-flex align-items-center justify-content-center"
+      (click)="state.refresh()"
+      [disabled]="state.refreshing()"
+      title="Refresh"
+    >
+      @if (state.refreshing()) {
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      } @else {
+        <i class="sa sa-refresh" aria-hidden="true"></i>
+      }
+    </button>
+  </div>
+
+  <div class="input-group mb-3">
+    <span class="input-group-text bg-body-secondary border-end-0 d-inline-flex align-items-center">
+      <i class="sa sa-magnifier text-secondary" aria-hidden="true"></i>
+    </span>
+    <input
+      type="search"
+      class="form-control border-start-0"
+      placeholder="Search migrations by tag or index…"
+      [value]="state.searchQuery()"
+      (input)="state.setSearchQuery($any($event.target).value)"
+      name="migrationSearch"
+    />
+    @if (state.searchQuery().length > 0) {
+      <button type="button" class="btn btn-outline-secondary" (click)="state.clearSearch()">Clear</button>
+    }
+  </div>
+
+  <div class="card border shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover table-striped mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th scope="col" class="text-nowrap">Idx</th>
+            <th scope="col">Tag</th>
+            <th scope="col" class="text-nowrap">Status</th>
+            <th scope="col" class="text-nowrap">Applied</th>
+            <th scope="col" class="text-end text-nowrap migration-actions-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of state.filteredMigrations(); track row.tag) {
+            <tr>
+              <td class="font-monospace small">{{ row.idx }}</td>
+              <td class="font-monospace small">{{ row.tag }}</td>
+              <td>
+                @if (row.status === 'applied') {
+                  <span class="badge text-bg-success">Applied</span>
+                } @else {
+                  <span class="badge text-bg-warning text-dark">Pending</span>
+                }
+              </td>
+              <td class="text-muted small">
+                @if (row.when) {
+                  {{ row.when | date: 'medium' }}
+                } @else {
+                  —
+                }
+              </td>
+              <td class="text-end">
+                <div
+                  class="migration-tn-actions d-flex gap-1 align-items-center justify-content-end flex-nowrap"
+                  role="group"
+                  [attr.aria-label]="'Actions for migration ' + row.tag"
+                >
+                  @if (row.status === 'applied') {
+                    <button
+                      type="button"
+                      class="btn btn-success waves-effect btn-xs d-inline-flex align-items-center justify-content-center"
+                      disabled
+                      title="Applied"
+                      aria-label="Applied"
+                    >
+                      <i class="sa sa-check" aria-hidden="true"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-primary waves-effect btn-xs edit-btn d-inline-flex align-items-center justify-content-center"
+                      title="View migration SQL"
+                      aria-label="View migration SQL"
+                      (click)="openViewSql(row.tag)"
+                    >
+                      <i class="sa sa-doc" aria-hidden="true"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-warning waves-effect btn-xs d-inline-flex align-items-center justify-content-center"
+                      title="Rollback guide"
+                      aria-label="Rollback guide"
+                      (click)="openRollback(row)"
+                    >
+                      <i class="sa sa-action-undo" aria-hidden="true"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger waves-effect btn-xs delete-btn d-inline-flex align-items-center justify-content-center"
+                      title="Delete migration record"
+                      aria-label="Delete migration record"
+                      (click)="openDelete(row)"
+                    >
+                      <i class="sa sa-trash" aria-hidden="true"></i>
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn btn-warning waves-effect btn-xs d-inline-flex align-items-center justify-content-center"
+                      disabled
+                      title="Pending"
+                      aria-label="Pending"
+                    >
+                      <i class="sa sa-hourglass" aria-hidden="true"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-primary waves-effect btn-xs edit-btn d-inline-flex align-items-center justify-content-center"
+                      title="View migration SQL"
+                      aria-label="View migration SQL"
+                      (click)="openViewSql(row.tag)"
+                    >
+                      <i class="sa sa-doc" aria-hidden="true"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-success waves-effect btn-xs d-inline-flex align-items-center justify-content-center"
+                      title="Run this migration"
+                      aria-label="Run this migration"
+                      [disabled]="state.runSingleTag() !== null"
+                      (click)="openRunConfirm(row)"
+                    >
+                      @if (state.runSingleTag() === row.tag) {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                      } @else {
+                        <i class="sa sa-control-play" aria-hidden="true"></i>
+                      }
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-secondary waves-effect btn-xs d-inline-flex align-items-center justify-content-center"
+                      title="Copy migration tag"
+                      aria-label="Copy migration tag"
+                      (click)="state.copyMigrationTag(row.tag)"
+                    >
+                      <i class="sa sa-tag" aria-hidden="true"></i>
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">No migrations match your search.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<ng-template #viewSqlTpl let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title d-inline-flex align-items-center gap-2">
+      <i class="sa sa-doc text-secondary" aria-hidden="true"></i>
+      View migration SQL
+    </h5>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p class="text-muted small font-monospace mb-2">{{ state.migrationSqlPath() }}</p>
+    @if (state.sqlModalLoading()) {
+      <div class="d-flex justify-content-center py-5">
+        <span class="spinner-border text-primary" role="status" aria-label="Loading SQL"></span>
+      </div>
+    } @else {
+      <pre class="border rounded p-3 small mb-0 bg-body-secondary overflow-auto" style="max-height: 50vh">{{ state.migrationSqlBody() }}</pre>
+    }
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="modal.close()">Close</button>
+  </div>
+</ng-template>
+
+<ng-template #rollbackTpl let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title d-inline-flex align-items-center gap-2">
+      <i class="sa sa-action-undo text-warning" aria-hidden="true"></i>
+      Rollback guide
+    </h5>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    @if (state.rollbackTarget(); as m) {
+      <p class="mb-2">
+        <strong>Tag:</strong> <span class="font-monospace">{{ m.tag }}</span>
+      </p>
+      @if (m.hash) {
+        <p class="mb-3 text-muted small">
+          <strong>Hash:</strong> <span class="font-monospace">{{ m.hash }}</span>
+        </p>
+      }
+      @if (state.rollbackLoading()) {
+        <div class="d-flex justify-content-center py-4">
+          <span class="spinner-border text-warning" role="status" aria-label="Loading guide"></span>
+        </div>
+      } @else {
+        <p class="mb-2">Drizzle does not auto-rollback applied migrations. Recommended approaches:</p>
+        <ul class="mb-3">
+          @for (b of state.rollbackBullets(); track b) {
+            <li>{{ b }}</li>
+          }
+        </ul>
+        @if (state.rollbackSqlPreview(); as preview) {
+          <p class="small text-secondary mb-1">SQL preview (start of migration file):</p>
+          <pre class="border rounded p-3 small mb-0 bg-body-secondary overflow-auto" style="max-height: 30vh">{{ preview }}</pre>
+        }
+      }
+    }
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-primary waves-effect" (click)="modal.close()">OK</button>
+  </div>
+</ng-template>
+
+<ng-template #deleteTpl let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title text-danger d-inline-flex align-items-center gap-2">
+      <i class="sa sa-trash" aria-hidden="true"></i>
+      Delete migration record
+    </h5>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p>Are you sure you want to delete the migration record for</p>
+    <p class="fw-semibold font-monospace">{{ state.deleteTarget()?.tag }}</p>
+    <p class="text-muted small mb-0">
+      This removes the row from <code class="small">spectra.__drizzle_migrations</code> so the SQL file can be applied again after you fix the database. Use only when you know the schema already matches (see repo
+      <code class="small">packages/database/README.md</code>).
+    </p>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">Cancel</button>
+    <button
+      type="button"
+      class="btn btn-danger waves-effect d-inline-flex align-items-center gap-2"
+      [disabled]="state.deleteRecordBusy()"
+      (click)="confirmDeleteRecord(modal)"
+    >
+      @if (state.deleteRecordBusy()) {
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      } @else {
+        <i class="sa sa-trash" aria-hidden="true"></i>
+      }
+      Delete
+    </button>
+  </div>
+</ng-template>
+
+<ng-template #runConfirmTpl let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title d-inline-flex align-items-center gap-2">
+      <i class="sa sa-control-play text-primary" aria-hidden="true"></i>
+      Run migration
+    </h5>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p>You are about to run migration:</p>
+    <p class="fw-semibold font-monospace">{{ state.runConfirmTarget()?.tag }}</p>
+    <p class="small text-secondary mb-2">Confirm you have:</p>
+    <ul class="small mb-3">
+      <li>Database backup or snapshot</li>
+      <li>Reviewed this migration for destructive operations</li>
+      <li>Maintenance window or low traffic</li>
+      <li>Rollback plan if needed</li>
+      <li>Notified your team</li>
+    </ul>
+    <p class="alert alert-warning small mb-0">
+      Running migrations can modify schema and data. Ensure backups before proceeding (Vital Woman Reset checklist).
+    </p>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">Cancel</button>
+    <button
+      type="button"
+      class="btn btn-primary waves-effect d-inline-flex align-items-center gap-2"
+      [disabled]="state.runSingleTag() !== null"
+      (click)="confirmRunMigration(modal)"
+    >
+      <i class="sa sa-control-play" aria-hidden="true"></i>
+      Run migration
+    </button>
+  </div>
+</ng-template>

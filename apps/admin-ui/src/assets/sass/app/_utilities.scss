@@ -13,22 +13,40 @@
   $b: math.div($b, 255);
 
   // Calculate relative luminance
-  $r: if($r <= 0.03928, math.div($r, 12.92), math.pow(math.div($r + 0.055, 1.055), 2.4));
-  $g: if($g <= 0.03928, math.div($g, 12.92), math.pow(math.div($g + 0.055, 1.055), 2.4));
-  $b: if($b <= 0.03928, math.div($b, 12.92), math.pow(math.div($b + 0.055, 1.055), 2.4));
+  @if $r <= 0.03928 {
+    $r: math.div($r, 12.92);
+  } @else {
+    $r: math.pow(math.div($r + 0.055, 1.055), 2.4);
+  }
+  @if $g <= 0.03928 {
+    $g: math.div($g, 12.92);
+  } @else {
+    $g: math.pow(math.div($g + 0.055, 1.055), 2.4);
+  }
+  @if $b <= 0.03928 {
+    $b: math.div($b, 12.92);
+  } @else {
+    $b: math.pow(math.div($b + 0.055, 1.055), 2.4);
+  }
 
   $luminance: $r * 0.2126 + $g * 0.7152 + $b * 0.0722;
 
   // Adjust threshold for better contrast
-  @return if($luminance > 0.55, #212121, white);
+  @if $luminance > 0.55 {
+    @return #212121;
+  }
+  @return white;
 }
 
 @each $color-name, $color-value in $theme-colors {
   @for $i from 50 through 900 {
     @if $i % 50 == 0 {
-      $bg-color: if($i == 500, $color-value,
-        if($i < 500, lighten($color-value, math.div(500 - $i, 50) * 10%),
-          darken($color-value, math.div($i - 500, 50) * 10%)));
+      $bg-color: $color-value;
+      @if $i < 500 {
+        $bg-color: lighten($color-value, math.div(500 - $i, 50) * 10%);
+      } @else if $i > 500 {
+        $bg-color: darken($color-value, math.div($i - 500, 50) * 10%);
+      }
 
       .bg-#{$color-name}-#{$i} {
         background-color: var(--#{$color-name}-#{$i}) !important;

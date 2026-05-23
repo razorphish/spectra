@@ -5,9 +5,18 @@ import {
   getControlPlaneRowCounts,
   getDb,
   pingDatabase,
+  resolveSpectraDatabaseUrl,
 } from '@spectra/database';
 
+import { createRequireAuth0AccessToken } from '../middleware/require-auth0-access-token';
+import { createAdminMeSyncHandler } from './admin-me-sync';
+import { registerAdminLoggingRoutes } from './admin-logging';
+import { registerAdminMigrationsRoutes } from './admin-migrations';
+
 const SEGMENT = 'admin';
+
+const requireAuth0AccessToken = createRequireAuth0AccessToken();
+const meSync = createAdminMeSyncHandler();
 
 const health: RequestHandler = (_req, res) => {
   res.status(200).json({ status: 'ok' });
@@ -15,8 +24,7 @@ const health: RequestHandler = (_req, res) => {
 
 const ready: RequestHandler = async (_req, res) => {
   const checks: Record<string, string> = { runtime: 'ok' };
-  const dbUrl =
-    process.env['DATABASE_URL'] ?? process.env['NEON_DATABASE_URL'];
+  const dbUrl = resolveSpectraDatabaseUrl();
   if (!dbUrl) {
     checks.database = 'not_configured';
     res.status(200).json({ status: 'ok', checks });
@@ -43,8 +51,7 @@ const info: RequestHandler = (_req, res) => {
 };
 
 const stats: RequestHandler = async (_req, res) => {
-  const dbUrl =
-    process.env['DATABASE_URL'] ?? process.env['NEON_DATABASE_URL'];
+  const dbUrl = resolveSpectraDatabaseUrl();
   if (!dbUrl) {
     res.status(200).json({ database: 'not_configured', counts: null });
     return;
@@ -62,6 +69,9 @@ export function createAdminRouter() {
   r.get('/health', health);
   r.get('/ready', ready);
   r.get('/info', info);
-  r.get('/stats', stats);
+  r.get('/stats', requireAuth0AccessToken, stats);
+  r.post('/me/sync', requireAuth0AccessToken, meSync);
+  registerAdminLoggingRoutes(r);
+  registerAdminMigrationsRoutes(r);
   return r;
 }

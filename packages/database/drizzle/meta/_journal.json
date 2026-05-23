@@ -8,6 +8,20 @@
       "when": 1778102552123,
       "tag": "0000_init_control_plane",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779500000000,
+      "tag": "0001_spectra_schema_and_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779600000000,
+      "tag": "0002_users_auth_subject",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ import {
   getControlPlaneRowCounts,
   getDb,
   pingDatabase,
+  resolveSpectraDatabaseUrl,
 } from '@spectra/database';
 
 const SEGMENT = 'platform';
@@ -15,8 +16,7 @@ const health: RequestHandler = (_req, res) => {
 
 const ready: RequestHandler = async (_req, res) => {
   const checks: Record<string, string> = { runtime: 'ok' };
-  const dbUrl =
-    process.env['DATABASE_URL'] ?? process.env['NEON_DATABASE_URL'];
+  const dbUrl = resolveSpectraDatabaseUrl();
   if (!dbUrl) {
     checks.database = 'not_configured';
     res.status(200).json({ status: 'ok', checks });
@@ -44,8 +44,7 @@ const info: RequestHandler = (_req, res) => {
 
 /** Database row counts — unauthenticated for MVP; lock behind auth later. */
 const stats: RequestHandler = async (_req, res) => {
-  const dbUrl =
-    process.env['DATABASE_URL'] ?? process.env['NEON_DATABASE_URL'];
+  const dbUrl = resolveSpectraDatabaseUrl();
   if (!dbUrl) {
     res.status(200).json({ database: 'not_configured', counts: null });
     return;

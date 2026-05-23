@@ -4,6 +4,7 @@ import type { RequestHandler } from 'express';
 import {
   createUploadRow,
   getDb,
+  resolveSpectraDatabaseUrl,
 } from '@spectra/database';
 import {
   DEFAULT_MAX_BYTES,
@@ -81,7 +82,7 @@ const initUpload: RequestHandler = async (req, res) => {
     // fails we still return the URL so the SQS consumer can be the source of
     // truth; the API should be wrapped in a transactional helper as soon as
     // the upload pipeline lands a real consumer.
-    const dbUrl = process.env['DATABASE_URL'] ?? process.env['NEON_DATABASE_URL'];
+    const dbUrl = resolveSpectraDatabaseUrl();
     if (dbUrl) {
       try {
         await createUploadRow(getDb(), {
