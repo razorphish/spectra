@@ -7,6 +7,12 @@ export const SETTINGS_ROUTES: Routes = [
     redirectTo: 'settings/migrations',
   },
   {
+    path: 'settings/general',
+    loadComponent: () =>
+      import('./general-settings-page/general-settings-page').then((m) => m.GeneralSettingsPage),
+    data: { title: 'General' },
+  },
+  {
     path: 'settings/migrations',
     loadComponent: () =>
       import('./settings-page/settings-page').then((m) => m.SettingsPage),

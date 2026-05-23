@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { templateNavVisibilityGuard } from '@/app/guards/template-nav-visibility.guard';
 import { BlankPage } from '@/app/views/blank-page/blank-page';
 import { Error404 } from '@/app/views/error/error-404';
 import { UserProfile } from '@/app/views/user-profile/user-profile';
@@ -33,17 +34,20 @@ export const VIEWS_ROUTES: Routes = [
   },
   {
     path: 'blank-page',
+    canActivate: [templateNavVisibilityGuard],
     component: BlankPage,
-    data: { title: 'Blank Page' },
+    data: { title: 'Blank Page', templateNavMenuKey: 'blank_page' },
   },
   {
     path: 'user-profile',
+    canActivate: [templateNavVisibilityGuard],
     component: UserProfile,
-    data: { title: 'User Profile' },
+    data: { title: 'User Profile', templateNavMenuKey: 'user_profile' },
   },
   {
     path: 'error/404',
+    canActivate: [templateNavVisibilityGuard],
     component: Error404,
-    data: { title: 'Error 404' },
+    data: { title: 'Error 404', templateNavMenuKey: 'error_pages' },
   },
 ];

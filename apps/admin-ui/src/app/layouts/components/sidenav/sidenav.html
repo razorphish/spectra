@@ -2,7 +2,7 @@
 
 <form class="app-menu-filter-container px-4">
   <input type="text" class="form-control" id="searchInput" placeholder="Filter" autocomplete="off"
-         [value]="filterText"
+         [value]="filterText()"
          (input)="updateFilterText($event)">
   <div class="js-filter-message nav-filter-msg badge bg-secondary btn" data-bs-toggle="tooltip"
        data-bs-placement="top" data-bs-original-title="Clear filter"></div>
@@ -10,7 +10,7 @@
 
 <ngx-simplebar style="height: 100%; overflow-x: hidden" id="sidenav">
   <nav id="js-primary-nav" class="primary-nav flex-grow-1 custom-scroll">
-    <app-menu [menuItems]="filteredMenuItems"/>
+    <app-menu [menuItems]="displayMenuItems()"/>
 
     @if (showNoResults) {
       <div class="no-results-msg pt-3 info-container">

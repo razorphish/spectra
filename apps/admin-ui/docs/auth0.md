@@ -138,6 +138,13 @@ The migrations tab uses the same **Auth0 access token** as `GET /v1/admin/logs` 
 
 The API resolves `packages/database/drizzle` from the monorepo root (`NX_WORKSPACE_ROOT` or walking up to `nx.json`).
 
+## Settings → General / sidebar visibility (`/v1/admin/nav-sidebar-visibility`)
+
+Uses the same **Auth0 access token** as other `/v1/admin/*` routes. Persists in **`spectra.platform_settings`** under key **`admin_ui.sidebar_nav_hidden_menu_keys`** (JSON array of hidden template `menuKey` strings).
+
+- `GET /v1/admin/nav-sidebar-visibility` — returns `{ "sidebarNavHiddenMenuKeys": string[] }`. If the row is missing or invalid, the API returns the default (all eight template sections hidden).
+- `PUT /v1/admin/nav-sidebar-visibility` — body `{ "sidebarNavHiddenMenuKeys": string[] }`; only known keys are allowed; **empty array** means show all template sections.
+
 ## Local staff user row (`POST /v1/admin/me/sync`)
 
 After Auth0 login, the SPA calls **`POST {apiBaseUrl}/v1/admin/me/sync`** once per browser session (see auth callback). The API upserts **`spectra.users`** using:

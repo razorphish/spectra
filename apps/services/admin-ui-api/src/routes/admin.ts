@@ -12,6 +12,7 @@ import { createRequireAuth0AccessToken } from '../middleware/require-auth0-acces
 import { createAdminMeSyncHandler } from './admin-me-sync';
 import { registerAdminLoggingRoutes } from './admin-logging';
 import { registerAdminMigrationsRoutes } from './admin-migrations';
+import { registerAdminNavVisibilityRoutes } from './admin-nav-visibility';
 
 const SEGMENT = 'admin';
 
@@ -73,5 +74,6 @@ export function createAdminRouter() {
   r.post('/me/sync', requireAuth0AccessToken, meSync);
   registerAdminLoggingRoutes(r);
   registerAdminMigrationsRoutes(r);
+  registerAdminNavVisibilityRoutes(r);
   return r;
 }

@@ -18,6 +18,8 @@ export interface LayoutState {
 
 export type MenuItemType = {
     label: string
+    /** When set, visibility is controlled by Settings → General (template) + route guards. */
+    menuKey?: string
     isTitle?: boolean
     icon?: string
     url?: string

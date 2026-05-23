@@ -1,0 +1,77 @@
+<div class="main-content">
+  <div class="container-xl py-4">
+    <app-page-breadcrumb
+      title="General"
+      subTitle1="Settings"
+      subText="Template sidebar sections and related routes (stored in spectra.platform_settings)."
+    />
+
+    <ul
+      [(activeId)]="activeId"
+      ngbNav
+      #nav="ngbNav"
+      class="nav nav-tabs-clean general-settings-nav mt-4"
+    >
+      <li ngbNavItem="template">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#layers"></use>
+          </svg>
+          Template
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            @if (saveError(); as err) {
+              <div class="alert alert-danger" role="alert">{{ err }}</div>
+            }
+
+            @if (loading()) {
+              <div class="text-muted py-4">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Loading…
+              </div>
+            } @else {
+              <div class="card shadow-sm border">
+                <div class="card-body">
+                  <h6 class="fw-semibold mb-2">Template navigation</h6>
+                  <p class="text-muted small mb-4">
+                    When a section is off, it is removed from the sidebar and blocked by route guards
+                    (except <code>/auth/*</code>, which must stay reachable for login).
+                    Key <code class="small">admin_ui.sidebar_nav_hidden_menu_keys</code> in
+                    <code>spectra.platform_settings</code>.
+                  </p>
+                  <div class="vstack gap-3 mb-4">
+                    @for (key of keys; track key) {
+                      <div class="form-check form-switch">
+                        <input
+                          class="form-check-input"
+                          type="checkbox"
+                          [id]="'nav-vis-' + key"
+                          [checked]="isVisible(key)"
+                          (change)="toggle(key, $any($event.target).checked)"
+                        />
+                        <label class="form-check-label" [for]="'nav-vis-' + key">
+                          {{ labels[key] }}
+                        </label>
+                      </div>
+                    }
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-primary" (click)="save()" [disabled]="loading()">
+                      Save
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" (click)="load()" [disabled]="loading()">
+                      Reload
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </li>
+    </ul>
+
+    <div class="tab-content pt-4" [ngbNavOutlet]="nav"></div>
+  </div>
+</div>

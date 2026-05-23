@@ -18,12 +18,14 @@ export const menuItems: MenuItemType[] = [
     icon: '/assets/icons/sprite.svg#home',
     label: 'Blank Page',
     url: '/blank-page',
+    menuKey: 'blank_page',
   },
   { label: 'Layouts', isTitle: true },
   {
     icon: '/assets/icons/sprite.svg#slash',
     isCollapsed: true,
     label: 'Authentication Pages',
+    menuKey: 'authentication_pages',
     children: [
       { label: 'Login', url: '/auth/login?auth0=1' },
       { label: 'Register', url: '/auth/register?auth0=signup' },
@@ -36,6 +38,7 @@ export const menuItems: MenuItemType[] = [
     isCollapsed: true,
     icon: '/assets/icons/sprite.svg#alert-triangle',
     label: 'Error Pages',
+    menuKey: 'error_pages',
     children: [
       { label: '404 Not Found', url: '/error/404' },
       { label: '404 Not Found 2', url: '/error/404-2' },
@@ -46,17 +49,20 @@ export const menuItems: MenuItemType[] = [
     icon: '/assets/icons/sprite.svg#user',
     label: 'User Profile',
     url: '/user-profile',
+    menuKey: 'user_profile',
   },
   {
     label: 'Landing',
     icon: '/assets/icons/sprite.svg#zap',
     url: '/landing',
     target: '_blank',
+    menuKey: 'landing',
   },
   {
     isCollapsed: true,
     icon: '/assets/icons/sprite.svg#heart',
     label: 'Iconography',
+    menuKey: 'iconography',
     children: [
       { label: 'System Icons', url: '/icons/system' },
       { label: 'FontAwesome', url: '/icons/font-awesome' },
@@ -67,6 +73,7 @@ export const menuItems: MenuItemType[] = [
     icon: '/assets/icons/sprite.svg#table',
     isCollapsed: true,
     label: 'Tables',
+    menuKey: 'tables',
     children: [
       { label: 'Basic Tables', url: '/tables/basic' },
       { label: 'Table Style Generator', url: '/tables/style-generator' },
@@ -76,6 +83,7 @@ export const menuItems: MenuItemType[] = [
     isCollapsed: true,
     icon: '/assets/icons/sprite.svg#database',
     label: 'TanStack Table',
+    menuKey: 'tanstack_table',
     children: [
       { label: 'Data table (default)', url: '/tanstack-tables/full' },
       { label: 'Table With Search', url: '/tanstack-tables/search' },
@@ -91,6 +99,7 @@ export const menuItems: MenuItemType[] = [
     icon: '/assets/icons/sprite.svg#settings',
     label: 'Settings',
     children: [
+      { label: 'General', url: '/settings/general' },
       { label: 'Migrations', url: '/settings/migrations' },
       { label: 'Logging', url: '/settings/logging' },
     ],
