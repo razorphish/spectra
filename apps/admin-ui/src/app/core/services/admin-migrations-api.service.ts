@@ -43,6 +43,13 @@ export interface MigrationsInventoryDto {
 export interface MigrationSqlDto {
   path: string;
   sql: string;
+  hash: string;
+  hashDisplay: string;
+  byteSize: number;
+  lineCount: number;
+  idempotent: boolean;
+  idempotentBasis: 'manifest' | 'heuristic';
+  schemaMigration: boolean;
 }
 
 export interface MigrationRollbackGuideDto {
@@ -99,11 +106,15 @@ export class AdminMigrationsApiService {
     return this.http.delete<MigrationsRunnerConfigDto>(`${this.adminBaseUrl()}/migrations/runner-config`);
   }
 
-  runMigrations(scope: 'pending' | 'all' | 'single', tag?: string): Observable<{ ok: boolean; inventory: MigrationsInventoryDto }> {
-    return this.http.post<{ ok: boolean; inventory: MigrationsInventoryDto }>(
-      `${this.adminBaseUrl()}/migrations/run`,
-      { scope, ...(tag ? { tag } : {}) },
-    );
+  runMigrations(
+    scope: 'pending' | 'all' | 'single',
+    tag?: string,
+  ): Observable<{ ok: boolean; inventory: MigrationsInventoryDto; hashRepairedTags?: string[] }> {
+    return this.http.post<{
+      ok: boolean;
+      inventory: MigrationsInventoryDto;
+      hashRepairedTags?: string[];
+    }>(`${this.adminBaseUrl()}/migrations/run`, { scope, ...(tag ? { tag } : {}) });
   }
 
   deleteMigrationRecord(tag: string): Observable<{ ok: boolean; inventory: MigrationsInventoryDto }> {

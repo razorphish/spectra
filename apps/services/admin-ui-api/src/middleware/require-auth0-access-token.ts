@@ -5,6 +5,11 @@ function stripAuth0Domain(raw: string): string {
   return raw.replace(/^https?:\/\//, '').replace(/\/$/, '');
 }
 
+/** Auth0 API identifiers may be pasted with a trailing slash; JWT `aud` usually omits it. */
+function normalizeAuth0ApiAudience(raw: string): string {
+  return raw.trim().replace(/\/+$/, '');
+}
+
 function defaultIssuerFromDomain(domain: string): string {
   return `https://${stripAuth0Domain(domain)}/`;
 }
@@ -22,7 +27,8 @@ function defaultIssuerFromDomain(domain: string): string {
  */
 export function createRequireAuth0AccessToken(): RequestHandler {
   const domain = process.env['AUTH0_DOMAIN']?.trim();
-  const audience = process.env['AUTH0_AUDIENCE']?.trim();
+  const audienceRaw = process.env['AUTH0_AUDIENCE']?.trim();
+  const audience = audienceRaw ? normalizeAuth0ApiAudience(audienceRaw) : undefined;
   const issuerOverride = process.env['AUTH0_ISSUER']?.trim();
   const verifyDisabled = process.env['AUTH0_VERIFY_DISABLED'] === 'true';
 
@@ -107,7 +113,11 @@ export function createRequireAuth0AccessToken(): RequestHandler {
       next();
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Token verification failed.';
-      res.status(401).json({ error: 'invalid_token', message });
+      const audHint =
+        message.includes('"aud"') || message.toLowerCase().includes('aud claim') ?
+          ' Ensure the access token was issued for the same API Identifier as AUTH0_AUDIENCE (must match ADMIN_UI_AUTH0_AUDIENCE on the SPA). Sign out of the admin UI, restart admin-ui-api after env changes, then sign in again so localStorage gets a fresh token.'
+        : '';
+      res.status(401).json({ error: 'invalid_token', message: `${message}${audHint}` });
     }
   };
 }

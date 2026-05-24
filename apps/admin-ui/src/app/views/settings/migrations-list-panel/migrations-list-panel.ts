@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, TemplateRef, inject, viewChild } from '@angular/core';
 import { NgbActiveModal, NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 import type { MigrationRow } from '../migrations-ui.state';
@@ -7,7 +7,7 @@ import { MigrationsUiState } from '../migrations-ui.state';
 @Component({
   selector: 'app-migrations-list-panel',
   templateUrl: './migrations-list-panel.html',
-  imports: [DatePipe, NgbModalModule],
+  imports: [DatePipe, DecimalPipe, NgbModalModule],
   styles: `
     .migrations-panel i.sa {
       font-size: 1rem;
@@ -49,6 +49,12 @@ export class MigrationsListPanel {
       this.state.viewSqlTag.set(null);
       this.state.migrationSqlBody.set('');
       this.state.migrationSqlPath.set('');
+      this.state.migrationSqlHash.set('');
+      this.state.migrationSqlHashDisplay.set('');
+      this.state.migrationSqlByteSize.set(0);
+      this.state.migrationSqlLineCount.set(0);
+      this.state.migrationSqlIdempotent.set(false);
+      this.state.migrationSqlSchemaMigration.set(false);
     });
   }
 

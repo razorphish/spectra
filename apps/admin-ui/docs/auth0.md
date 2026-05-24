@@ -18,14 +18,21 @@ Sandbox UI will use a **separate** Auth0 application and API audience when you a
    - **Allowed Callback URLs** must include the SPA OAuth callback for each origin you use, for example:  
      - `http://localhost:4202/auth/callback` and `http://127.0.0.1:4202/auth/callback` for local `nx serve admin-ui`  
      - `https://your-staff-admin.example.com/auth/callback` for production staff UI  
+   - Auth0 error **“Callback URL mismatch”** means the `redirect_uri` your app sent (by default `{browserOrigin}/auth/callback`) is **not** listed verbatim in Allowed Callback URLs — add the exact URL (scheme, host, port, path). `localhost` and `127.0.0.1` are different hosts; allowlist both if you use both. Optional: set **`ADMIN_UI_AUTH0_REDIRECT_URI`** to a single fixed callback URL and allowlist that exact string.
+   - If Auth0 redirects to `/auth/callback` with **`invalid_request`** and **“Client … is not authorized to access resource server …”**, the callback URL is fine: your API’s **user-delegated access** policy is blocking this SPA until it is explicitly allowed. Open **Applications → APIs** → select the API whose **Identifier** matches your audience (e.g. `https://spectra.admin.api`) → **Application Access** tab → **Edit** → find your staff SPA and grant **User-Delegated Access** (choose permissions, or “always grant all” if your team uses that). If the API’s access policy is **All apps allowed** for user-delegated access, first-party SPAs can request that audience without this step; **Per-app authorization** requires the Application Access grant. See Auth0: [API access policies for applications](https://auth0.com/docs/get-started/apis/api-access-policies-for-applications). **Third-party** applications always need an explicit grant regardless of “allow all.”
+   - **User-delegated vs client access:** **User-delegated access** is what the staff SPA needs (tokens on behalf of the signed-in user). **Client access** is for **machine-to-machine** applications using the `client_credentials` grant; a public SPA does not use that, so you can leave **Client access** disabled for this SPA unless you have an unusual setup. Prefer granting only the API permissions you need in production rather than “all” forever.
    - **Allowed Logout URLs** must include the **exact** post-logout URL the SPA sends as `returnTo` (Auth0 shows a generic error if it is missing or mismatched). By default the app uses `{origin}/auth/login` (e.g. `http://localhost:4202/auth/login` and `http://127.0.0.1:4202/auth/login`). Add each URL you use, or set **`ADMIN_UI_AUTH0_LOGOUT_RETURN_TO`** / **`STAFF_AUTH0_LOGOUT_RETURN_TO`** to a single fixed URL and allowlist that string exactly.
    - **Allowed Web Origins** should list the **origins** only (scheme + host + port), e.g. `http://localhost:4202` (no path).  
    - Authorize this application to request your Admin API so access tokens include the correct `aud`.
 
-3. **Users**  
+3. **Refresh tokens (recommended for local dev and browsers that block third-party cookies)**  
+   The admin UI configures `@auth0/auth0-angular` with **`useRefreshTokens: true`** and **`cacheLocation: 'localstorage'`** so a **full page reload** can restore the session without relying on silent `prompt=none` iframe auth (which often fails with **HTTP 400** on `/authorize` when Auth0 cookies are third-party).  
+   In Auth0: open your **SPA** application → **Settings** → enable **Refresh Token Rotation** (and allow the **Refresh Token** grant if your tenant shows grant toggles). After changing this, users may need to **sign in once** to receive a refresh token.
+
+4. **Users**  
    - **User Management → Users → Create User** for database username/password, or enable social / enterprise connections for this application only.
 
-4. **Backend (`admin-ui-api`)**  
+5. **Backend (`admin-ui-api`)**  
    - Set `AUTH0_DOMAIN` (tenant host, no `https://`) and `AUTH0_AUDIENCE` (same as API Identifier).  
    - Optional: `AUTH0_ISSUER` if tokens use a custom issuer (e.g. custom domain).  
    - Local-only escape hatch: `AUTH0_VERIFY_DISABLED=true` (never in shared environments).
@@ -117,6 +124,11 @@ Use this whenever the tenant, SPA, API identifier, or URLs change.
 
 2. **URL allowlists** — **Application Login URI** in the Auth0 app must match your deployed `/auth/login` URL (see dashboard setup above). **Allowed Callback URLs** must list each full callback URL (default pattern `{origin}/auth/callback`, e.g. `http://localhost:4202/auth/callback`). **Allowed Logout URLs** must list each full **post-logout** URL (default `{origin}/auth/login`). **Allowed Web Origins** use origins only (no path). Include both `localhost` and `127.0.0.1` if you switch between them.
 
+### Blank UI after refresh + HTTP `400` on `/authorize` (`prompt=none`, `response_mode=web_message`)
+
+- **Wrong audience** — If the failing URL includes `audience=…/api/v2`, you pointed the SPA at the **Auth0 Management API**. Use your **custom API** Identifier from Auth0 → APIs (same string as `AUTH0_AUDIENCE` on `admin-ui-api`), e.g. `https://spectra.admin.api`. The SPA prints a **console error** when it detects an `/api/v2` audience.
+- **Silent renewal** — Browsers often block third-party cookies, so iframe-based silent auth fails. The app uses **`useRefreshTokens: true`** and **`cacheLocation: 'localstorage'`**; in Auth0 enable **Refresh Token Rotation** on the staff SPA application, then sign in once.
+
 3. **Runtime** — After login, browser **Network** tab: requests to `{apiBaseUrl}/v1/admin/*` should include `Authorization: Bearer …`.  
    - `401` + `invalid_token`: decode the JWT and check `iss` and `aud`.  
    - `503` + `auth_not_configured` on the API: missing `AUTH0_DOMAIN` / `AUTH0_AUDIENCE`.
@@ -128,7 +140,7 @@ Use this whenever the tenant, SPA, API identifier, or URLs change.
 The migrations tab uses the same **Auth0 access token** as `GET /v1/admin/logs` and `GET /v1/admin/stats`. Endpoints:
 
 - `GET /v1/admin/migrations` — journal + `spectra.__drizzle_migrations` inventory  
-- `GET /v1/admin/migrations/sql?tag=…` — migration `.sql` from the repo  
+- `GET /v1/admin/migrations/sql?tag=…` — `{ path, sql, hash, hashDisplay, byteSize, lineCount, idempotent, idempotentBasis, schemaMigration }` (hash SHA-256 of file body; idempotency is heuristic unless overridden by `-- @spectra-migration: …` in the SQL file; see `.cursor/rules/sql-migrations-idempotent.mdc`)  
 - `GET /v1/admin/migrations/rollback-guide?tag=…` — static guidance + optional SQL preview  
 - `POST /v1/admin/migrations/run` — body `{ "scope": "pending" | "all" | "single", "tag"?: "…" }` (Drizzle `migrate()`; `single` only runs when that tag is the **next** pending migration). Honors `spectra.platform_settings` key `admin_migrations_use_shared_http_client` and `NODE_ENV` default (see Runner tab).  
 - `GET /v1/admin/migrations/runner-config` — effective runner mode, whether a DB row overrides, and the environment default  

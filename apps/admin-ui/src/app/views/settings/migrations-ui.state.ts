@@ -66,6 +66,12 @@ export class MigrationsUiState {
   viewSqlTag = signal<string | null>(null);
   migrationSqlPath = signal('');
   migrationSqlBody = signal('');
+  migrationSqlHash = signal('');
+  migrationSqlHashDisplay = signal('');
+  migrationSqlByteSize = signal(0);
+  migrationSqlLineCount = signal(0);
+  migrationSqlIdempotent = signal(false);
+  migrationSqlSchemaMigration = signal(false);
   sqlModalLoading = signal(false);
 
   rollbackTarget = signal<MigrationRow | null>(null);
@@ -124,8 +130,16 @@ export class MigrationsUiState {
   private errMessage(e: unknown): string {
     if (e instanceof HttpErrorResponse) {
       const body = e.error;
-      if (body && typeof body === 'object' && 'message' in body && typeof (body as { message: unknown }).message === 'string') {
-        return (body as { message: string }).message;
+      if (body && typeof body === 'object') {
+        const msg =
+          'message' in body && typeof (body as { message: unknown }).message === 'string' ?
+            (body as { message: string }).message
+          : e.message || `HTTP ${e.status}`;
+        const cause =
+          'cause' in body && typeof (body as { cause: unknown }).cause === 'string' ?
+            (body as { cause: string }).cause
+          : undefined;
+        return cause ? `${msg} (${cause})` : msg;
       }
       return e.message || `HTTP ${e.status}`;
     }
@@ -159,10 +173,22 @@ export class MigrationsUiState {
     this.sqlModalLoading.set(true);
     this.migrationSqlPath.set('');
     this.migrationSqlBody.set('');
+    this.migrationSqlHash.set('');
+    this.migrationSqlHashDisplay.set('');
+    this.migrationSqlByteSize.set(0);
+    this.migrationSqlLineCount.set(0);
+    this.migrationSqlIdempotent.set(false);
+    this.migrationSqlSchemaMigration.set(false);
     try {
       const res = await firstValueFrom(this.api.getSql(tag));
       this.migrationSqlPath.set(res.path);
       this.migrationSqlBody.set(res.sql);
+      this.migrationSqlHash.set(res.hash);
+      this.migrationSqlHashDisplay.set(res.hashDisplay);
+      this.migrationSqlByteSize.set(res.byteSize);
+      this.migrationSqlLineCount.set(res.lineCount);
+      this.migrationSqlIdempotent.set(res.idempotent);
+      this.migrationSqlSchemaMigration.set(res.schemaMigration);
     } catch (e) {
       this.toastr.error(this.errMessage(e), 'Migration SQL');
     } finally {
@@ -189,9 +215,16 @@ export class MigrationsUiState {
     if (this.runPendingBusy()) return;
     this.runPendingBusy.set(true);
     try {
-      const { inventory } = await firstValueFrom(this.api.runMigrations('pending'));
+      const { inventory, hashRepairedTags } = await firstValueFrom(this.api.runMigrations('pending'));
       this.applyInventory(inventory);
-      this.toastr.success('Migrations applied (pending batch).', 'Run Pending');
+      if (hashRepairedTags?.length) {
+        this.toastr.success(
+          `Recorded missing journal migration(s) by hash: ${hashRepairedTags.join(', ')}.`,
+          'Run Pending',
+        );
+      } else {
+        this.toastr.success('Migrations applied (pending batch).', 'Run Pending');
+      }
     } catch (e) {
       this.toastr.error(this.errMessage(e), 'Run Pending');
     } finally {
@@ -203,9 +236,16 @@ export class MigrationsUiState {
     if (this.runAllBusy()) return;
     this.runAllBusy.set(true);
     try {
-      const { inventory } = await firstValueFrom(this.api.runMigrations('all'));
+      const { inventory, hashRepairedTags } = await firstValueFrom(this.api.runMigrations('all'));
       this.applyInventory(inventory);
-      this.toastr.success('Drizzle migrate completed for pending files.', 'Run All');
+      if (hashRepairedTags?.length) {
+        this.toastr.success(
+          `Hash-order repair: ${hashRepairedTags.join(', ')}. Drizzle migrate completed.`,
+          'Run All',
+        );
+      } else {
+        this.toastr.success('Drizzle migrate completed for pending files.', 'Run All');
+      }
     } catch (e) {
       this.toastr.error(this.errMessage(e), 'Run All');
     } finally {
@@ -233,9 +273,16 @@ export class MigrationsUiState {
     if (row.status !== 'pending' || this.runSingleTag() !== null) return;
     this.runSingleTag.set(row.tag);
     try {
-      const { inventory } = await firstValueFrom(this.api.runMigrations('single', row.tag));
+      const { inventory, hashRepairedTags } = await firstValueFrom(this.api.runMigrations('single', row.tag));
       this.applyInventory(inventory);
-      this.toastr.success(`Ran migration batch including "${row.tag}".`, 'Run migration');
+      if (hashRepairedTags?.length) {
+        this.toastr.success(
+          `Hash-order repair: ${hashRepairedTags.join(', ')}. Batch including "${row.tag}" completed.`,
+          'Run migration',
+        );
+      } else {
+        this.toastr.success(`Ran migration batch including "${row.tag}".`, 'Run migration');
+      }
     } catch (e) {
       this.toastr.error(this.errMessage(e), 'Run migration');
     } finally {

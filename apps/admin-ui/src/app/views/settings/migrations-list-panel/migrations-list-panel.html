@@ -64,8 +64,8 @@
 
   <div class="card border shadow-sm">
     <div class="table-responsive">
-      <table class="table table-hover table-striped mb-0 align-middle">
-        <thead class="table-light">
+      <table class="st-table table table-hover table-striped mb-0 align-middle">
+        <thead class="bg-light align-middle bg-opacity-25 thead-sm">
           <tr>
             <th scope="col" class="text-nowrap">Idx</th>
             <th scope="col">Tag</th>
@@ -208,6 +208,22 @@
         <span class="spinner-border text-primary" role="status" aria-label="Loading SQL"></span>
       </div>
     } @else {
+      @if (state.migrationSqlPath()) {
+        <dl class="row small mb-3 g-2 border-bottom pb-3">
+          <dt class="col-sm-3 text-secondary">Hash</dt>
+          <dd class="col-sm-9 font-monospace mb-0 text-break" [title]="state.migrationSqlHash()">
+            {{ state.migrationSqlHashDisplay() }}
+          </dd>
+          <dt class="col-sm-3 text-secondary">Size</dt>
+          <dd class="col-sm-9 mb-0">
+            {{ state.migrationSqlByteSize() | number }} bytes ({{ state.migrationSqlLineCount() | number }} lines)
+          </dd>
+          <dt class="col-sm-3 text-secondary">Idempotent</dt>
+          <dd class="col-sm-9 mb-0">{{ state.migrationSqlIdempotent() ? 'Yes' : 'No' }}</dd>
+          <dt class="col-sm-3 text-secondary">Schema migration</dt>
+          <dd class="col-sm-9 mb-0">{{ state.migrationSqlSchemaMigration() ? 'Yes' : 'No' }}</dd>
+        </dl>
+      }
       <pre class="border rounded p-3 small mb-0 bg-body-secondary overflow-auto" style="max-height: 50vh">{{ state.migrationSqlBody() }}</pre>
     }
   </div>

@@ -239,14 +239,18 @@ export class Login implements OnInit {
         return;
       }
       if (opts?.connection) {
-        void auth.loginWithRedirect({
+        auth.loginWithRedirect({
           appState: { target: '/dashboards/control-center' },
           authorizationParams: { connection: opts.connection },
+        }).subscribe({
+          error: (e) => console.error('[admin-ui] Auth0 loginWithRedirect failed', e),
         });
         return;
       }
-      void auth.loginWithRedirect({
+      auth.loginWithRedirect({
         appState: { target: '/dashboards/control-center' },
+      }).subscribe({
+        error: (e) => console.error('[admin-ui] Auth0 loginWithRedirect failed', e),
       });
     });
   }

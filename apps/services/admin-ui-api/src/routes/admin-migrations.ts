@@ -1,8 +1,12 @@
 import type { RequestHandler, Router } from 'express';
 
+import { createHash } from 'node:crypto';
+
 import {
+  analyzeMigrationSql,
   clearAdminMigrationsUseSharedHttpClient,
   deleteMigrationRecordByHash,
+  formatMigrationHashDisplay,
   getAdminMigrationsRunnerSource,
   getDb,
   getFirstPendingTag,
@@ -56,7 +60,19 @@ const getSql: RequestHandler = async (req, res) => {
   try {
     const root = workspaceRoot();
     const { relativePath, sql } = readMigrationSqlFile(root, tag);
-    res.status(200).json({ path: relativePath, sql });
+    const hash = createHash('sha256').update(sql).digest('hex');
+    const meta = analyzeMigrationSql(sql);
+    res.status(200).json({
+      path: relativePath,
+      sql,
+      hash,
+      hashDisplay: formatMigrationHashDisplay(hash),
+      byteSize: meta.byteSize,
+      lineCount: meta.lineCount,
+      idempotent: meta.idempotent,
+      idempotentBasis: meta.idempotentBasis,
+      schemaMigration: meta.schemaMigration,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     res.status(400).json({ error: 'migration_sql_failed', message });
@@ -153,14 +169,19 @@ const postRun: RequestHandler = async (req, res) => {
 
   try {
     const useShared = await getAdminMigrationsUseSharedHttpClient(db);
-    await runDrizzleMigrationsWithRunnerMode(db, root, useShared);
+    const hashRepairedTags = await runDrizzleMigrationsWithRunnerMode(db, root, useShared);
     const inventory = await getMigrationInventory(db, root);
-    res.status(200).json({ ok: true, inventory });
+    res.status(200).json({ ok: true, inventory, hashRepairedTags });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
+    let cause: string | undefined;
+    if (e instanceof Error && 'cause' in e && e.cause instanceof Error) {
+      cause = e.cause.message;
+    }
     res.status(500).json({
       error: 'migrate_failed',
       message,
+      ...(cause ? { cause } : {}),
     });
   }
 };

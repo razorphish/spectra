@@ -33,3 +33,22 @@ export function auth0LogoutReturnToUrl(): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * The Auth0 Management API identifier ends with `/api/v2`. It is not a valid audience for the
+ * staff SPA + `admin-ui-api` — silent renewal and token exchange often fail with **400** on
+ * `/authorize` (`prompt=none`, `response_mode=web_message`).
+ */
+export function isLikelyAuth0ManagementApiAudience(audience: string | undefined): boolean {
+  const t = audience?.trim();
+  if (!t) return false;
+  return t.replace(/\/+$/, '').toLowerCase().endsWith('/api/v2');
+}
+
+/** Browser-only: logs once when audience is misconfigured. */
+export function warnIfStaffAuth0AudienceUnsupported(audience: string | undefined): void {
+  if (typeof window === 'undefined' || !isLikelyAuth0ManagementApiAudience(audience)) return;
+  console.error(
+    '[admin-ui] ADMIN_UI_AUTH0_AUDIENCE points at the Auth0 Management API (/api/v2). Use your **custom API** Identifier (the same value as AUTH0_AUDIENCE on admin-ui-api), not the Management API. Wrong audience commonly causes a blank page on refresh and HTTP 400 on silent /authorize.',
+  );
+}

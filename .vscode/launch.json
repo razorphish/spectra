@@ -262,7 +262,7 @@
   "compounds": [
     {
       "name": "📱 Launch Expo Platform",
-      "preLaunchTask": "db-migrate-local",
+      "preLaunchTask": "ensure-postgres-local",
       "configurations": [
         "Backend (Launch)",
         "admin-ui-api (Launch)",
@@ -275,7 +275,7 @@
     },
     {
       "name": "🐛 Debug Expo Platform",
-      "preLaunchTask": "db-migrate-local",
+      "preLaunchTask": "ensure-postgres-local",
       "configurations": [
         "Backend (Debug)",
         "Debug admin-ui-api with Nx",
@@ -288,7 +288,7 @@
     },
     {
       "name": "🌐 Debug Expo Web Only",
-      "preLaunchTask": "db-migrate-local",
+      "preLaunchTask": "ensure-postgres-local",
       "configurations": [
         "Backend (Debug)",
         "Debug admin-ui-api with Nx",
@@ -325,13 +325,13 @@
     },
     {
       "name": "🛠 Launch Platform only",
-      "preLaunchTask": "db-migrate-local",
+      "preLaunchTask": "ensure-postgres-local",
       "configurations": ["Backend (Launch)", "Platform (Expo)"],
       "presentation": { "group": "focused", "order": 5 }
     },
     {
       "name": "🐛 Debug Platform only",
-      "preLaunchTask": "db-migrate-local",
+      "preLaunchTask": "ensure-postgres-local",
       "configurations": ["Backend (Debug)", "Platform (Expo)"],
       "presentation": { "group": "focused", "order": 6 }
     },

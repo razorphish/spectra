@@ -218,6 +218,8 @@ function computeCheck(
   orderedJournalHashes: string[],
   appliedOrdered: { hash: string; created_at: number }[],
   pendingCount: number,
+  /** Parallel to `orderedJournalHashes` — used for clearer gap messages. */
+  journalTags?: string[],
 ): MigrationCheckResult {
   const journalSet = new Set(orderedJournalHashes);
   const orphanDbHashes = appliedOrdered
@@ -241,8 +243,20 @@ function computeCheck(
     message =
       'Database contains migration hash(es) not present in the repo journal. See packages/database/README.md.';
   } else if (!prefixOk) {
+    let firstMissingTag: string | undefined;
+    if (journalTags && journalTags.length === orderedJournalHashes.length) {
+      for (let i = 0; i < orderedJournalHashes.length; i++) {
+        const h = orderedJournalHashes[i]!;
+        if (!appliedOrdered.some((a) => a.hash === h)) {
+          firstMissingTag = journalTags[i];
+          break;
+        }
+      }
+    }
     message =
-      'Applied migrations do not form a clean prefix of the repo journal (a migration may have been skipped or reordered).';
+      firstMissingTag ?
+        `Applied history is missing "${firstMissingTag}" (its current on-disk hash is not in spectra.__drizzle_migrations) while a later migration is already recorded. Use Run Pending to apply missing migrations in journal order. See packages/database/README.md.`
+      : 'Applied migrations do not form a clean prefix of the repo journal (a migration may have been skipped or reordered).';
   } else if (pendingCount > 0) {
     message = `${pendingCount} migration(s) pending — run from the list or use Run Pending.`;
   }
@@ -310,7 +324,12 @@ export async function getMigrationInventory(
     lastMigrationAt = new Date(maxTs).toISOString();
   }
 
-  const check = computeCheck(orderedJournalHashes, applied, pending);
+  const check = computeCheck(
+    orderedJournalHashes,
+    applied,
+    pending,
+    journalEntries.map((e) => e.tag),
+  );
 
   return {
     paths: buildMigrationPaths(workspaceRoot),
@@ -331,33 +350,125 @@ const migrationConfig = (migrationsFolder: string) => ({
   migrationsTable: MIGRATIONS_TABLE,
 });
 
+async function ensureSpectraMigrationsTable(db: SpectraDb): Promise<void> {
+  await db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.identifier(MIGRATIONS_SCHEMA)}`);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS ${sql.identifier(MIGRATIONS_SCHEMA)}.${sql.identifier(MIGRATIONS_TABLE)} (
+      id SERIAL PRIMARY KEY,
+      hash text NOT NULL,
+      created_at bigint
+    )
+  `);
+}
+
+/**
+ * Drizzle's built-in `migrate()` only considers the **latest** row in `__drizzle_migrations`
+ * (`order by created_at desc limit 1`) and skips any migration whose journal `when` is not
+ * greater than that row. If a **later** migration was applied while an **earlier** journal file
+ * was never recorded (hash drift repair, manual deletes, etc.), `migrate()` will never run the
+ * skipped file. This pass applies every journal migration whose **hash** is missing, in order,
+ * then normal `migrate()` can no-op safely.
+ */
+async function applyMissingJournalMigrationsByHash(
+  db: SpectraDb,
+  workspaceRoot: string,
+): Promise<string[]> {
+  const migrationsFolder = resolveMigrationsFolder(workspaceRoot);
+  const cfg = migrationConfig(migrationsFolder);
+  await ensureSpectraMigrationsTable(db);
+  const migrations = readMigrationFiles(cfg);
+  const journalEntries = readJournalEntries(migrationsFolder);
+  if (migrations.length !== journalEntries.length) {
+    throw new Error('Journal entry count does not match migration files');
+  }
+
+  const applied = await selectApplied(db);
+  const appliedSet = new Set(applied.map((r) => r.hash));
+  const appliedTags: string[] = [];
+
+  for (let i = 0; i < migrations.length; i++) {
+    const m = migrations[i]!;
+    const tag = journalEntries[i]!.tag;
+    if (appliedSet.has(m.hash)) continue;
+
+    if (isNodePostgresDb(db)) {
+      try {
+        await db.transaction(async (tx) => {
+          for (const stmt of m.sql) {
+            const t = stmt.trim();
+            if (!t) continue;
+            await tx.execute(sql.raw(t));
+          }
+          await tx.execute(sql`
+            insert into ${sql.identifier(MIGRATIONS_SCHEMA)}.${sql.identifier(MIGRATIONS_TABLE)}
+              ("hash", "created_at")
+            values (${m.hash}, ${m.folderMillis})
+          `);
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        const err = new Error(`Hash-order migration "${tag}" failed: ${msg}`);
+        (err as Error & { cause?: unknown }).cause = e;
+        throw err;
+      }
+    } else {
+      try {
+        for (const stmt of m.sql) {
+          const t = stmt.trim();
+          if (!t) continue;
+          await db.execute(sql.raw(t));
+        }
+        await db.execute(sql`
+          insert into ${sql.identifier(MIGRATIONS_SCHEMA)}.${sql.identifier(MIGRATIONS_TABLE)}
+            ("hash", "created_at")
+            values (${m.hash}, ${m.folderMillis})
+        `);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        const err = new Error(`Hash-order migration "${tag}" failed: ${msg}`);
+        (err as Error & { cause?: unknown }).cause = e;
+        throw err;
+      }
+    }
+
+    appliedSet.add(m.hash);
+    appliedTags.push(tag);
+  }
+
+  return appliedTags;
+}
+
 /**
  * Runs Drizzle `migrate()` using the same journal + `spectra.__drizzle_migrations` as `drizzle-kit migrate`.
  */
 export async function runDrizzleMigrations(
   db: SpectraDb,
   workspaceRoot: string,
-): Promise<void> {
+): Promise<string[]> {
   const migrationsFolder = resolveMigrationsFolder(workspaceRoot);
+  const repairedTags = await applyMissingJournalMigrationsByHash(db, workspaceRoot);
   const cfg = migrationConfig(migrationsFolder);
   if (isNodePostgresDb(db)) {
     await migratePg(db, cfg);
   } else {
     await migrateNeon(db as NeonHttpDatabase<Schema>, cfg);
   }
+  return repairedTags;
 }
 
 async function runDedicatedPgMigrate(
   connectionString: string,
   workspaceRoot: string,
-): Promise<void> {
+): Promise<string[]> {
   const pgModule = require('pg') as typeof import('pg');
   const { drizzle } =
     require('drizzle-orm/node-postgres') as typeof import('drizzle-orm/node-postgres');
   const pool = new pgModule.Pool({ connectionString });
   try {
     const db = drizzle(pool, { schema });
+    const repairedTags = await applyMissingJournalMigrationsByHash(db, workspaceRoot);
     await migratePg(db, migrationConfig(resolveMigrationsFolder(workspaceRoot)));
+    return repairedTags;
   } finally {
     await pool.end();
   }
@@ -371,10 +482,9 @@ export async function runDrizzleMigrationsWithRunnerMode(
   sharedDb: SpectraDb,
   workspaceRoot: string,
   useSharedHttpClient: boolean,
-): Promise<void> {
+): Promise<string[]> {
   if (useSharedHttpClient) {
-    await runDrizzleMigrations(sharedDb, workspaceRoot);
-    return;
+    return runDrizzleMigrations(sharedDb, workspaceRoot);
   }
   const direct =
     process.env['DATABASE_DIRECT_URL']?.trim() ||
@@ -385,7 +495,7 @@ export async function runDrizzleMigrationsWithRunnerMode(
       'Dedicated migration runner needs a Postgres URL (set DATABASE_URL / NEON_DATABASE_URL, or DATABASE_DIRECT_URL for migrate).',
     );
   }
-  await runDedicatedPgMigrate(direct, workspaceRoot);
+  return runDedicatedPgMigrate(direct, workspaceRoot);
 }
 
 export function resolveMigrationHashForTag(

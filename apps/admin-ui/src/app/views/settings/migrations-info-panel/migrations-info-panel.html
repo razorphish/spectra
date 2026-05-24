@@ -79,6 +79,33 @@
             @if (chk.message) {
               <div class="text-muted mt-2">{{ chk.message }}</div>
             }
+            @if (chk.orphanDbHashes.length > 0) {
+              <div class="alert alert-warning small mt-2 mb-0 py-2">
+                <div class="fw-semibold mb-1">Stale migration hash(es) in the database</div>
+                <p class="mb-1">
+                  These SHA-256 values appear in
+                  <code class="small">spectra.__drizzle_migrations</code> but do not match any current
+                  <code class="small">packages/database/drizzle/*.sql</code> file (for example
+                  <code class="small">0002_users_auth_subject.sql</code> was edited after apply). Remove
+                  the orphan row(s) with SQL (example:
+                  <code class="small">DELETE FROM spectra.__drizzle_migrations WHERE hash = '…';</code>),
+                  then <strong>Run Pending</strong> so idempotent migrations re-record the correct hash.
+                </p>
+                <ul class="mb-0 font-monospace small">
+                  @for (h of chk.orphanDbHashes; track h) {
+                    <li class="text-break">{{ h }}</li>
+                  }
+                </ul>
+              </div>
+            }
+            <div class="text-muted mt-3 small">
+              <strong>Pending</strong> (per migration row) means the on-disk SQL file’s SHA-256 is not
+              recorded in <code class="small">spectra.__drizzle_migrations</code>. If the change already
+              ran (for example the file was edited after apply, or SQL was run manually), the database can
+              still match while the UI shows pending. Idempotent migrations can be fixed with
+              <strong>Run Pending</strong> (safe re-run) so Drizzle records the current hash; see
+              <code class="small">packages/database/README.md</code>.
+            </div>
           </div>
         </div>
       }

@@ -10,7 +10,7 @@ import { provideRouter, withInMemoryScrolling } from '@angular/router';
 import { authHttpInterceptorFn, provideAuth0 } from '@auth0/auth0-angular';
 import { provideToastr } from 'ngx-toastr';
 import { environment } from '../environments/environment';
-import { isAuth0RuntimeConfigured } from './core/auth/auth0-env';
+import { isAuth0RuntimeConfigured, warnIfStaffAuth0AudienceUnsupported } from './core/auth/auth0-env';
 import { SpectraGlobalErrorHandler } from './core/telemetry/spectra-global-error-handler';
 import { provideTelemetryInit } from './core/telemetry/telemetry-init';
 import { appRoutes } from './app.routes';
@@ -36,10 +36,14 @@ function auth0Config() {
   if (!isAuth0RuntimeConfigured()) {
     return [];
   }
+  warnIfStaffAuth0AudienceUnsupported(a.audience);
   return [
     provideAuth0({
       domain: a.domain,
       clientId: a.clientId,
+      /** Persist tokens + use refresh-token grant so full reload works without third-party cookies / iframe silent auth. */
+      useRefreshTokens: true,
+      cacheLocation: 'localstorage',
       authorizationParams: {
         audience: a.audience || undefined,
         redirect_uri: auth0RedirectUri(),

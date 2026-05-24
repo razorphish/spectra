@@ -30,6 +30,22 @@
       }
     },
     {
+      "label": "ensure-postgres-local",
+      "type": "shell",
+      "command": "echo \"[ensure-postgres-local] Postgres compose is up (skipping drizzle-kit migrate; use Admin UI → Settings → Migrations if needed).\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": ["kill-local-dev-ports", "compose-up-postgres"],
+      "dependsOrder": "sequence",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
       "label": "db-migrate-local",
       "type": "shell",
       "command": "DATABASE_URL=postgresql://spectra:spectra@localhost:5432/spectra DATABASE_DIRECT_URL=postgresql://spectra:spectra@localhost:5432/spectra DATABASE_DRIVER=pg npx drizzle-kit migrate",

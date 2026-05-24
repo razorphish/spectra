@@ -8,7 +8,7 @@
   "targets": {
     "env-sync": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "inputs": [
         "{projectRoot}/.env",
         "{projectRoot}/.env.local",

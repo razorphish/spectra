@@ -6,6 +6,10 @@
  * 1. Workspace root `.env` — only variables prefixed with `ADMIN_UI_`
  * 2. `apps/admin-ui/.env`
  * 3. `apps/admin-ui/.env.local` (optional overrides)
+ *
+ * **Nx:** `admin-ui:env-sync` must stay **uncached** (`project.json` cache: false). Env files are
+ * usually gitignored; cached env-sync can keep serving an old `environment.auth0.local.ts` even
+ * after you fix `ADMIN_UI_AUTH0_*` in `.env`.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -94,3 +98,6 @@ export const auth0FromDotEnv = {
 
 writeFileSync(outPath, content, 'utf8');
 console.log(`[sync-admin-ui-env] wrote ${outPath}`);
+console.log(
+  `[sync-admin-ui-env] ADMIN_UI_AUTH0_AUDIENCE -> ${audience || '(empty)'}`,
+);

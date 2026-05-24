@@ -1,10 +1,33 @@
 import type { RequestHandler } from 'express';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
-import { getDb, resolveSpectraDatabaseUrl, users } from '@spectra/database';
+import {
+  catalog,
+  CATALOG_IDS,
+  getDb,
+  resolveSpectraDatabaseUrl,
+  users,
+} from '@spectra/database';
 
 import { fetchStaffEmailFromAuth0Userinfo } from '../lib/staff-email-from-auth0-userinfo';
 import { staffEmailFromAccessTokenClaims } from '../lib/staff-access-token-claims';
+
+async function selectUserWithLifecycleCatalog(db: ReturnType<typeof getDb>, userId: string) {
+  const [row] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      authSubject: users.authSubject,
+      statusId: users.statusId,
+      statusName: catalog.name,
+      statusFamily: catalog.family,
+    })
+    .from(users)
+    .innerJoin(catalog, eq(users.statusId, catalog.id))
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row;
+}
 
 /**
  * Upserts `spectra.users` from Auth0 access token (`sub` + email claim).
@@ -55,6 +78,8 @@ export function createAdminMeSyncHandler(): RequestHandler {
       return;
     }
 
+    const activeId = CATALOG_IDS.status.active;
+
     try {
       const db = getDb();
 
@@ -66,27 +91,31 @@ export function createAdminMeSyncHandler(): RequestHandler {
 
       if (bySub) {
         if (bySub.email !== email) {
-          const [emailOwner] = await db
+          const [otherActive] = await db
             .select()
             .from(users)
-            .where(eq(users.email, email))
+            .where(and(eq(users.email, email), eq(users.statusId, activeId)))
             .limit(1);
-          if (emailOwner && emailOwner.id !== bySub.id) {
+          if (otherActive && otherActive.id !== bySub.id) {
             res.status(409).json({
               error: 'email_conflict',
               message: 'Email is already associated with another user.',
             });
             return;
           }
-          await db
-            .update(users)
-            .set({ email })
-            .where(eq(users.id, bySub.id));
+          await db.update(users).set({ email }).where(eq(users.id, bySub.id));
+        }
+        const hydrated = await selectUserWithLifecycleCatalog(db, bySub.id);
+        if (!hydrated) {
+          res.status(500).json({ error: 'sync_failed', message: 'User row missing catalog join.' });
+          return;
         }
         res.status(200).json({
-          id: bySub.id,
-          email,
+          id: hydrated.id,
+          email: hydrated.email,
           authSubject: sub,
+          statusId: hydrated.statusId,
+          status: { name: hydrated.statusName, family: hydrated.statusFamily },
         });
         return;
       }
@@ -94,7 +123,7 @@ export function createAdminMeSyncHandler(): RequestHandler {
       const [byEmail] = await db
         .select()
         .from(users)
-        .where(eq(users.email, email))
+        .where(and(eq(users.email, email), eq(users.statusId, activeId)))
         .limit(1);
 
       if (byEmail) {
@@ -105,21 +134,25 @@ export function createAdminMeSyncHandler(): RequestHandler {
           });
           return;
         }
-        await db
-          .update(users)
-          .set({ authSubject: sub })
-          .where(eq(users.id, byEmail.id));
+        await db.update(users).set({ authSubject: sub }).where(eq(users.id, byEmail.id));
+        const hydrated = await selectUserWithLifecycleCatalog(db, byEmail.id);
+        if (!hydrated) {
+          res.status(500).json({ error: 'sync_failed', message: 'User row missing catalog join.' });
+          return;
+        }
         res.status(200).json({
-          id: byEmail.id,
-          email,
+          id: hydrated.id,
+          email: hydrated.email,
           authSubject: sub,
+          statusId: hydrated.statusId,
+          status: { name: hydrated.statusName, family: hydrated.statusFamily },
         });
         return;
       }
 
       const insertedRows = await db
         .insert(users)
-        .values({ email, authSubject: sub })
+        .values({ email, authSubject: sub, statusId: activeId })
         .returning();
       const inserted = insertedRows[0];
       if (!inserted) {
@@ -127,10 +160,18 @@ export function createAdminMeSyncHandler(): RequestHandler {
         return;
       }
 
+      const hydrated = await selectUserWithLifecycleCatalog(db, inserted.id);
+      if (!hydrated) {
+        res.status(500).json({ error: 'sync_failed', message: 'User row missing catalog join.' });
+        return;
+      }
+
       res.status(200).json({
-        id: inserted.id,
-        email: inserted.email,
-        authSubject: inserted.authSubject ?? sub,
+        id: hydrated.id,
+        email: hydrated.email,
+        authSubject: hydrated.authSubject ?? sub,
+        statusId: hydrated.statusId,
+        status: { name: hydrated.statusName, family: hydrated.statusFamily },
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Database error';

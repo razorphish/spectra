@@ -63,11 +63,19 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [id, email, authSubject]
+                required: [id, email, authSubject, statusId, status]
                 properties:
                   id: { type: string, format: uuid }
                   email: { type: string, format: email }
                   authSubject: { type: string }
+                  statusId: { type: string, format: uuid }
+                  status:
+                    type: object
+                    description: Resolved lifecycle catalog row (`family` is always `status` for users)
+                    required: [name, family]
+                    properties:
+                      name: { type: string }
+                      family: { type: string }
         '400':
           description: Missing email claim or invalid subject
         '401':
