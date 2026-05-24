@@ -4,9 +4,10 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug api-gateway with Nx",
+      "name": "Debug local-edge with Nx",
+      "preLaunchTask": "kill-local-dev-ports",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "api-gateway"],
+      "runtimeArgs": ["nx", "serve", "local-edge"],
       "env": {
         "NODE_OPTIONS": "--inspect=9229"
       },
@@ -14,9 +15,8 @@
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"],
       "sourceMaps": true,
-      "preLaunchTask": "db-migrate-local",
       "outFiles": [
-        "${workspaceFolder}/apps/api-gateway/dist/**/*.(m|c|)js",
+        "${workspaceFolder}/apps/local-edge/dist/**/*.(m|c|)js",
         "!**/node_modules/**"
       ]
     },
@@ -163,6 +163,17 @@
       "preLaunchTask": "kill-local-dev-ports",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["nx", "serve", "admin-ui"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Serve local-edge",
+      "preLaunchTask": "kill-local-dev-ports",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "local-edge"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"]
@@ -339,7 +350,7 @@
       "name": "🟢 Full Stack (Local)",
       "preLaunchTask": "db-migrate-local",
       "configurations": [
-        "Debug api-gateway with Nx",
+        "Debug local-edge with Nx",
         "Debug aviate-api with Nx",
         "Debug admin-ui-api with Nx",
         "Debug seq-api with Nx",

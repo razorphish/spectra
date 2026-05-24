@@ -1,16 +1,16 @@
 openapi: 3.0.3
 info:
-  title: api-gateway
+  title: local-edge
   version: 0.0.1
 paths:
-  /v1/gateway/health:
+  /v1/local-edge/health:
     get:
       tags: [System]
       summary: Liveness
       responses:
         '200':
           description: OK
-  /v1/gateway/ready:
+  /v1/local-edge/ready:
     get:
       tags: [System]
       summary: Readiness

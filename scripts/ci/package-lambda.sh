@@ -3,8 +3,8 @@
 # Usage: ./scripts/ci/package-lambda.sh <service> <out_dir>
 # Example: ./scripts/ci/package-lambda.sh aviate-api dist/lambdas
 #
-# Looks for Nx output under dist/apps/services/<service> (or dist/apps/<service>
-# for api-gateway). Emits <out_dir>/<service>.zip and writes <out_dir>/<service>.hash
+# Looks for Nx output under dist/apps/services/<service> (or dist/apps/<project>
+# for Node apps at apps/<project> such as local-edge). Emits <out_dir>/<service>.zip and writes <out_dir>/<service>.hash
 # containing the deterministic backend_hash.
 
 set -euo pipefail

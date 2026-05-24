@@ -5,7 +5,7 @@
 ## Affected workspaces
 
 - [ ] `apps/spectra-ui` / `sandbox-ui` / `admin-ui`
-- [ ] `apps/api-gateway`
+- [ ] `apps/local-edge`
 - [ ] `apps/services/*`
 - [ ] `packages/*`
 - [ ] `terraform/`

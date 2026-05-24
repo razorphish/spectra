@@ -1,10 +1,10 @@
 module.exports = {
-  displayName: 'api-gateway',
+  displayName: 'local-edge',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/apps/api-gateway',
+  coverageDirectory: '../../coverage/apps/local-edge',
 };

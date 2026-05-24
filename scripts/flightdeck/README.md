@@ -67,7 +67,6 @@ your git branch.
 | ------------- | ----------------------------------- | ----------------------------------------------------------- |
 | `aviate-api`  | `deploy-aviate-api-direct.sh`       | Build + zip + S3 + Lambda alias flip + `/v1/platform/health` |
 | `admin-ui-api`| `deploy-admin-ui-api-direct.sh`     | Same, on the admin plane                                    |
-| `api-gateway` | `deploy-api-gateway-direct.sh`      | Same, root proxy Lambda                                     |
 | `spectra-ui`  | `deploy-spectra-ui-direct.sh`       | nx build + `s3 sync` + CloudFront invalidate                |
 | `sandbox-ui`  | `deploy-sandbox-ui-direct.sh`       | Same                                                        |
 | `admin-ui`    | `deploy-admin-ui-direct.sh`         | Same                                                        |
@@ -127,7 +126,6 @@ scripts/flightdeck/
 │   └── flightdeck.sh                  # detect_spectra_env + AWS helpers
 ├── deploy-aviate-api-direct.sh        # active Node Lambda
 ├── deploy-admin-ui-api-direct.sh      # active Node Lambda
-├── deploy-api-gateway-direct.sh       # active Node Lambda
 ├── deploy-spectra-ui-direct.sh        # SPA
 ├── deploy-sandbox-ui-direct.sh        # SPA
 ├── deploy-admin-ui-direct.sh          # SPA

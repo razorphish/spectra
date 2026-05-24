@@ -44,7 +44,7 @@ import { environment } from '../../environments/environment';
     <section class="dev-strip" aria-labelledby="dev-heading">
       <div class="spectra-page dev-strip-inner">
         <h2 id="dev-heading">API status</h2>
-        <p class="dev-hint">Probe of the public gateway health endpoint (development build uses <code>apiBaseUrl</code>).</p>
+        <p class="dev-hint">Probe of the <strong>local-edge</strong> dev server health (development build uses <code>apiBaseUrl</code>).</p>
         <div class="probe">
           <p class="meta">
             <span class="label">Configured base</span>
@@ -288,7 +288,7 @@ export class HomeComponent implements OnInit {
 
   ngOnInit() {
     if (!environment.apiBaseUrl) return;
-    const url = `${environment.apiBaseUrl}/v1/gateway/health`;
+    const url = `${environment.apiBaseUrl}/v1/local-edge/health`;
     this.healthUrl.set(url);
     this.http.get<unknown>(url).subscribe({
       next: (body) => {

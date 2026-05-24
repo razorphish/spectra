@@ -15,7 +15,7 @@ on:
         description: 'JSON array of service names'
         required: false
         type: string
-        default: '["api-gateway","aviate-api","admin-ui-api","seq-api","quantum-api","corridor-api"]'
+        default: '["aviate-api","admin-ui-api","seq-api","quantum-api","corridor-api"]'
       node_version:
         required: false
         type: string

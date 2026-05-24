@@ -110,7 +110,6 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - api-gateway
           - aviate-api
           - admin-ui-api
           - seq-api

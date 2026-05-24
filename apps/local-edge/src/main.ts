@@ -20,14 +20,14 @@ const root = workspaceRoot();
 for (const [p, o] of [
   [join(root, '.env'), false],
   [join(root, '.env.local'), true],
-  [join(root, 'apps/api-gateway', '.env.development'), true],
+  [join(root, 'apps/local-edge', '.env.development'), true],
 ] as const) {
   if (existsSync(p)) {
     config({ path: p, override: o });
   }
 }
 
-/** Thin optional BFF — routing usually maps API Gateway → Lambdas directly. */
+/** Local dev only — CORS + optional passthrough. Not deployed. Production edge is AWS HTTP API (Terraform api_http). */
 const host = process.env.HOST ?? 'localhost';
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -50,18 +50,21 @@ app.use((req, res, next) => {
 });
 app.use(express.json());
 
-const SEGMENT = 'gateway';
+const SEGMENT = 'local-edge';
 
 app.get(`/v1/${SEGMENT}/health`, (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
 app.get(`/v1/${SEGMENT}/ready`, (_req, res) => {
-  res.status(200).json({ status: 'ok', checks: { gateway: 'ok' } });
+  res.status(200).json({ status: 'ok', checks: { local_edge: 'ok' } });
 });
 
 app.get('/', (_req, res) => {
-  res.send({ message: 'Spectra api-gateway stub', segment: SEGMENT });
+  res.send({
+    message: 'Spectra local-edge — local development only; not deployed to AWS.',
+    segment: SEGMENT,
+  });
 });
 
 app.listen(port, host, () => {

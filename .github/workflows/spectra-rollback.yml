@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       service:
-        description: 'Service name (api-gateway, aviate-api, admin-ui-api, ...)'
+        description: 'Service name (aviate-api, admin-ui-api, seq-api, ...)'
         required: true
         type: string
       target_s3_key:

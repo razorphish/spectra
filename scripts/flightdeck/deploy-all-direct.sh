@@ -14,7 +14,7 @@
 #   --skip-migrations         skip the drizzle-kit migrate step
 #   --skip-verify             skip the final verify-deployment.sh step
 #   --only=<csv>              run only the listed assets (subset of:
-#                             aviate-api, admin-ui-api, api-gateway,
+#                             aviate-api, admin-ui-api,
 #                             spectra-ui, sandbox-ui, admin-ui)
 #                             implies --skip-infra, --skip-migrations
 #                             unless they're explicitly listed.
@@ -34,7 +34,7 @@ source "${SCRIPT_DIR}/../ci/lib/aws-helpers.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/_lib/flightdeck.sh"
 
-ALL_LAMBDAS=(api-gateway aviate-api admin-ui-api)
+ALL_LAMBDAS=(aviate-api admin-ui-api)
 ALL_SPAS=(spectra-ui sandbox-ui admin-ui)
 
 # --- arg parsing ---------------------------------------------------------
@@ -94,7 +94,7 @@ if [ -n "$ONLY_LIST" ]; then
       infra)        RUN_INFRA=1 ;;
       migrations)   RUN_MIGRATIONS=1 ;;
       verify)       RUN_VERIFY=1 ;;
-      api-gateway|aviate-api|admin-ui-api) LAMBDAS_TO_RUN+=("$item") ;;
+      aviate-api|admin-ui-api) LAMBDAS_TO_RUN+=("$item") ;;
       spectra-ui|sandbox-ui|admin-ui)      SPAS_TO_RUN+=("$item") ;;
       *)
         log_error "--only: unknown asset '$item'"
