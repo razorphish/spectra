@@ -12,8 +12,12 @@ import type { Pool } from 'pg';
 
 import * as schema from '../schema';
 import { platformSettings } from '../schema/control-plane';
-import type { SpectraDb } from './connection';
-import { resolveSpectraDatabaseUrl } from './connection';
+import {
+  databasePackageLog,
+  refreshDatabasePackageLoggingFromPlatform,
+  resolveSpectraDatabaseUrl,
+  type SpectraDb,
+} from './connection';
 
 type Schema = typeof schema;
 
@@ -279,6 +283,7 @@ export async function getMigrationInventory(
   db: SpectraDb,
   workspaceRoot: string,
 ): Promise<MigrationInventory> {
+  await refreshDatabasePackageLoggingFromPlatform(db);
   const migrationsFolder = resolveMigrationsFolder(workspaceRoot);
   if (!existsSync(join(migrationsFolder, 'meta', '_journal.json'))) {
     throw new Error(
@@ -330,6 +335,19 @@ export async function getMigrationInventory(
     pending,
     journalEntries.map((e) => e.tag),
   );
+
+  databasePackageLog.info('Migration inventory computed', {
+    module: 'database|src/lib/admin-migrations.ts|getMigrationInventory',
+    action: 'database.migrations.inventory',
+    metadata: {
+      attrs: {
+        totalApplied,
+        totalAvailable,
+        pending,
+        isValid: check.isValid,
+      },
+    },
+  });
 
   return {
     paths: buildMigrationPaths(workspaceRoot),
@@ -445,6 +463,11 @@ export async function runDrizzleMigrations(
   db: SpectraDb,
   workspaceRoot: string,
 ): Promise<string[]> {
+  await refreshDatabasePackageLoggingFromPlatform(db);
+  databasePackageLog.info('Drizzle migrate starting', {
+    module: 'database|src/lib/admin-migrations.ts|runDrizzleMigrations',
+    action: 'database.migrations.run_start',
+  });
   const migrationsFolder = resolveMigrationsFolder(workspaceRoot);
   const repairedTags = await applyMissingJournalMigrationsByHash(db, workspaceRoot);
   const cfg = migrationConfig(migrationsFolder);
@@ -453,6 +476,13 @@ export async function runDrizzleMigrations(
   } else {
     await migrateNeon(db as NeonHttpDatabase<Schema>, cfg);
   }
+  databasePackageLog.info('Drizzle migrate finished', {
+    module: 'database|src/lib/admin-migrations.ts|runDrizzleMigrations',
+    action: 'database.migrations.run_complete',
+    metadata: {
+      attrs: { repairedJournalMigrations: repairedTags.length },
+    },
+  });
   return repairedTags;
 }
 

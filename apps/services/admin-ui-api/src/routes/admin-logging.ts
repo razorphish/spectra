@@ -25,7 +25,14 @@ import { createRequireAuth0AccessToken } from '../middleware/require-auth0-acces
 const requireAuth0AccessToken = createRequireAuth0AccessToken();
 
 /** Keys surfaced in the admin UI (aligned with Vital Woman Reset `LoggingSettingsTab`). */
-const LOGGING_SETTING_KEYS = ['logging_level', 'log_to_console'] as const;
+const LOGGING_SETTING_KEYS = ['logging_level', 'logging_output'] as const;
+
+/** Extra keys read to synthesize defaults (legacy `log_to_console`). */
+const LOGGING_SETTING_QUERY_KEYS = [
+  'logging_level',
+  'logging_output',
+  'log_to_console',
+] as const;
 
 type LoggingSettingKey = (typeof LOGGING_SETTING_KEYS)[number];
 
@@ -199,7 +206,7 @@ const getLoggingSettings: RequestHandler = async (_req, res) => {
 
   const defaults: Record<LoggingSettingKey, unknown> = {
     logging_level: 'INFO',
-    log_to_console: true,
+    logging_output: 'both',
   };
 
   try {
@@ -207,14 +214,26 @@ const getLoggingSettings: RequestHandler = async (_req, res) => {
     const rows = await db
       .select()
       .from(platformSettings)
-      .where(inArray(platformSettings.key, [...LOGGING_SETTING_KEYS]));
+      .where(inArray(platformSettings.key, [...LOGGING_SETTING_QUERY_KEYS]));
 
-    const byKey = new Map(rows.map((r) => [r.key as LoggingSettingKey, r.value]));
+    const byKey = new Map(rows.map((r) => [r.key, r.value]));
 
-    const settings = LOGGING_SETTING_KEYS.map((key) => ({
-      key,
-      value: byKey.has(key) ? byKey.get(key) : defaults[key],
-    }));
+    const loggingOutputValue = ((): unknown => {
+      if (byKey.has('logging_output')) return byKey.get('logging_output');
+      const legacy = byKey.get('log_to_console');
+      if (typeof legacy === 'boolean') {
+        return legacy ? 'both' : 'database';
+      }
+      return defaults.logging_output;
+    })();
+
+    const settings = LOGGING_SETTING_KEYS.map((key) => {
+      if (key === 'logging_output') {
+        return { key, value: loggingOutputValue };
+      }
+      const value = byKey.has(key) ? byKey.get(key) : defaults[key];
+      return { key, value };
+    });
 
     res.status(200).json({ settings });
   } catch (e) {
@@ -251,32 +270,54 @@ const putLoggingSetting: RequestHandler = async (req, res) => {
     return;
   }
 
-  if (key === 'logging_level' && typeof body.value !== 'string') {
-    res.status(400).json({
-      error: 'invalid_value',
-      message: 'logging_level must be a string.',
-    });
-    return;
+  let valueToStore: unknown = body.value;
+
+  if (key === 'logging_level') {
+    if (typeof body.value !== 'string') {
+      res.status(400).json({
+        error: 'invalid_value',
+        message: 'logging_level must be a string.',
+      });
+      return;
+    }
+    if (!/^(debug|info|warn|error|critical)$/i.test(body.value.trim())) {
+      res.status(400).json({
+        error: 'invalid_value',
+        message: 'logging_level must be one of: DEBUG, INFO, WARN, ERROR, CRITICAL.',
+      });
+      return;
+    }
   }
-  if (key === 'log_to_console' && typeof body.value !== 'boolean') {
-    res.status(400).json({
-      error: 'invalid_value',
-      message: 'log_to_console must be a boolean.',
-    });
-    return;
+  if (key === 'logging_output') {
+    if (typeof body.value !== 'string') {
+      res.status(400).json({
+        error: 'invalid_value',
+        message: 'logging_output must be a string.',
+      });
+      return;
+    }
+    const norm = body.value.trim().toLowerCase();
+    if (norm !== 'both' && norm !== 'console' && norm !== 'database') {
+      res.status(400).json({
+        error: 'invalid_value',
+        message: 'logging_output must be one of: both, console, database.',
+      });
+      return;
+    }
+    valueToStore = norm;
   }
 
   try {
     const db = getDb();
     await db
       .insert(platformSettings)
-      .values({ key, value: body.value as never })
+      .values({ key, value: valueToStore as never })
       .onConflictDoUpdate({
         target: platformSettings.key,
-        set: { value: body.value as never },
+        set: { value: valueToStore as never },
       });
 
-    res.status(200).json({ ok: true, key, value: body.value });
+    res.status(200).json({ ok: true, key, value: valueToStore });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     res.status(500).json({

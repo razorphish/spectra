@@ -29,6 +29,13 @@
       "when": 1780100000000,
       "tag": "0003_control_plane_catalog_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780200000000,
+      "tag": "0004_application_logs",
+      "breakpoints": true
     }
   ]
 }

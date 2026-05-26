@@ -209,9 +209,10 @@
                 <div class="card-body">
                   <h6 class="fw-semibold mb-3">Logging settings</h6>
                   <p class="text-muted small mb-4">
-                    Keys <code>logging_level</code> and <code>log_to_console</code> in
+                    Keys <code>logging_level</code> and <code>logging_output</code> in
                     <code>spectra.platform_settings</code> (same intent as Vital Woman Reset
-                    <code>LoggingSettingsTab</code>).
+                    <code>LoggingSettingsTab</code>). Legacy <code>log_to_console</code> is still read when
+                    <code>logging_output</code> is unset.
                   </p>
                   <div class="row g-4">
                     <div class="col-md-6">
@@ -227,17 +228,18 @@
                         }
                       </select>
                     </div>
-                    <div class="col-md-6 d-flex align-items-center">
-                      <div class="form-check form-switch mt-md-4">
-                        <input
-                          class="form-check-input"
-                          type="checkbox"
-                          id="logToConsole"
-                          name="logToConsole"
-                          [(ngModel)]="logToConsole"
-                        />
-                        <label class="form-check-label" for="logToConsole">Log to console</label>
-                      </div>
+                    <div class="col-md-6">
+                      <label class="form-label" for="loggingOutput">Log destinations</label>
+                      <select
+                        id="loggingOutput"
+                        class="form-select"
+                        name="loggingOutput"
+                        [(ngModel)]="loggingOutput"
+                      >
+                        @for (opt of loggingOutputs; track opt.value) {
+                          <option [value]="opt.value">{{ opt.label }}</option>
+                        }
+                      </select>
                     </div>
                     <div class="col-12">
                       <button

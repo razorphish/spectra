@@ -1,7 +1,10 @@
 import { sql } from 'drizzle-orm';
+import { createLogger, resolveLoggingRuntimeFromEnv } from '@spectra/logger';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import * as schema from '../schema';
+
+import { fetchLoggingRuntimeFromPlatform } from './logging-platform-settings';
 
 type Schema = typeof schema;
 
@@ -17,6 +20,33 @@ type Schema = typeof schema;
  * Active URL: {@link resolveSpectraDatabaseUrl} (`SPECTRA_DB_TARGET`, `DATABASE_URL`, etc.).
  */
 export type SpectraDb = NeonHttpDatabase<Schema> | NodePgDatabase<Schema>;
+
+const databasePackageLogEnv = resolveLoggingRuntimeFromEnv();
+
+/**
+ * Shared package logger (connection + migrations). Always **stdout JSON only** — never
+ * tied to `logging_output` / DB transports so control-plane policy cannot hide library
+ * diagnostics or write migration noise into `application_logs`. {@link refreshDatabasePackageLoggingFromPlatform}
+ * still applies **min level** from `platform_settings` + env.
+ */
+export const databasePackageLog = createLogger({
+  service: 'database',
+  minLevel: databasePackageLogEnv.minLevel,
+  output: 'console',
+});
+
+/**
+ * Applies `logging_level` from `spectra.platform_settings` (with env fallback) to
+ * {@link databasePackageLog}. Output stays stdout-only (`console`).
+ */
+export async function refreshDatabasePackageLoggingFromPlatform(db: SpectraDb): Promise<void> {
+  try {
+    const cfg = await fetchLoggingRuntimeFromPlatform(db);
+    databasePackageLog.setLoggingRuntime({ minLevel: cfg.minLevel, output: 'console' });
+  } catch {
+    /* keep env defaults if platform_settings cannot be read */
+  }
+}
 
 /** Default Docker Compose Postgres (see repo `docker-compose.yml` / `npm run dev:db`). */
 export const DEFAULT_LOCAL_DATABASE_URL =
@@ -50,8 +80,15 @@ export function resolveSpectraDatabaseUrl(): string | undefined {
     process.env['NODE_ENV'] !== 'production' &&
     !process.env['CI']
   ) {
-    console.warn(
-      `[spectra/database] Ignoring invalid SPECTRA_DB_TARGET="${process.env['SPECTRA_DB_TARGET']}" — use local, neon, or omit.`
+    databasePackageLog.warn(
+      'Ignoring invalid SPECTRA_DB_TARGET — use local, neon, or omit.',
+      {
+        module: 'database|src/lib/connection.ts|resolveSpectraDatabaseUrl',
+        action: 'database.config.invalid_target',
+        metadata: {
+          attrs: { SPECTRA_DB_TARGET: process.env['SPECTRA_DB_TARGET'] ?? null },
+        },
+      },
     );
   }
   return (
@@ -115,6 +152,7 @@ let singleton: SpectraDb | undefined;
 export function getDb(): SpectraDb {
   if (!singleton) {
     singleton = createDb(resolveConnectionString());
+    void refreshDatabasePackageLoggingFromPlatform(singleton);
   }
   return singleton;
 }

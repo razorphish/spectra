@@ -272,6 +272,32 @@ export const auditLogs = spectra.table('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Append-only operational / application logs (stdout + optional DB transport).
+ * `context` = request/correlation; domain data in `metadata` envelope (`attrs`, optional `sessionId` / `userId`).
+ */
+export const applicationLogs = spectra.table(
+  'application_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    level: text('level').notNull(),
+    message: text('message').notNull(),
+    context: jsonb('context'),
+    module: text('module'),
+    action: text('action'),
+    metadata: jsonb('metadata'),
+    createdBy: jsonb('created_by').notNull().default(systemActorJsonbDefault),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('application_logs_created_at_idx').on(t.createdAt),
+    index('application_logs_level_idx').on(t.level),
+    index('application_logs_module_idx').on(t.module),
+    index('application_logs_action_idx').on(t.action),
+  ]
+);
+
 /** Key–value platform config (e.g. upload thresholds). */
 export const platformSettings = spectra.table('platform_settings', {
   key: text('key').primaryKey(),

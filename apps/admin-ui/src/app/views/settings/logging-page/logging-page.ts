@@ -49,7 +49,7 @@ export class LoggingPage implements OnInit {
   readonly pageSize = 20;
 
   loggingLevel = 'INFO';
-  logToConsole = true;
+  loggingOutput: 'both' | 'console' | 'database' = 'both';
   settingsLoading = signal(false);
   settingsError = signal<string | null>(null);
 
@@ -125,8 +125,11 @@ export class LoggingPage implements OnInit {
         if (s.key === 'logging_level' && typeof s.value === 'string') {
           this.loggingLevel = s.value;
         }
-        if (s.key === 'log_to_console' && typeof s.value === 'boolean') {
-          this.logToConsole = s.value;
+        if (s.key === 'logging_output' && typeof s.value === 'string') {
+          const v = s.value.trim().toLowerCase();
+          if (v === 'both' || v === 'console' || v === 'database') {
+            this.loggingOutput = v;
+          }
         }
       }
     } catch (e: unknown) {
@@ -148,7 +151,7 @@ export class LoggingPage implements OnInit {
     this.settingsError.set(null);
     try {
       await firstValueFrom(this.api.putLoggingSetting('logging_level', this.loggingLevel));
-      await firstValueFrom(this.api.putLoggingSetting('log_to_console', this.logToConsole));
+      await firstValueFrom(this.api.putLoggingSetting('logging_output', this.loggingOutput));
       this.toastr.success('Saved', 'Logging settings updated.');
     } catch (e: unknown) {
       let msg = 'Failed to save settings';
@@ -166,4 +169,9 @@ export class LoggingPage implements OnInit {
   }
 
   protected readonly logLevels = LOG_LEVELS;
+  protected readonly loggingOutputs = [
+    { value: 'both', label: 'Console and database' },
+    { value: 'console', label: 'Console only' },
+    { value: 'database', label: 'Database only' },
+  ] as const;
 }
