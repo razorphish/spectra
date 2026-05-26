@@ -236,7 +236,7 @@
       }
     },
     {
-      "name": "Platform (Expo)",
+      "name": "Expo Metro (apps/platform)",
       "preLaunchTask": "kill-local-dev-ports",
       "type": "node",
       "request": "launch",
@@ -250,10 +250,11 @@
         "EXPO_PUBLIC_API_URL": "http://localhost:3001",
         "EXPO_ROUTER_APP_ROOT": "./app",
         "NODE_PATH": "${workspaceFolder}/node_modules"
-      }
+      },
+      "presentation": { "hidden": true }
     },
     {
-      "name": "Platform (Expo Web)",
+      "name": "Expo Web (apps/platform)",
       "preLaunchTask": "kill-local-dev-ports",
       "type": "node",
       "request": "launch",
@@ -267,12 +268,13 @@
         "EXPO_PUBLIC_API_URL": "http://localhost:3001",
         "EXPO_ROUTER_APP_ROOT": "./app",
         "NODE_PATH": "${workspaceFolder}/node_modules"
-      }
+      },
+      "presentation": { "hidden": true }
     }
   ],
   "compounds": [
     {
-      "name": "📱 Launch Expo Platform",
+      "name": "🛠 Launch Spectra",
       "preLaunchTask": "ensure-postgres-local",
       "configurations": [
         "Backend (Launch)",
@@ -280,12 +282,13 @@
         "ml-camp (Launch)",
         "Serve admin-ui",
         "Serve sandbox-ui",
-        "Platform (Expo)"
+        "Serve spectra-ui",
+        "Serve local-edge"
       ],
-      "presentation": { "group": "expo", "order": 1 }
+      "presentation": { "group": "spectra", "order": 1 }
     },
     {
-      "name": "🐛 Debug Expo Platform",
+      "name": "🐛 Debug Spectra",
       "preLaunchTask": "ensure-postgres-local",
       "configurations": [
         "Backend (Debug)",
@@ -293,9 +296,10 @@
         "Debug ml-camp with Nx",
         "Serve admin-ui",
         "Serve sandbox-ui",
-        "Platform (Expo)"
+        "Serve spectra-ui",
+        "Debug local-edge with Nx"
       ],
-      "presentation": { "group": "expo", "order": 2 }
+      "presentation": { "group": "spectra", "order": 2 }
     },
     {
       "name": "🌐 Debug Expo Web Only",
@@ -306,9 +310,9 @@
         "Debug ml-camp with Nx",
         "Serve admin-ui",
         "Serve sandbox-ui",
-        "Platform (Expo Web)"
+        "Expo Web (apps/platform)"
       ],
-      "presentation": { "group": "expo", "order": 3 }
+      "presentation": { "hidden": true, "group": "expo", "order": 1 }
     },
     {
       "name": "🛠 Launch Admin stack",
@@ -335,16 +339,16 @@
       "presentation": { "group": "focused", "order": 4 }
     },
     {
-      "name": "🛠 Launch Platform only",
+      "name": "Launch Expo (aviate + Metro only)",
       "preLaunchTask": "ensure-postgres-local",
-      "configurations": ["Backend (Launch)", "Platform (Expo)"],
-      "presentation": { "group": "focused", "order": 5 }
+      "configurations": ["Backend (Launch)", "Expo Metro (apps/platform)"],
+      "presentation": { "hidden": true, "group": "expo", "order": 2 }
     },
     {
-      "name": "🐛 Debug Platform only",
+      "name": "Debug Expo (aviate + Metro only)",
       "preLaunchTask": "ensure-postgres-local",
-      "configurations": ["Backend (Debug)", "Platform (Expo)"],
-      "presentation": { "group": "focused", "order": 6 }
+      "configurations": ["Backend (Debug)", "Expo Metro (apps/platform)"],
+      "presentation": { "hidden": true, "group": "expo", "order": 3 }
     },
     {
       "name": "🟢 Full Stack (Local)",
@@ -359,8 +363,7 @@
         "Debug ml-camp with Nx",
         "Serve spectra-ui",
         "Serve sandbox-ui",
-        "Serve admin-ui",
-        "Platform (Expo Web)"
+        "Serve admin-ui"
       ],
       "presentation": { "group": "fullstack", "order": 1 }
     }
