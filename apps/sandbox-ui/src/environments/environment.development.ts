@@ -1,4 +1,8 @@
 export const environment = {
   production: false,
   apiBaseUrl: 'http://127.0.0.1:3001',
+  auth0: {
+    domain: 'dev-spectra.us.auth0.com',
+    clientId: '08OQko6swcjYIT7MGtjsZhBoJEbRtBF1',
+  },
 };

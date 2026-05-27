@@ -1,1 +1,27 @@
-/* You can add global styles to this file, and also import other style files */
+.auth-shell {
+  font-family: system-ui, sans-serif;
+  max-width: 42rem;
+  margin: 1rem auto;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.auth-shell pre {
+  overflow: auto;
+  font-size: 0.8rem;
+  background: #020617;
+  padding: 0.75rem;
+  border-radius: 6px;
+}
+
+.auth-shell button {
+  margin-right: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.auth-error {
+  color: #fecaca;
+}
+
