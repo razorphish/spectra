@@ -13,9 +13,10 @@ description: >-
 
 | Piece | Package / location |
 |-------|-------------------|
-| Logger API | `@spectra/logger` — `createLogger`, `LogCallOptions`, `resolveLoggingRuntimeFromEnv` |
+| Logger API | `@spectra/logger` — `createLogger`, `logModule`, `serializeError`, `resolveLoggingRuntimeFromEnv` |
+| Express wiring | `@spectra/logger-express` — `createServiceLogging`, `createRequestLoggingMiddleware`, `createRouteLoggingHelpers` |
 | DB sink | `@spectra/database` — `createApplicationLogTransport`, `fetchLoggingRuntimeFromPlatform` |
-| Reference service | [admin-ui-api](apps/services/admin-ui-api) — `src/lib/service-logger.ts`, `request-logging.ts`, [admin-logging.ts](apps/services/admin-ui-api/src/routes/admin-logging.ts) |
+| Reference service | [admin-ui-api](apps/services/admin-ui-api) — thin `service-logger.ts`, [admin-logging.ts](apps/services/admin-ui-api/src/routes/admin-logging.ts) |
 | Library-only logger | `databasePackageLog` in `@spectra/database` — **stdout only**; never wire DB transport inside shared packages |
 
 ## When to log
@@ -42,10 +43,10 @@ description: >-
 
 ## Service wiring (Node API)
 
-1. **`src/lib/service-logger.ts`** — `getServiceLog()`, `initServiceLogging()`, `refreshServiceLoggingFromPlatform()`.
-2. **`src/lib/request-logging.ts`** — Express middleware on `finish`.
-3. **`main.ts`** — `app.use(requestLoggingMiddleware())`; `void initServiceLogging().then(() => app.listen(...))`.
-4. **Routes** — `getServiceLog()` per handler; `logModule('file.ts', 'handlerName')` for `module`.
+1. **`createServiceLogging({ service: 'your-api' })`** — export `getServiceLog`, `initServiceLogging`, `refreshServiceLoggingFromPlatform` (see admin-ui-api `service-logger.ts`).
+2. **`createRequestLoggingMiddleware({ getLog: getServiceLog })`** — HTTP access logs on `finish`.
+3. **`main.ts`** — `app.use(middleware)`; `void initServiceLogging().then(() => app.listen(...))`.
+4. **Routes** — `getServiceLog()` per handler; `logModule('file.ts', 'handlerName')` from `@spectra/logger`.
 
 After changing `logging_level` / `logging_output` in DB, call `refreshServiceLoggingFromPlatform()` (see `putLoggingSetting` in admin-logging).
 
@@ -64,16 +65,15 @@ getServiceLog().info('Audit logs listed', {
 ```
 
 ```typescript
+import { serializeError } from '@spectra/logger';
+import { requestContext } from '@spectra/logger-express';
+
 getServiceLog().error('listAuditLogs failed', {
   module: 'admin-logging.ts|listAuditLogs',
   context: requestContext(req),
   metadata: {
     userId: req.auth?.sub,
-    error: {
-      name: e instanceof Error ? e.name : 'Error',
-      message: e instanceof Error ? e.message : String(e),
-      stack: e instanceof Error ? e.stack : undefined,
-    },
+    error: serializeError(e),
   },
 });
 ```
@@ -91,7 +91,7 @@ Polyglot services (.NET / Python / Go): mirror the same levels and fields in JSO
 
 - [ ] Uses `getServiceLog()` not `console.*`
 - [ ] `module` is `file.ts|handler`
-- [ ] Errors include `metadata.error`
+- [ ] Errors include `metadata.error` via `serializeError(e)`
 - [ ] 4xx → `warn`, 5xx → `error`, happy path → `info` or `debug`
 - [ ] Staff routes include `metadata.userId` from `req.auth?.sub`
 - [ ] Settings changes trigger `refreshServiceLoggingFromPlatform()` when applicable

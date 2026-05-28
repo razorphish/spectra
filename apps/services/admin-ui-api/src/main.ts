@@ -39,7 +39,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
-app.use(requestLoggingMiddleware());
+app.use(requestLoggingMiddleware);
 
 app.use('/v1/admin', createAdminRouter());
 

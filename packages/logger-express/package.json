@@ -1,0 +1,16 @@
+{
+  "name": "@spectra/logger-express",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "dependencies": {
+    "@spectra/database": "file:../database",
+    "@spectra/logger": "file:../logger",
+    "tslib": "^2.3.0"
+  },
+  "peerDependencies": {
+    "express": "^4.21.0"
+  }
+}

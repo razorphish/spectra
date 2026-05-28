@@ -57,6 +57,14 @@ If `output` is `database` or `both` but no transports are configured, the implem
 
 Admin API: `GET/PUT /v1/admin/logging/settings` — keys `logging_level` (e.g. `INFO`, `CRITICAL`) and `logging_output` (`both` | `console` | `database`). Services should apply these at runtime via `setLoggingRuntime` on their `SpectraLogger` instance.
 
+## Helpers
+
+- `logModule(file, handler)` — `file|handler` for the `module` field.
+- `serializeError(e)` — `{ name, message, stack? }` for `metadata.error`.
+- `validateLogLevelInput(value)` / `validateLoggingOutputInput(value)` — admin PUT validation (`{ ok, value }` or `{ ok: false, error, message }`).
+
+For Express service wiring (singleton logger, request middleware, route helpers), use `@spectra/logger-express`.
+
 ## Tests
 
 `nx test logger`

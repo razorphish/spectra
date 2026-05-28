@@ -1,0 +1,26 @@
+{
+  "name": "logger-express",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/logger-express/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/packages/logger-express",
+        "main": "packages/logger-express/src/index.ts",
+        "tsConfig": "packages/logger-express/tsconfig.lib.json",
+        "assets": ["packages/logger-express/*.md"]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "packages/logger-express/jest.config.cts"
+      }
+    }
+  }
+}

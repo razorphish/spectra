@@ -1,12 +1,20 @@
 # Spectra logging reference
 
+## Packages
+
+| Package | Role |
+|---------|------|
+| `@spectra/logger` | `createLogger`, `logModule`, `serializeError`, validators |
+| `@spectra/logger-express` | `createServiceLogging`, `createRequestLoggingMiddleware`, `createRouteLoggingHelpers` |
+| `@spectra/database` | `createApplicationLogTransport`, `fetchLoggingRuntimeFromPlatform` |
+
 ## admin-ui-api file map
 
 | File | Role |
 |------|------|
-| `src/lib/service-logger.ts` | Logger singleton, platform refresh, startup init |
-| `src/lib/request-logging.ts` | HTTP access-style logs on response `finish` |
-| `src/lib/logging-helpers.ts` | `logModule`, `requestContext`, `actorUserIdFromRequest` |
+| `src/lib/service-logger.ts` | `createServiceLogging({ service: 'admin-ui-api' })` |
+| `src/lib/request-logging.ts` | Bound request middleware |
+| `src/lib/route-helpers.ts` | Bound route logging helpers + query parsers |
 | `src/routes/admin-logging.ts` | Canonical route-level logging examples |
 | `src/main.ts` | Wires middleware + `initServiceLogging()` |
 
@@ -37,9 +45,18 @@ Each line is JSON:
 }
 ```
 
-## Copying to another Node service
+## New Node service
 
-1. Copy `service-logger.ts` and `request-logging.ts`; change `service: 'your-api'`.
-2. Copy `logging-helpers.ts` or import shared helpers if extracted to a package later.
-3. Call `initServiceLogging()` before listen.
-4. Add route logs following `admin-logging.ts` patterns.
+1. Add `src/lib/service-logger.ts`:
+
+   ```typescript
+   import { createServiceLogging } from '@spectra/logger-express';
+   export const { getServiceLog, initServiceLogging, refreshServiceLoggingFromPlatform } =
+     createServiceLogging({ service: 'your-api' });
+   ```
+
+2. Wire `createRequestLoggingMiddleware({ getLog: getServiceLog })` in `main.ts`; call `initServiceLogging()` before listen.
+3. Use `createRouteLoggingHelpers({ getLog: getServiceLog })` for 503/400/500 helpers.
+4. Import `logModule`, `serializeError` from `@spectra/logger` in routes.
+
+See [packages/logger-express/README.md](../../../packages/logger-express/README.md).

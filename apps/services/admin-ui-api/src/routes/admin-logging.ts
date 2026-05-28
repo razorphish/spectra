@@ -21,13 +21,14 @@ import {
   users,
 } from '@spectra/database';
 
+import { logModule } from '@spectra/logger';
+import {
+  defaultUserIdFromRequest,
+  requestContext,
+} from '@spectra/logger-express';
+
 import { requireAuth0AccessToken } from '../lib/auth';
 import { mapAuditLogRowToAdminDto } from '../lib/audit-log-dto';
-import {
-  actorUserIdFromRequest,
-  logModule,
-  requestContext,
-} from '../lib/logging-helpers';
 import { validateLoggingSettingValue } from '../lib/logging-settings-validation';
 import {
   ensureDatabaseConfigured,
@@ -148,7 +149,7 @@ const listAuditLogs: RequestHandler = async (req, res) => {
         hasSearch: Boolean(search),
         hasUserId: Boolean(userId),
       },
-      metadata: { userId: actorUserIdFromRequest(req) },
+      metadata: { userId: defaultUserIdFromRequest(req) },
     });
 
     res.status(200).json({
@@ -180,7 +181,7 @@ const getLoggingSettings: RequestHandler = async (req, res) => {
     getServiceLog().debug('Logging settings read', {
       module: handler,
       context: requestContext(req),
-      metadata: { userId: actorUserIdFromRequest(req) },
+      metadata: { userId: defaultUserIdFromRequest(req) },
     });
 
     res.status(200).json({ settings });
@@ -254,7 +255,7 @@ const putLoggingSetting: RequestHandler = async (req, res) => {
         key,
         value: valueToStore,
       },
-      metadata: { userId: actorUserIdFromRequest(req) },
+      metadata: { userId: defaultUserIdFromRequest(req) },
     });
 
     res.status(200).json({ ok: true, key, value: valueToStore });
