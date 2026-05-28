@@ -6,7 +6,23 @@
   "sourceRoot": "apps/sandbox-ui/src",
   "tags": [],
   "targets": {
+    "env-sync": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "inputs": [
+        "{projectRoot}/.env",
+        "{projectRoot}/.env.local",
+        "{workspaceRoot}/.env",
+        "{workspaceRoot}/scripts/sync-sandbox-ui-env.mjs"
+      ],
+      "outputs": ["{projectRoot}/src/environments/environment.auth0.local.ts"],
+      "options": {
+        "cwd": "{projectRoot}",
+        "command": "node ../../scripts/sync-sandbox-ui-env.mjs"
+      }
+    },
     "build": {
+      "dependsOn": ["env-sync"],
       "executor": "@angular/build:application",
       "outputs": ["{options.outputPath}"],
       "options": {
@@ -52,6 +68,7 @@
       "defaultConfiguration": "production"
     },
     "serve": {
+      "dependsOn": ["env-sync"],
       "continuous": true,
       "executor": "@angular/build:dev-server",
       "options": {

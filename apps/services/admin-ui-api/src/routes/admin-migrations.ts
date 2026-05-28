@@ -19,10 +19,8 @@ import {
   setAdminMigrationsUseSharedHttpClient,
 } from '@spectra/database';
 
-import { createRequireAuth0AccessToken } from '../middleware/require-auth0-access-token';
+import { requireAuth0AccessToken } from '../lib/auth';
 import { workspaceRoot } from '../workspace-root';
-
-const requireAuth0AccessToken = createRequireAuth0AccessToken();
 
 const listMigrations: RequestHandler = async (_req, res) => {
   const dbUrl = resolveSpectraDatabaseUrl();

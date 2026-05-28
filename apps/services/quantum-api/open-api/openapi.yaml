@@ -2,6 +2,34 @@ openapi: 3.0.3
 info:
   title: quantum-api
   version: 0.0.1
+  description: Quantum API (Python). Paths are served under /v1/quantum on port 3004 locally.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Auth0 access token (public/sandbox API audience)
+  schemas:
+    HelloResponse:
+      type: object
+      required: [message, segment, service, authenticated, principal]
+      properties:
+        message: { type: string, example: Hello from quantum-api }
+        segment: { type: string, example: quantum }
+        service: { type: string, example: quantum-api }
+        authenticated: { type: boolean, example: true }
+        principal:
+          type: object
+          required: [sub]
+          properties:
+            sub: { type: string }
+    AuthErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
 paths:
   /v1/quantum/health:
     get:
@@ -17,3 +45,32 @@ paths:
       responses:
         '200':
           description: OK
+  /v1/quantum/hello:
+    get:
+      tags: [Sandbox]
+      summary: Authenticated sandbox hello (quantum segment)
+      description: |
+        Python implementation of the shared hello contract. Token must include the public API audience.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HelloResponse'
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '503':
+          description: Auth not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+      x-spectra-testing: |
+        curl -s -H "Authorization: Bearer $ACCESS_TOKEN" http://127.0.0.1:3000/v1/quantum/hello

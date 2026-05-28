@@ -5,7 +5,26 @@
   "projectType": "library",
   "tags": [],
   "targets": {
+    "merge": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/apps/services/aviate-api/open-api/openapi.yaml",
+        "{workspaceRoot}/apps/services/seq-api/open-api/openapi.yaml",
+        "{workspaceRoot}/apps/services/quantum-api/open-api/openapi.yaml",
+        "{workspaceRoot}/apps/services/corridor-api/open-api/openapi.yaml",
+        "{workspaceRoot}/scripts/merge-public-openapi.mjs"
+      ],
+      "outputs": [
+        "{workspaceRoot}/packages/openapi/dist/spectra-public-api.json",
+        "{workspaceRoot}/apps/services/aviate-api/src/assets/spectra-public-api.json"
+      ],
+      "options": {
+        "command": "node scripts/merge-public-openapi.mjs"
+      }
+    },
     "build": {
+      "dependsOn": ["merge"],
       "executor": "@nx/js:tsc",
       "outputs": ["{options.outputPath}"],
       "options": {

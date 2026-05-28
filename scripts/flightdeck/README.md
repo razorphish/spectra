@@ -78,9 +78,9 @@ your git branch.
 
 | Service        | Runtime  | CI workflow status                                               |
 | -------------- | -------- | ---------------------------------------------------------------- |
-| `seq-api`      | .NET     | [`spectra-build-seq.yml`](../../.github/workflows/spectra-build-seq.yml) (`if: false`) |
-| `quantum-api`  | Python   | [`spectra-build-quantum.yml`](../../.github/workflows/spectra-build-quantum.yml) (`if: false`) |
-| `corridor-api` | Go       | [`spectra-build-corridor.yml`](../../.github/workflows/spectra-build-corridor.yml) (`if: false`) |
+| `seq-api`      | .NET 8   | [`spectra-build-seq.yml`](../../.github/workflows/spectra-build-seq.yml) (`if: false`); local: `nx serve seq-api` |
+| `quantum-api`  | Python   | [`spectra-build-quantum.yml`](../../.github/workflows/spectra-build-quantum.yml) (`if: false`); local: `nx serve quantum-api` |
+| `corridor-api` | Go       | [`spectra-build-corridor.yml`](../../.github/workflows/spectra-build-corridor.yml) (`if: false`); local: `nx serve corridor-api` |
 | `ml-camp`      | Docker / Batch | [`spectra-build-ml-camp.yml`](../../.github/workflows/spectra-build-ml-camp.yml) (`if: false`) |
 
 A direct script will land alongside each runtime when it ships. For now run

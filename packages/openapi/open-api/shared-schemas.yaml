@@ -1,0 +1,32 @@
+# Reference fragments for per-service OpenAPI (hello + errors). Copied into each service spec.
+HelloResponse:
+  type: object
+  required: [message, segment, service, authenticated, principal]
+  properties:
+    message:
+      type: string
+      example: Hello from seq-api
+    segment:
+      type: string
+      enum: [platform, seq, quantum, corridor]
+    service:
+      type: string
+    authenticated:
+      type: boolean
+      example: true
+    principal:
+      type: object
+      required: [sub]
+      properties:
+        sub:
+          type: string
+          example: auth0|abc123
+AuthErrorResponse:
+  type: object
+  required: [error, message]
+  properties:
+    error:
+      type: string
+      enum: [missing_token, invalid_token, auth_not_configured]
+    message:
+      type: string

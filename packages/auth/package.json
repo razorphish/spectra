@@ -6,6 +6,10 @@
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "dependencies": {
+    "jose": "^6.2.3",
     "tslib": "^2.3.0"
+  },
+  "peerDependencies": {
+    "express": "^4.21.0"
   }
 }

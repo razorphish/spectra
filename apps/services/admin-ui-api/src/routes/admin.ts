@@ -8,7 +8,7 @@ import {
   resolveSpectraDatabaseUrl,
 } from '@spectra/database';
 
-import { createRequireAuth0AccessToken } from '../middleware/require-auth0-access-token';
+import { requireAuth0AccessToken } from '../lib/auth';
 import { createAdminMeSyncHandler } from './admin-me-sync';
 import { registerAdminLoggingRoutes } from './admin-logging';
 import { registerAdminMigrationsRoutes } from './admin-migrations';
@@ -16,7 +16,6 @@ import { registerAdminNavVisibilityRoutes } from './admin-nav-visibility';
 
 const SEGMENT = 'admin';
 
-const requireAuth0AccessToken = createRequireAuth0AccessToken();
 const meSync = createAdminMeSyncHandler();
 
 const health: RequestHandler = (_req, res) => {

@@ -135,48 +135,36 @@
       ]
     },
     {
-      "type": "node",
+      "type": "node-terminal",
       "request": "launch",
       "name": "Serve spectra-ui",
       "preLaunchTask": "kill-local-dev-ports",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "spectra-ui"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
+      "command": "npx nx serve spectra-ui",
+      "cwd": "${workspaceFolder}"
     },
     {
-      "type": "node",
+      "type": "node-terminal",
       "request": "launch",
       "name": "Serve sandbox-ui",
       "preLaunchTask": "kill-local-dev-ports",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "sandbox-ui"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
+      "command": "npx nx serve sandbox-ui",
+      "cwd": "${workspaceFolder}"
     },
     {
-      "type": "node",
+      "type": "node-terminal",
       "request": "launch",
       "name": "Serve admin-ui",
       "preLaunchTask": "kill-local-dev-ports",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "admin-ui"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
+      "command": "npx nx serve admin-ui",
+      "cwd": "${workspaceFolder}"
     },
     {
-      "type": "node",
+      "type": "node-terminal",
       "request": "launch",
       "name": "Serve local-edge",
       "preLaunchTask": "kill-local-dev-ports",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "local-edge"],
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"]
+      "command": "npx nx serve local-edge",
+      "cwd": "${workspaceFolder}"
     },
     {
       "name": "Backend (Launch)",

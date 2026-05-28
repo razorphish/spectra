@@ -1,7 +1,8 @@
 import { config } from 'dotenv';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import express from 'express';
+import swaggerUi from 'swagger-ui-express';
 import { createPlatformRouter } from './routes/platform';
 import { createUploadsRouter } from './routes/uploads';
 
@@ -53,6 +54,38 @@ app.use(express.json({ limit: '64kb' }));
 
 app.use('/v1/platform', createPlatformRouter());
 app.use('/v1/platform/uploads', createUploadsRouter());
+
+function loadMergedOpenApiSpec(): Record<string, unknown> {
+  const candidates = [
+    join(__dirname, 'assets', 'spectra-public-api.json'),
+    join(root, 'apps/services/aviate-api/src/assets/spectra-public-api.json'),
+    join(root, 'packages/openapi/dist/spectra-public-api.json'),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      return JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>;
+    }
+  }
+  return {
+    openapi: '3.0.3',
+    info: { title: 'Spectra Public API', version: '0.0.1' },
+    paths: {},
+  };
+}
+
+const openApiSpec = loadMergedOpenApiSpec();
+
+app.get('/openapi.json', (_req, res) => {
+  res.json(openApiSpec);
+});
+
+app.use(
+  '/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(openApiSpec, {
+    customSiteTitle: 'Spectra Public API',
+  })
+);
 
 app.get('/', (_req, res) => {
   res.send({ message: 'Spectra aviate-api', prefix: '/v1/platform' });

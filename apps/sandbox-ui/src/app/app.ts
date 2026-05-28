@@ -12,7 +12,9 @@ import { environment } from '../environments/environment';
 export class App {
   protected readonly window = window;
   protected readonly auth0Configured = Boolean(
-    environment.auth0.domain?.trim() && environment.auth0.clientId?.trim(),
+    environment.auth0.enabled &&
+      environment.auth0.domain?.trim() &&
+      environment.auth0.clientId?.trim(),
   );
   protected readonly auth = inject(AuthService);
 }

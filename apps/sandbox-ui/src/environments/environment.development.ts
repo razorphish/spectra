@@ -1,8 +1,13 @@
+import { apiBaseUrlFromDotEnv, auth0FromDotEnv } from './environment.auth0.local';
+
 export const environment = {
   production: false,
-  apiBaseUrl: 'http://127.0.0.1:3001',
+  apiBaseUrl: apiBaseUrlFromDotEnv,
   auth0: {
-    domain: 'dev-spectra.us.auth0.com',
-    clientId: '08OQko6swcjYIT7MGtjsZhBoJEbRtBF1',
+    requested: auth0FromDotEnv.requested,
+    enabled: auth0FromDotEnv.enabled,
+    domain: auth0FromDotEnv.domain,
+    clientId: auth0FromDotEnv.clientId,
+    audience: auth0FromDotEnv.audience,
   },
 };

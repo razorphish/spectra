@@ -1,5 +1,11 @@
+/// <reference path="./express.d.ts" />
 import { createRemoteJWKSet, decodeJwt, jwtVerify } from 'jose';
 import type { RequestHandler } from 'express';
+
+export type Auth0AccessTokenMiddlewareOptions = {
+  /** Log prefix for warnings, e.g. `aviate-api` or `admin-ui-api`. */
+  logLabel?: string;
+};
 
 function stripAuth0Domain(raw: string): string {
   return raw.replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -25,7 +31,10 @@ function defaultIssuerFromDomain(domain: string): string {
  * Local-only escape hatch (never use in shared environments):
  * - `AUTH0_VERIFY_DISABLED=true` — decode JWT **without** verifying signature or claims
  */
-export function createRequireAuth0AccessToken(): RequestHandler {
+export function createRequireAuth0AccessToken(
+  options: Auth0AccessTokenMiddlewareOptions = {}
+): RequestHandler {
+  const logLabel = options.logLabel ?? 'spectra-auth';
   const domain = process.env['AUTH0_DOMAIN']?.trim();
   const audienceRaw = process.env['AUTH0_AUDIENCE']?.trim();
   const audience = audienceRaw ? normalizeAuth0ApiAudience(audienceRaw) : undefined;
@@ -34,7 +43,7 @@ export function createRequireAuth0AccessToken(): RequestHandler {
 
   if (verifyDisabled) {
     console.warn(
-      '[admin-ui-api] AUTH0_VERIFY_DISABLED=true — JWTs are not cryptographically verified. Use only on a trusted local machine.'
+      `[${logLabel}] AUTH0_VERIFY_DISABLED=true — JWTs are not cryptographically verified. Use only on a trusted local machine.`
     );
   } else if (!domain || !audience) {
     return (_req, res) => {
@@ -115,7 +124,7 @@ export function createRequireAuth0AccessToken(): RequestHandler {
       const message = e instanceof Error ? e.message : 'Token verification failed.';
       const audHint =
         message.includes('"aud"') || message.toLowerCase().includes('aud claim') ?
-          ' Ensure the access token was issued for the same API Identifier as AUTH0_AUDIENCE (must match ADMIN_UI_AUTH0_AUDIENCE on the SPA). Sign out of the admin UI, restart admin-ui-api after env changes, then sign in again so localStorage gets a fresh token.'
+          ' Ensure the access token was issued for the same API Identifier as AUTH0_AUDIENCE.'
         : '';
       res.status(401).json({ error: 'invalid_token', message: `${message}${audHint}` });
     }

@@ -1,3 +1,4 @@
+import { createRequireAuth0AccessToken } from '@spectra/auth';
 import { Router } from 'express';
 import type { RequestHandler } from 'express';
 
@@ -8,7 +9,12 @@ import {
   resolveSpectraDatabaseUrl,
 } from '@spectra/database';
 
+import { createHelloHandler } from './hello';
+
 const SEGMENT = 'platform';
+const requireAuth0AccessToken = createRequireAuth0AccessToken({
+  logLabel: 'aviate-api',
+});
 
 const health: RequestHandler = (_req, res) => {
   res.status(200).json({ status: 'ok' });
@@ -63,5 +69,6 @@ export function createPlatformRouter() {
   r.get('/ready', ready);
   r.get('/info', info);
   r.get('/stats', stats);
+  r.get('/hello', requireAuth0AccessToken, createHelloHandler('aviate-api', SEGMENT));
   return r;
 }

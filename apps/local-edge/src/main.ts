@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import express from 'express';
+import { mountServiceProxies } from './proxy';
 
 function workspaceRoot(): string {
   const env = process.env['NX_WORKSPACE_ROOT'];
@@ -60,10 +61,18 @@ app.get(`/v1/${SEGMENT}/ready`, (_req, res) => {
   res.status(200).json({ status: 'ok', checks: { local_edge: 'ok' } });
 });
 
+mountServiceProxies(app);
+
 app.get('/', (_req, res) => {
   res.send({
     message: 'Spectra local-edge — local development only; not deployed to AWS.',
     segment: SEGMENT,
+    proxy: {
+      platform: process.env['AVIATE_API_URL'] ?? 'http://127.0.0.1:3001',
+      seq: process.env['SEQ_API_URL'] ?? 'http://127.0.0.1:3003',
+      quantum: process.env['QUANTUM_API_URL'] ?? 'http://127.0.0.1:3004',
+      corridor: process.env['CORRIDOR_API_URL'] ?? 'http://127.0.0.1:3005',
+    },
   });
 });
 

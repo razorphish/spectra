@@ -1,85 +1,24 @@
 {
   "name": "seq-api",
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/services/seq-api/src",
+  "sourceRoot": "apps/services/seq-api",
   "projectType": "application",
-  "tags": [],
+  "tags": ["polyglot", "dotnet"],
   "targets": {
     "build": {
-      "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{options.outputPath}"],
-      "defaultConfiguration": "production",
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/bin", "{projectRoot}/obj"],
       "options": {
-        "platform": "node",
-        "outputPath": "dist/apps/services/seq-api",
-        "format": ["cjs"],
-        "bundle": false,
-        "main": "apps/services/seq-api/src/main.ts",
-        "tsConfig": "apps/services/seq-api/tsconfig.app.json",
-        "assets": ["apps/services/seq-api/src/assets"],
-        "generatePackageJson": true,
-        "esbuildOptions": {
-          "sourcemap": true,
-          "outExtension": {
-            ".js": ".js"
-          }
-        }
-      },
-      "configurations": {
-        "development": {},
-        "production": {
-          "esbuildOptions": {
-            "sourcemap": false,
-            "outExtension": {
-              ".js": ".js"
-            }
-          }
-        }
+        "cwd": "apps/services/seq-api",
+        "command": "bash ../../../scripts/polyglot-build.sh dotnet build -c Release"
       }
-    },
-    "prune-lockfile": {
-      "dependsOn": ["build"],
-      "cache": true,
-      "executor": "@nx/js:prune-lockfile",
-      "outputs": [
-        "{workspaceRoot}/dist/apps/services/seq-api/package.json",
-        "{workspaceRoot}/dist/apps/services/seq-api/package-lock.json"
-      ],
-      "options": {
-        "buildTarget": "build"
-      }
-    },
-    "copy-workspace-modules": {
-      "dependsOn": ["build"],
-      "cache": true,
-      "outputs": [
-        "{workspaceRoot}/dist/apps/services/seq-api/workspace_modules"
-      ],
-      "executor": "@nx/js:copy-workspace-modules",
-      "options": {
-        "buildTarget": "build"
-      }
-    },
-    "prune": {
-      "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
-      "executor": "nx:noop"
     },
     "serve": {
       "continuous": true,
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
-      "dependsOn": ["build"],
+      "executor": "nx:run-commands",
       "options": {
-        "buildTarget": "seq-api:build",
-        "runBuildTargetDependencies": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "seq-api:build:development"
-        },
-        "production": {
-          "buildTarget": "seq-api:build:production"
-        }
+        "cwd": "apps/services/seq-api",
+        "command": "dotnet run --project SeqApi.csproj"
       }
     },
     "test": {

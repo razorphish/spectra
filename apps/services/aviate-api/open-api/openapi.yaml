@@ -2,77 +2,33 @@ openapi: 3.0.3
 info:
   title: aviate-api
   version: 0.0.1
-paths:
-  /v1/platform/health:
-    get:
-      tags: [System]
-      summary: Liveness
-      responses:
-        '200':
-          description: OK
-  /v1/platform/ready:
-    get:
-      tags: [System]
-      summary: Readiness
-      responses:
-        '200':
-          description: OK
-        '503':
-          description: Dependency degraded
-  /v1/platform/info:
-    get:
-      tags: [System]
-      summary: Service metadata
-      responses:
-        '200':
-          description: OK
-  /v1/platform/stats:
-    get:
-      tags: [System]
-      summary: Control-plane table row counts (MVP; authenticate in production)
-      responses:
-        '200':
-          description: OK
-        '503':
-          description: Database unavailable
-
-  /v1/platform/uploads/init:
-    post:
-      tags: [Uploads]
-      summary: Initialize an object upload (returns presigned PUT URL)
-      description: |
-        Creates an `uploads` row in Neon and returns a single-part PUT URL
-        scoped to the env's uploads bucket. The client must `PUT` the
-        payload using the same `Content-Type` (and `Content-Length` if
-        provided) used in this request. Default cap: 1 GiB.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InitUploadRequest'
-      responses:
-        '201':
-          description: Upload initialized.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InitUploadResponse'
-        '400':
-          description: Validation error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          description: Uploads not configured (missing bucket env var).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Auth0 access token (public/sandbox API audience)
   schemas:
+    HelloResponse:
+      type: object
+      required: [message, segment, service, authenticated, principal]
+      properties:
+        message: { type: string, example: Hello from aviate-api }
+        segment: { type: string, example: platform }
+        service: { type: string, example: aviate-api }
+        authenticated: { type: boolean, example: true }
+        principal:
+          type: object
+          required: [sub]
+          properties:
+            sub: { type: string, example: auth0|abc123 }
+    AuthErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string }
+        message: { type: string }
     InitUploadRequest:
       type: object
       required: [orgId, bytesExpected]
@@ -121,3 +77,101 @@ components:
           type: string
         message:
           type: string
+paths:
+  /v1/platform/health:
+    get:
+      tags: [System]
+      summary: Liveness
+      responses:
+        '200':
+          description: OK
+  /v1/platform/ready:
+    get:
+      tags: [System]
+      summary: Readiness
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Dependency degraded
+  /v1/platform/info:
+    get:
+      tags: [System]
+      summary: Service metadata
+      responses:
+        '200':
+          description: OK
+  /v1/platform/stats:
+    get:
+      tags: [System]
+      summary: Control-plane table row counts (MVP; authenticate in production)
+      responses:
+        '200':
+          description: OK
+        '503':
+          description: Database unavailable
+  /v1/platform/hello:
+    get:
+      tags: [Sandbox]
+      summary: Authenticated sandbox hello (platform segment)
+      description: |
+        Proves Auth0 bearer tokens reach aviate-api. Requires a sandbox-ui (or Swagger UI)
+        access token with the **public** API audience. Use `/health` for unauthenticated probes.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated greeting with principal `sub`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HelloResponse'
+        '401':
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '503':
+          description: Auth0 verifier not configured on the server.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+      x-spectra-testing: |
+        curl -s -H "Authorization: Bearer $ACCESS_TOKEN" http://127.0.0.1:3000/v1/platform/hello
+
+  /v1/platform/uploads/init:
+    post:
+      tags: [Uploads]
+      summary: Initialize an object upload (returns presigned PUT URL)
+      description: |
+        Creates an `uploads` row in Neon and returns a single-part PUT URL
+        scoped to the env's uploads bucket. The client must `PUT` the
+        payload using the same `Content-Type` (and `Content-Length` if
+        provided) used in this request. Default cap: 1 GiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitUploadRequest'
+      responses:
+        '201':
+          description: Upload initialized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitUploadResponse'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Uploads not configured (missing bucket env var).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

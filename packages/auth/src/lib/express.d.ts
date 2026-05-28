@@ -7,7 +7,7 @@ declare module 'express-serve-static-core' {
       sub: string;
       claims: Record<string, unknown>;
     };
-    /** Raw Bearer token; set with `auth` for optional Userinfo fallback (e.g. me/sync). */
+    /** Raw Bearer token; set with `auth` for optional downstream use. */
     auth0AccessToken?: string;
   }
 }

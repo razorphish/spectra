@@ -2,6 +2,8 @@ import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import express from 'express';
+import { requestLoggingMiddleware } from './lib/request-logging';
+import { initServiceLogging, getServiceLog } from './lib/service-logger';
 import { createAdminRouter } from './routes/admin';
 import { workspaceRoot } from './workspace-root';
 
@@ -37,6 +39,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
+app.use(requestLoggingMiddleware());
 
 app.use('/v1/admin', createAdminRouter());
 
@@ -44,6 +47,12 @@ app.get('/', (_req, res) => {
   res.send({ message: 'Spectra admin-ui-api', prefix: '/v1/admin' });
 });
 
-app.listen(port, host, () => {
-  console.log(`[ ready ] http://${host}:${port}`);
+void initServiceLogging().then(() => {
+  app.listen(port, host, () => {
+    getServiceLog().info(`Listening on http://${host}:${port}`, {
+      module: 'main.ts',
+      action: 'listen',
+      context: { host, port },
+    });
+  });
 });

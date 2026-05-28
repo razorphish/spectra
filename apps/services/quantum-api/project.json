@@ -1,85 +1,23 @@
 {
   "name": "quantum-api",
   "$schema": "../../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/services/quantum-api/src",
+  "sourceRoot": "apps/services/quantum-api",
   "projectType": "application",
-  "tags": [],
+  "tags": ["polyglot", "python"],
   "targets": {
     "build": {
-      "executor": "@nx/esbuild:esbuild",
-      "outputs": ["{options.outputPath}"],
-      "defaultConfiguration": "production",
+      "executor": "nx:run-commands",
       "options": {
-        "platform": "node",
-        "outputPath": "dist/apps/services/quantum-api",
-        "format": ["cjs"],
-        "bundle": false,
-        "main": "apps/services/quantum-api/src/main.ts",
-        "tsConfig": "apps/services/quantum-api/tsconfig.app.json",
-        "assets": ["apps/services/quantum-api/src/assets"],
-        "generatePackageJson": true,
-        "esbuildOptions": {
-          "sourcemap": true,
-          "outExtension": {
-            ".js": ".js"
-          }
-        }
-      },
-      "configurations": {
-        "development": {},
-        "production": {
-          "esbuildOptions": {
-            "sourcemap": false,
-            "outExtension": {
-              ".js": ".js"
-            }
-          }
-        }
+        "cwd": "apps/services/quantum-api",
+        "command": "bash ../../../scripts/build-quantum-api.sh"
       }
-    },
-    "prune-lockfile": {
-      "dependsOn": ["build"],
-      "cache": true,
-      "executor": "@nx/js:prune-lockfile",
-      "outputs": [
-        "{workspaceRoot}/dist/apps/services/quantum-api/package.json",
-        "{workspaceRoot}/dist/apps/services/quantum-api/package-lock.json"
-      ],
-      "options": {
-        "buildTarget": "build"
-      }
-    },
-    "copy-workspace-modules": {
-      "dependsOn": ["build"],
-      "cache": true,
-      "outputs": [
-        "{workspaceRoot}/dist/apps/services/quantum-api/workspace_modules"
-      ],
-      "executor": "@nx/js:copy-workspace-modules",
-      "options": {
-        "buildTarget": "build"
-      }
-    },
-    "prune": {
-      "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
-      "executor": "nx:noop"
     },
     "serve": {
       "continuous": true,
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
-      "dependsOn": ["build"],
+      "executor": "nx:run-commands",
       "options": {
-        "buildTarget": "quantum-api:build",
-        "runBuildTargetDependencies": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "quantum-api:build:development"
-        },
-        "production": {
-          "buildTarget": "quantum-api:build:production"
-        }
+        "cwd": "apps/services/quantum-api",
+        "command": "python3 -m quantum_api.main"
       }
     },
     "test": {

@@ -6,55 +6,47 @@ import {
   eq,
   gte,
   ilike,
-  inArray,
   lte,
   or,
   sql,
 } from 'drizzle-orm';
 
 import {
+  ADMIN_UI_LOGGING_SETTING_KEYS,
   auditLogs,
+  fetchLoggingSettingsForAdminUi,
   getDb,
+  isAdminUiLoggingSettingKey,
   platformSettings,
-  resolveSpectraDatabaseUrl,
   users,
 } from '@spectra/database';
 
-import { createRequireAuth0AccessToken } from '../middleware/require-auth0-access-token';
+import { requireAuth0AccessToken } from '../lib/auth';
+import { mapAuditLogRowToAdminDto } from '../lib/audit-log-dto';
+import {
+  actorUserIdFromRequest,
+  logModule,
+  requestContext,
+} from '../lib/logging-helpers';
+import { validateLoggingSettingValue } from '../lib/logging-settings-validation';
+import {
+  ensureDatabaseConfigured,
+  logHandlerError,
+  parseIsoDateQuery,
+  queryString,
+  respondValidationError,
+} from '../lib/route-helpers';
+import { getServiceLog, refreshServiceLoggingFromPlatform } from '../lib/service-logger';
 
-const requireAuth0AccessToken = createRequireAuth0AccessToken();
-
-/** Keys surfaced in the admin UI (aligned with Vital Woman Reset `LoggingSettingsTab`). */
-const LOGGING_SETTING_KEYS = ['logging_level', 'logging_output'] as const;
-
-/** Extra keys read to synthesize defaults (legacy `log_to_console`). */
-const LOGGING_SETTING_QUERY_KEYS = [
-  'logging_level',
-  'logging_output',
-  'log_to_console',
-] as const;
-
-type LoggingSettingKey = (typeof LOGGING_SETTING_KEYS)[number];
-
-function isLoggingSettingKey(k: string): k is LoggingSettingKey {
-  return (LOGGING_SETTING_KEYS as readonly string[]).includes(k);
-}
+const MOD = 'admin-logging.ts';
 
 function escapeIlikePattern(raw: string): string {
   return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 
-/**
- * Maps control-plane `audit_logs` rows to a Vital Woman Reset–style admin log DTO
- * (`apps/server/src/routers/logs.router.ts` `adminList` response shape).
- */
 const listAuditLogs: RequestHandler = async (req, res) => {
-  const dbUrl = resolveSpectraDatabaseUrl();
-  if (!dbUrl) {
-    res.status(503).json({
-      error: 'database_not_configured',
-      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
-    });
+  const handler = logModule(MOD, 'listAuditLogs');
+  if (!ensureDatabaseConfigured(req, res, handler, 'listAuditLogs: database not configured')) {
     return;
   }
 
@@ -63,23 +55,28 @@ const listAuditLogs: RequestHandler = async (req, res) => {
   const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
   const offset = (page - 1) * pageSize;
 
-  const search = typeof req.query['search'] === 'string' ? req.query['search'].trim() : '';
-  const userId =
-    typeof req.query['userId'] === 'string' && req.query['userId'].length > 0 ?
-      req.query['userId']
-    : undefined;
-  const moduleFilter =
-    typeof req.query['module'] === 'string' && req.query['module'].length > 0 ?
-      req.query['module'].trim()
-    : undefined;
-  const startDate =
-    typeof req.query['startDate'] === 'string' && req.query['startDate'].length > 0 ?
-      req.query['startDate']
-    : undefined;
-  const endDate =
-    typeof req.query['endDate'] === 'string' && req.query['endDate'].length > 0 ?
-      req.query['endDate']
-    : undefined;
+  const search = queryString(req, 'search', true) ?? '';
+  const userId = queryString(req, 'userId');
+  const moduleFilter = queryString(req, 'module', true);
+  const startDateRaw = queryString(req, 'startDate');
+  const endDateRaw = queryString(req, 'endDate');
+
+  const startDate = parseIsoDateQuery(startDateRaw);
+  if (startDate === null) {
+    respondValidationError(req, res, handler, {
+      error: 'invalid_start_date',
+      message: 'startDate must be a valid ISO date string.',
+    });
+    return;
+  }
+  const endDate = parseIsoDateQuery(endDateRaw);
+  if (endDate === null) {
+    respondValidationError(req, res, handler, {
+      error: 'invalid_end_date',
+      message: 'endDate must be a valid ISO date string.',
+    });
+    return;
+  }
 
   const conditions = [];
 
@@ -87,10 +84,10 @@ const listAuditLogs: RequestHandler = async (req, res) => {
     conditions.push(eq(auditLogs.actorUserId, userId));
   }
   if (startDate) {
-    conditions.push(gte(auditLogs.createdAt, new Date(startDate)));
+    conditions.push(gte(auditLogs.createdAt, startDate));
   }
   if (endDate) {
-    conditions.push(lte(auditLogs.createdAt, new Date(endDate)));
+    conditions.push(lte(auditLogs.createdAt, endDate));
   }
   if (search) {
     const p = `%${escapeIlikePattern(search)}%`;
@@ -138,42 +135,20 @@ const listAuditLogs: RequestHandler = async (req, res) => {
       .limit(pageSize)
       .offset(offset);
 
-    const logs = rows.map((row) => {
-      const payload = row.payload as Record<string, unknown> | null;
-      const level =
-        payload && typeof payload['level'] === 'string' ?
-          payload['level']
-        : 'INFO';
-      const module =
-        payload && typeof payload['module'] === 'string' ?
-          payload['module']
-        : 'control-plane';
-      const message = `${row.action} · ${row.resource}`;
+    const logs = rows.map(mapAuditLogRowToAdminDto);
 
-      return {
-        id: row.id,
-        level,
-        message,
-        context: null as string | null,
-        sessionId: null as string | null,
-        userId: row.actorUserId,
-        module,
-        action: row.action,
-        metadata: row.payload,
-        createdAt: row.createdAt,
-        createdBy: null as string | null,
-        updatedAt: null as Date | null,
-        updatedBy: null as string | null,
-        user:
-          row.actorUserId && row.userEmail ?
-            {
-              id: row.actorUserId,
-              email: row.userEmail,
-              firstName: null as string | null,
-              lastName: null as string | null,
-            }
-          : null,
-      };
+    getServiceLog().debug('Audit logs listed', {
+      module: handler,
+      action: 'query',
+      context: {
+        ...requestContext(req),
+        page,
+        pageSize,
+        total,
+        hasSearch: Boolean(search),
+        hasUserId: Boolean(userId),
+      },
+      metadata: { userId: actorUserIdFromRequest(req) },
     });
 
     res.status(200).json({
@@ -186,126 +161,78 @@ const listAuditLogs: RequestHandler = async (req, res) => {
       },
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Unknown error';
-    res.status(500).json({
-      error: 'logs_query_failed',
-      message,
-    });
+    const message = logHandlerError(req, handler, e, 'listAuditLogs failed');
+    res.status(500).json({ error: 'logs_query_failed', message });
   }
 };
 
-const getLoggingSettings: RequestHandler = async (_req, res) => {
-  const dbUrl = resolveSpectraDatabaseUrl();
-  if (!dbUrl) {
-    res.status(503).json({
-      error: 'database_not_configured',
-      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
-    });
+const getLoggingSettings: RequestHandler = async (req, res) => {
+  const handler = logModule(MOD, 'getLoggingSettings');
+  if (
+    !ensureDatabaseConfigured(req, res, handler, 'getLoggingSettings: database not configured')
+  ) {
     return;
   }
 
-  const defaults: Record<LoggingSettingKey, unknown> = {
-    logging_level: 'INFO',
-    logging_output: 'both',
-  };
-
   try {
-    const db = getDb();
-    const rows = await db
-      .select()
-      .from(platformSettings)
-      .where(inArray(platformSettings.key, [...LOGGING_SETTING_QUERY_KEYS]));
+    const settings = await fetchLoggingSettingsForAdminUi(getDb());
 
-    const byKey = new Map(rows.map((r) => [r.key, r.value]));
-
-    const loggingOutputValue = ((): unknown => {
-      if (byKey.has('logging_output')) return byKey.get('logging_output');
-      const legacy = byKey.get('log_to_console');
-      if (typeof legacy === 'boolean') {
-        return legacy ? 'both' : 'database';
-      }
-      return defaults.logging_output;
-    })();
-
-    const settings = LOGGING_SETTING_KEYS.map((key) => {
-      if (key === 'logging_output') {
-        return { key, value: loggingOutputValue };
-      }
-      const value = byKey.has(key) ? byKey.get(key) : defaults[key];
-      return { key, value };
+    getServiceLog().debug('Logging settings read', {
+      module: handler,
+      context: requestContext(req),
+      metadata: { userId: actorUserIdFromRequest(req) },
     });
 
     res.status(200).json({ settings });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Unknown error';
-    res.status(500).json({
-      error: 'logging_settings_query_failed',
-      message,
-    });
+    const message = logHandlerError(req, handler, e, 'getLoggingSettings failed');
+    res.status(500).json({ error: 'logging_settings_query_failed', message });
   }
 };
 
 const putLoggingSetting: RequestHandler = async (req, res) => {
-  const dbUrl = resolveSpectraDatabaseUrl();
-  if (!dbUrl) {
-    res.status(503).json({
-      error: 'database_not_configured',
-      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
-    });
+  const handler = logModule(MOD, 'putLoggingSetting');
+  if (
+    !ensureDatabaseConfigured(req, res, handler, 'putLoggingSetting: database not configured')
+  ) {
     return;
   }
 
   const body = req.body as { key?: unknown; value?: unknown };
   const key = typeof body.key === 'string' ? body.key : '';
-  if (!isLoggingSettingKey(key)) {
-    res.status(400).json({
-      error: 'invalid_key',
-      message: `key must be one of: ${LOGGING_SETTING_KEYS.join(', ')}`,
-    });
+
+  if (!isAdminUiLoggingSettingKey(key)) {
+    respondValidationError(
+      req,
+      res,
+      handler,
+      {
+        error: 'invalid_key',
+        message: `key must be one of: ${ADMIN_UI_LOGGING_SETTING_KEYS.join(', ')}. log_to_console is legacy read-only.`,
+      },
+      { key },
+    );
     return;
   }
 
   if (body.value === undefined) {
-    res.status(400).json({ error: 'missing_value', message: 'value is required.' });
+    respondValidationError(
+      req,
+      res,
+      handler,
+      { error: 'missing_value', message: 'value is required.' },
+      { key },
+    );
     return;
   }
 
-  let valueToStore: unknown = body.value;
+  const validated = validateLoggingSettingValue(key, body.value);
+  if (validated.ok === false) {
+    respondValidationError(req, res, handler, validated, { key });
+    return;
+  }
 
-  if (key === 'logging_level') {
-    if (typeof body.value !== 'string') {
-      res.status(400).json({
-        error: 'invalid_value',
-        message: 'logging_level must be a string.',
-      });
-      return;
-    }
-    if (!/^(debug|info|warn|error|critical)$/i.test(body.value.trim())) {
-      res.status(400).json({
-        error: 'invalid_value',
-        message: 'logging_level must be one of: DEBUG, INFO, WARN, ERROR, CRITICAL.',
-      });
-      return;
-    }
-  }
-  if (key === 'logging_output') {
-    if (typeof body.value !== 'string') {
-      res.status(400).json({
-        error: 'invalid_value',
-        message: 'logging_output must be a string.',
-      });
-      return;
-    }
-    const norm = body.value.trim().toLowerCase();
-    if (norm !== 'both' && norm !== 'console' && norm !== 'database') {
-      res.status(400).json({
-        error: 'invalid_value',
-        message: 'logging_output must be one of: both, console, database.',
-      });
-      return;
-    }
-    valueToStore = norm;
-  }
+  const valueToStore = validated.value;
 
   try {
     const db = getDb();
@@ -317,20 +244,27 @@ const putLoggingSetting: RequestHandler = async (req, res) => {
         set: { value: valueToStore as never },
       });
 
+    await refreshServiceLoggingFromPlatform();
+
+    getServiceLog().info('Logging setting updated', {
+      module: handler,
+      action: 'update',
+      context: {
+        ...requestContext(req),
+        key,
+        value: valueToStore,
+      },
+      metadata: { userId: actorUserIdFromRequest(req) },
+    });
+
     res.status(200).json({ ok: true, key, value: valueToStore });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Unknown error';
-    res.status(500).json({
-      error: 'logging_settings_update_failed',
-      message,
-    });
+    const message = logHandlerError(req, handler, e, 'putLoggingSetting failed');
+    res.status(500).json({ error: 'logging_settings_update_failed', message });
   }
 };
 
-/**
- * Registers admin logging routes (Vital Woman Reset `logs.router` / `LoggingSettingsTab` parity).
- * Protected with the same Auth0 access-token middleware as `GET /v1/admin/stats`.
- */
+/** Staff audit log list + platform logging settings (admin UI parity). */
 export function registerAdminLoggingRoutes(r: Router): void {
   r.get('/logs', requireAuth0AccessToken, listAuditLogs);
   r.get('/logging/settings', requireAuth0AccessToken, getLoggingSettings);

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 
 import { getDb, platformSettings, resolveSpectraDatabaseUrl } from '@spectra/database';
 
-import { createRequireAuth0AccessToken } from '../middleware/require-auth0-access-token';
+import { requireAuth0AccessToken } from '../lib/auth';
 
 /** Namespaced key in `spectra.platform_settings` (avoid collisions with logging / migrations). */
 export const ADMIN_UI_SIDEBAR_NAV_HIDDEN_MENU_KEYS = 'admin_ui.sidebar_nav_hidden_menu_keys' as const;
@@ -23,8 +23,6 @@ export const TEMPLATE_NAV_MENU_KEYS = [
 export type TemplateNavMenuKey = (typeof TEMPLATE_NAV_MENU_KEYS)[number];
 
 const ALLOWED = new Set<string>(TEMPLATE_NAV_MENU_KEYS);
-
-const requireAuth0AccessToken = createRequireAuth0AccessToken();
 
 export function defaultHiddenSidebarNavKeys(): string[] {
   return [...TEMPLATE_NAV_MENU_KEYS];
