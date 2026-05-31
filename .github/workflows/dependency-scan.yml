@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan
         id: trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: ${{ github.event_name == 'pull_request' && !startsWith(github.base_ref, 'staging') && github.base_ref != 'main' }}
         with:
           scan-type: fs
