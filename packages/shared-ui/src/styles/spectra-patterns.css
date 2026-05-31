@@ -1,0 +1,152 @@
+/* Shared layout / marketing utilities */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 1000;
+  padding: 0.5rem 1rem;
+  background: var(--spectra-color-card);
+  color: var(--spectra-color-text);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--spectra-radius-sm);
+  box-shadow: var(--spectra-shadow-md);
+}
+
+.skip-link:focus {
+  left: 0.75rem;
+  top: 0.75rem;
+}
+
+.spectra-page {
+  max-width: var(--spectra-max-width);
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+.spectra-page h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.75rem, 2.5vw, 2.25rem);
+  font-weight: 700;
+  color: var(--spectra-color-navy);
+}
+
+.spectra-page .lede {
+  margin: 0 0 2rem;
+  color: var(--spectra-color-muted);
+  font-size: 1.05rem;
+  max-width: 40rem;
+}
+
+/* Dark developer / API probe panels */
+.spectra-probe {
+  margin-top: 0;
+  padding: 1rem 1.25rem;
+  border-radius: var(--spectra-radius-md);
+  background: var(--spectra-color-panel-bg);
+  color: var(--spectra-color-panel-text);
+}
+
+.spectra-probe h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.spectra-probe-row {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--spectra-color-panel-border);
+}
+
+.spectra-probe .meta {
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+}
+
+.spectra-probe .label {
+  display: inline-block;
+  min-width: 7rem;
+  color: var(--spectra-color-panel-muted);
+}
+
+.spectra-probe code {
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.spectra-probe pre {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem;
+  border-radius: var(--spectra-radius-sm);
+  background: var(--spectra-color-panel-code-bg);
+  overflow: auto;
+  font-size: 0.8rem;
+}
+
+.spectra-probe .err {
+  color: var(--spectra-color-panel-err);
+  margin: 0.5rem 0 0;
+}
+
+.spectra-probe .hint {
+  margin: 0;
+  color: var(--spectra-color-panel-muted);
+  font-size: 0.9rem;
+}
+
+.spectra-probe a {
+  color: var(--spectra-color-panel-link);
+}
+
+.spectra-probe a:hover {
+  color: var(--spectra-color-panel-link-hover);
+}
+
+/* Auth / compact dark shell (login card) */
+.spectra-auth-shell {
+  font-family: var(--spectra-font-sans);
+  max-width: 42rem;
+  margin: 1rem auto;
+  padding: 1rem 1.25rem;
+  border-radius: var(--spectra-radius-md);
+  background: var(--spectra-color-panel-bg);
+  color: var(--spectra-color-panel-text);
+}
+
+.spectra-auth-shell pre {
+  overflow: auto;
+  font-size: 0.8rem;
+  background: var(--spectra-color-panel-code-bg);
+  padding: 0.75rem;
+  border-radius: var(--spectra-radius-sm);
+}
+
+.spectra-auth-shell button {
+  margin-right: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.spectra-auth-error {
+  color: var(--spectra-color-panel-err);
+}
+
+/* Toolbar row inside spectra-app-shell (sandbox) or composed headers */
+.spectra-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: var(--spectra-max-width);
+  margin: 0 auto;
+  padding: 0 1.25rem;
+  min-height: var(--spectra-header-height);
+}
+
+.spectra-shell-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #dbe4f0;
+}

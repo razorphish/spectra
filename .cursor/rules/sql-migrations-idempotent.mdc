@@ -1,0 +1,25 @@
+---
+description: Drizzle SQL migrations under packages/database/drizzle should be idempotent where practical; manifest headers override heuristics.
+globs: packages/database/drizzle/**/*.sql
+---
+
+# SQL migrations — idempotency (Spectra / Vital Woman Reset alignment)
+
+**Context:** Drizzle journal migrations in `packages/database/drizzle/` are applied once per hash in production, but **rehearsal branches**, **record deletion + re-apply**, and **local resets** can re-run files. Prefer patterns that do not corrupt data or fail noisily when re-executed after partial success.
+
+## Patterns to prefer
+
+- `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP … IF EXISTS` where appropriate.
+- Data backfills: `INSERT … ON CONFLICT DO NOTHING` / `ON CONFLICT DO UPDATE` keyed to natural or primary keys; avoid blind `INSERT` without a conflict target when duplicates are possible.
+- Destructive DDL (`DROP COLUMN`, `TRUNCATE`, unscoped `DELETE`) only with explicit review and usually a dedicated forward migration with backups per the **Vital Woman Reset** / platform checklist (see repo `README.md` and admin migrations run confirmation copy).
+
+## Explicit override (admin UI + tooling)
+
+The admin **View migration SQL** modal uses `analyzeMigrationSql` in `@spectra/database` (`migration-sql-metadata.ts`). To override conservative heuristics, put **one** of these on the **first lines** of the file (within the scanned header):
+
+- `-- @spectra-migration: idempotent` — treat as safe to re-run (use only when true).
+- `-- @spectra-migration: non-idempotent` — treat as one-shot / manual (e.g. intentional destructive change).
+
+## Historical note
+
+Early generated migrations (e.g. `0000_init_control_plane.sql`) use raw `CREATE TABLE` without `IF NOT EXISTS`; the heuristic correctly marks them **non-idempotent**. New migrations should tighten this where product and Postgres semantics allow.

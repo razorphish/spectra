@@ -1,34 +1,53 @@
-@if (auth0Configured) {
-  @if (auth.isLoading$ | async) {
-    <div class="auth-shell">Loading…</div>
-  } @else {
-    @if ((auth.isAuthenticated$ | async) && (auth.user$ | async); as user) {
-      <div class="auth-shell">
-        <p>Logged in as {{ user.email }}</p>
-        <h2>User profile</h2>
-        <pre>{{ user | json }}</pre>
-        <button
-          type="button"
-          (click)="auth.logout({ logoutParams: { returnTo: window.location.origin } })"
-        >
-          Log out
-        </button>
-      </div>
-    } @else {
-      <div class="auth-shell">
-        @if (auth.error$ | async; as error) {
-          <p class="auth-error">Error: {{ error.message }}</p>
+<div class="sandbox-app">
+  <header class="sandbox-chrome-header" role="banner">
+    <div class="spectra-shell-header">
+      <spectra-brand-bar [homeHref]="marketingHomeHref" />
+      <nav class="sandbox-nav-main">
+        <a [href]="documentationUrl" target="_blank" rel="noopener noreferrer">Documentation</a>
+        <a [href]="supportUrl" target="_blank" rel="noopener noreferrer">Support</a>
+        @if (auth0Configured && auth && (auth.isAuthenticated$ | async)) {
+          <a [href]="apiDocsUrl" target="_blank" rel="noopener noreferrer">API reference</a>
         }
-        <button
-          type="button"
-          (click)="auth.loginWithRedirect({ authorizationParams: { screen_hint: 'signup' } })"
-        >
-          Sign up
-        </button>
-        <button type="button" (click)="auth.loginWithRedirect()">Log in</button>
+      </nav>
+      <div class="sandbox-nav-actions">
+        @if (auth0Configured && auth) {
+          @if (auth.isLoading$ | async) {
+            <span class="muted">Signing in…</span>
+          } @else if (auth.isAuthenticated$ | async) {
+            @if (auth.user$ | async; as user) {
+              <a routerLink="/account" class="user-email" title="Account profile">{{
+                user.email || user.name || 'Profile'
+              }}</a>
+              <button type="button" class="spectra-sandbox-logout" (click)="logout()">
+                Log out
+              </button>
+            }
+          } @else {
+            <button type="button" class="btn-login" (click)="login()">Log in</button>
+          }
+        }
+      </div>
+    </div>
+  </header>
+
+  <main class="sandbox-app-main">
+    @if (oauthReturnError(); as oe) {
+      <div class="sandbox-oauth-banner" role="alert">
+        <div class="sandbox-oauth-banner-inner">
+          <strong>Sign-in was rejected by Auth0</strong>
+          <p class="sandbox-oauth-code"><code>{{ oe.error }}</code></p>
+          <p class="sandbox-oauth-desc">{{ oe.error_description }}</p>
+          <p class="sandbox-oauth-hint">
+            Typical fixes: add <code>{{ appOrigin }}</code> to <strong>Allowed Callback URLs</strong> and
+            <strong>Allowed Web Origins</strong> (match <code>localhost</code> vs <code>127.0.0.1</code> to how you
+            open this app). If the message mentions a resource server, in Auth0 open that <strong>API</strong> and
+            authorize this SPA application for it (audience <code>{{ auth0AudienceHint }}</code>).
+          </p>
+          <button type="button" class="sandbox-oauth-dismiss" (click)="dismissOauthError()">Dismiss</button>
+        </div>
       </div>
     }
-  }
-}
 
-<router-outlet />
+    <router-outlet />
+  </main>
+</div>

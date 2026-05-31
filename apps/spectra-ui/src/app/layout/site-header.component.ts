@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { SpectraBrandBarComponent } from '@spectra/shared-ui';
 import { filter } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import {
@@ -19,18 +21,16 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'spectra-site-header',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RouterLink, RouterLinkActive, SpectraBrandBarComponent],
   template: `
     <header class="site-header" role="banner">
       <div class="site-header-inner">
-        <a routerLink="/" class="brand" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
-          Spectra
-        </a>
+        <spectra-brand-bar [homeRouterPath]="'/'" />
 
         <button
           type="button"
           class="menu-toggle"
-          (click)="menuOpen.update((v) => !v)"
+          (click)="toggleMobileMenu()"
           [attr.aria-expanded]="menuOpen()"
           aria-controls="primary-nav"
         >
@@ -48,61 +48,97 @@ import {
               [routerLink]="link.path"
               routerLinkActive="active"
               class="nav-link"
+              (click)="closeMobileMenu()"
               >{{ link.label }}</a
             >
           }
 
-          <details class="nav-dropdown">
-            <summary
+          <div
+            class="nav-dropdown"
+            (mouseenter)="onFlyoutEnter('docs')"
+            (mouseleave)="onFlyoutLeave()"
+          >
+            <button
+              type="button"
               class="nav-summary"
+              id="nav-flyout-docs-trigger"
+              aria-haspopup="true"
+              [attr.aria-expanded]="activeFlyout() === 'docs'"
+              aria-controls="nav-flyout-docs-panel"
               [attr.aria-current]="docsPathActive() ? 'page' : null"
               [class.active]="docsPathActive()"
+              (click)="onFlyoutTriggerClick('docs', $event)"
             >
               API Documentation
-            </summary>
-            <ul class="nav-dropdown-panel" role="list">
-              @for (item of docsNavItems; track item.fragment) {
-                <li>
-                  <a
-                    [routerLink]="['/docs']"
-                    [fragment]="item.fragment"
-                    class="nav-dropdown-link"
-                    (click)="closeMobileMenu()"
-                    >{{ item.label }}</a
-                  >
-                </li>
-              }
-            </ul>
-          </details>
+            </button>
+            @if (activeFlyout() === 'docs') {
+              <ul
+                id="nav-flyout-docs-panel"
+                class="nav-dropdown-panel"
+                role="list"
+                aria-labelledby="nav-flyout-docs-trigger"
+              >
+                @for (item of docsNavItems; track item.fragment) {
+                  <li>
+                    <a
+                      [routerLink]="['/docs']"
+                      [fragment]="item.fragment"
+                      class="nav-dropdown-link"
+                      (click)="finalizeFlyoutNav()"
+                      >{{ item.label }}</a
+                    >
+                  </li>
+                }
+              </ul>
+            }
+          </div>
 
-          <details class="nav-dropdown">
-            <summary
+          <div
+            class="nav-dropdown"
+            (mouseenter)="onFlyoutEnter('data')"
+            (mouseleave)="onFlyoutLeave()"
+          >
+            <button
+              type="button"
               class="nav-summary"
+              id="nav-flyout-data-trigger"
+              aria-haspopup="true"
+              [attr.aria-expanded]="activeFlyout() === 'data'"
+              aria-controls="nav-flyout-data-panel"
               [attr.aria-current]="dataPathActive() ? 'page' : null"
               [class.active]="dataPathActive()"
+              (click)="onFlyoutTriggerClick('data', $event)"
             >
               Data
-            </summary>
-            <ul class="nav-dropdown-panel" role="list">
-              @for (item of dataNavItems; track item.fragment) {
-                <li>
-                  <a
-                    [routerLink]="['/data']"
-                    [fragment]="item.fragment"
-                    class="nav-dropdown-link"
-                    (click)="closeMobileMenu()"
-                    >{{ item.label }}</a
-                  >
-                </li>
-              }
-            </ul>
-          </details>
+            </button>
+            @if (activeFlyout() === 'data') {
+              <ul
+                id="nav-flyout-data-panel"
+                class="nav-dropdown-panel"
+                role="list"
+                aria-labelledby="nav-flyout-data-trigger"
+              >
+                @for (item of dataNavItems; track item.fragment) {
+                  <li>
+                    <a
+                      [routerLink]="['/data']"
+                      [fragment]="item.fragment"
+                      class="nav-dropdown-link"
+                      (click)="finalizeFlyoutNav()"
+                      >{{ item.label }}</a
+                    >
+                  </li>
+                }
+              </ul>
+            }
+          </div>
 
           @for (link of primaryNavLinksAfterDocs; track link.path) {
             <a
               [routerLink]="link.path"
               routerLinkActive="active"
               class="nav-link"
+              (click)="closeMobileMenu()"
               >{{ link.label }}</a
             >
           }
@@ -142,24 +178,6 @@ import {
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
-    }
-
-    .brand {
-      font-weight: 700;
-      font-size: 1.15rem;
-      letter-spacing: 0.02em;
-      color: #f8fafc;
-      text-decoration: none;
-      white-space: nowrap;
-    }
-
-    .brand:hover {
-      color: #fff;
-    }
-
-    .brand.active {
-      text-decoration: underline;
-      text-underline-offset: 4px;
     }
 
     .menu-toggle {
@@ -210,18 +228,20 @@ import {
     }
 
     .nav-summary {
-      list-style: none;
+      display: inline-flex;
+      align-items: center;
+      font: inherit;
+      font-family: inherit;
       cursor: pointer;
       padding: 0.5rem 0.65rem;
+      border: none;
+      background: transparent;
       border-radius: var(--spectra-radius-sm);
       color: #dbe4f0;
       font-weight: 500;
       font-size: 0.95rem;
       user-select: none;
-    }
-
-    .nav-summary::-webkit-details-marker {
-      display: none;
+      text-align: left;
     }
 
     .nav-summary::after {
@@ -246,16 +266,27 @@ import {
     .nav-dropdown-panel {
       position: absolute;
       left: 0;
-      top: calc(100% + 0.15rem);
-      min-width: 14rem;
+      top: 100%;
       margin: 0;
       padding: 0.35rem 0;
+      padding-top: 0.4rem;
       list-style: none;
       background: var(--spectra-color-card);
       border: 1px solid var(--spectra-color-border);
       border-radius: var(--spectra-radius-md);
       box-shadow: var(--spectra-shadow-md);
       z-index: 60;
+      min-width: 14rem;
+    }
+
+    /* Invisible hover bridge so pointer does not leave the hitbox between trigger and panel. */
+    .nav-dropdown-panel::before {
+      content: '';
+      position: absolute;
+      top: -0.35rem;
+      left: 0;
+      right: 0;
+      height: 0.35rem;
     }
 
     .nav-dropdown-link {
@@ -343,16 +374,22 @@ export class SiteHeaderComponent {
   protected readonly sandboxUiUrl = environment.sandboxUiUrl;
 
   protected readonly menuOpen = signal(false);
+  /** Only one flyout (docs vs data) may be open — mutual exclusion for hover + click. */
+  protected readonly activeFlyout = signal<'docs' | 'data' | null>(null);
+
+  private flyoutLeaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.clearFlyoutLeaveTimer());
     this.router.events
       .pipe(
         filter((e): e is NavigationEnd => e instanceof NavigationEnd),
         takeUntilDestroyed(),
       )
-      .subscribe(() => this.menuOpen.set(false));
+      .subscribe(() => this.afterNavigation());
   }
 
   protected docsPathActive(): boolean {
@@ -367,5 +404,67 @@ export class SiteHeaderComponent {
 
   protected closeMobileMenu(): void {
     this.menuOpen.set(false);
+  }
+
+  protected toggleMobileMenu(): void {
+    this.menuOpen.update((open) => {
+      const next = !open;
+      if (next) {
+        this.clearFlyoutLeaveTimer();
+        this.activeFlyout.set(null);
+      }
+      return next;
+    });
+  }
+
+  /** Desktop / fine pointer: open flyout on hover (exclusive — only one menu). */
+  protected onFlyoutEnter(id: 'docs' | 'data'): void {
+    this.clearFlyoutLeaveTimer();
+    if (this.hoverFlyoutsEnabled()) {
+      this.activeFlyout.set(id);
+    }
+  }
+
+  /** Debounced so moving between trigger and panel (or adjacent menus) does not flicker closed. */
+  protected onFlyoutLeave(): void {
+    if (!this.hoverFlyoutsEnabled()) return;
+    this.clearFlyoutLeaveTimer();
+    this.flyoutLeaveTimer = setTimeout(() => {
+      this.flyoutLeaveTimer = null;
+      this.activeFlyout.set(null);
+    }, 120);
+  }
+
+  /** Toggle flyout on trigger (touch / keyboard / click when hover is not used). */
+  protected onFlyoutTriggerClick(id: 'docs' | 'data', event: MouseEvent): void {
+    event.stopPropagation();
+    this.clearFlyoutLeaveTimer();
+    this.activeFlyout.update((cur) => (cur === id ? null : id));
+  }
+
+  protected finalizeFlyoutNav(): void {
+    this.clearFlyoutLeaveTimer();
+    this.activeFlyout.set(null);
+    this.menuOpen.set(false);
+  }
+
+  private hoverFlyoutsEnabled(): boolean {
+    return (
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(hover: hover) and (pointer: fine)').matches
+    );
+  }
+
+  private clearFlyoutLeaveTimer(): void {
+    if (this.flyoutLeaveTimer) {
+      clearTimeout(this.flyoutLeaveTimer);
+      this.flyoutLeaveTimer = null;
+    }
+  }
+
+  private afterNavigation(): void {
+    this.clearFlyoutLeaveTimer();
+    this.menuOpen.set(false);
+    this.activeFlyout.set(null);
   }
 }

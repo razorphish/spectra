@@ -1,0 +1,65 @@
+/* Component Control–inspired design tokens (tune hex values against live marketing site). */
+:root {
+  --spectra-color-navy: #0c1e35;
+  --spectra-color-navy-mid: #132a45;
+  --spectra-color-surface: #f4f6f9;
+  --spectra-color-card: #ffffff;
+  --spectra-color-text: #1a2332;
+  --spectra-color-muted: #5c6778;
+  --spectra-color-border: #d5dbe4;
+  --spectra-color-accent: #c45c1a;
+  --spectra-color-accent-hover: #a34d16;
+  --spectra-color-link: #1e6bb8;
+  --spectra-color-link-hover: #155a9c;
+  /* Dark developer panels (probe, auth shell on light page) */
+  --spectra-color-panel-bg: #0f172a;
+  --spectra-color-panel-code-bg: #020617;
+  --spectra-color-panel-text: #e2e8f0;
+  --spectra-color-panel-muted: #94a3b8;
+  --spectra-color-panel-border: #334155;
+  --spectra-color-panel-link: #7dd3fc;
+  --spectra-color-panel-link-hover: #bae6fd;
+  --spectra-color-panel-err: #fecaca;
+  --spectra-font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, Cantarell,
+    'Noto Sans', sans-serif;
+  --spectra-radius-sm: 6px;
+  --spectra-radius-md: 10px;
+  --spectra-shadow-sm: 0 1px 2px rgb(12 30 53 / 0.06);
+  --spectra-shadow-md: 0 4px 14px rgb(12 30 53 / 0.08);
+  --spectra-max-width: 72rem;
+  --spectra-header-height: 3.5rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  font-family: var(--spectra-font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--spectra-color-text);
+  background: var(--spectra-color-surface);
+}
+
+a {
+  color: var(--spectra-color-link);
+}
+
+a:hover {
+  color: var(--spectra-color-link-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--spectra-color-accent);
+  outline-offset: 2px;
+}

@@ -15,9 +15,8 @@ import { environment } from '../../environments/environment';
         <p class="eyebrow">Developer &amp; partner API</p>
         <h1>Spectra</h1>
         <p class="hero-lede">
-          Public discovery, documentation, and sandbox access for integrating with Spectra — structured like the
-          <a href="https://bluebutton.cms.gov/" rel="noopener noreferrer" target="_blank">CMS Blue Button</a> developer
-          experience.
+          Public discovery, documentation, and sandbox access for integrating with Spectra — aligned with the Component
+          Control developer experience.
         </p>
         <div class="hero-actions">
           <a routerLink="/docs" class="btn btn-primary">API Documentation</a>
@@ -45,7 +44,7 @@ import { environment } from '../../environments/environment';
       <div class="spectra-page dev-strip-inner">
         <h2 id="dev-heading">API status</h2>
         <p class="dev-hint">Probe of the <strong>local-edge</strong> dev server health (development build uses <code>apiBaseUrl</code>).</p>
-        <div class="probe">
+        <div class="spectra-probe">
           <p class="meta">
             <span class="label">Configured base</span>
             <code>{{ baseLabel() }}</code>
@@ -56,7 +55,7 @@ import { environment } from '../../environments/environment';
               <code>{{ healthUrl() }}</code>
             </p>
             @if (health()) {
-              <pre class="ok">{{ health() | json }}</pre>
+              <pre>{{ health() | json }}</pre>
             }
             @if (error()) {
               <p class="err">{{ error() }}</p>
@@ -109,14 +108,6 @@ import { environment } from '../../environments/environment';
       font-size: 1.1rem;
       line-height: 1.55;
       color: #cbd5e1;
-    }
-
-    .hero-lede a {
-      color: #93c5fd;
-    }
-
-    .hero-lede a:hover {
-      color: #bfdbfe;
     }
 
     .hero-actions {
@@ -212,49 +203,6 @@ import { environment } from '../../environments/environment';
       margin: 0 0 1rem;
       color: var(--spectra-color-muted);
       font-size: 0.95rem;
-    }
-
-    .probe {
-      padding: 1rem 1.25rem;
-      border-radius: var(--spectra-radius-md);
-      background: #0f172a;
-      color: #e2e8f0;
-    }
-
-    .meta {
-      margin: 0.35rem 0;
-      font-size: 0.9rem;
-    }
-
-    .label {
-      display: inline-block;
-      min-width: 7rem;
-      color: #94a3b8;
-    }
-
-    code {
-      font-size: 0.85rem;
-      word-break: break-all;
-    }
-
-    pre.ok {
-      margin: 0.75rem 0 0;
-      padding: 0.75rem;
-      border-radius: 6px;
-      background: #020617;
-      overflow: auto;
-      font-size: 0.8rem;
-    }
-
-    .err {
-      color: #fecaca;
-      margin: 0.5rem 0 0;
-    }
-
-    .hint {
-      margin: 0;
-      color: #94a3b8;
-      font-size: 0.9rem;
     }
   `,
 })

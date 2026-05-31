@@ -118,25 +118,72 @@ export const orgMemberships = spectra.table(
   ]
 );
 
+/** One personal org per sandbox developer (maps Auth0 user to org for applications). */
+export const userDeveloperContext = spectra.table(
+  'user_developer_context',
+  {
+    userId: uuid('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => orgs.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    statusId: uuid('status_id')
+      .notNull()
+      .references(() => catalog.id, { onDelete: 'restrict' }),
+    createdBy: jsonb('created_by').notNull().default(systemActorJsonbDefault),
+    updatedBy: jsonb('updated_by').notNull().default(systemActorJsonbDefault),
+  },
+  (t) => [
+    uniqueIndex('user_developer_context_org_id_uq')
+      .on(t.orgId)
+      .where(sql`${t.deletedAt} is null`),
+  ],
+);
+
 /** Developer-registered API product within an org. */
-export const applications = spectra.table('applications', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  orgId: uuid('org_id')
-    .notNull()
-    .references(() => orgs.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-  deletedAt: timestamp('deleted_at', { withTimezone: true }),
-  statusId: uuid('status_id')
-    .notNull()
-    .references(() => catalog.id, { onDelete: 'restrict' }),
-  createdBy: jsonb('created_by').notNull().default(systemActorJsonbDefault),
-  updatedBy: jsonb('updated_by').notNull().default(systemActorJsonbDefault),
-});
+export const applications = spectra.table(
+  'applications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => orgs.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    companyWebsiteUrl: text('company_website_url'),
+    privacyPolicyUrl: text('privacy_policy_url'),
+    applicationTosUrl: text('application_tos_url'),
+    supportEmail: text('support_email'),
+    supportPhone: text('support_phone'),
+    developmentContacts: text('development_contacts'),
+    /** FK to uploads.id enforced in DB migration; avoids circular TS reference. */
+    logoUploadId: uuid('logo_upload_id'),
+    spectraTosAcceptedAt: timestamp('spectra_tos_accepted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    statusId: uuid('status_id')
+      .notNull()
+      .references(() => catalog.id, { onDelete: 'restrict' }),
+    createdBy: jsonb('created_by').notNull().default(systemActorJsonbDefault),
+    updatedBy: jsonb('updated_by').notNull().default(systemActorJsonbDefault),
+  },
+  (t) => [
+    uniqueIndex('applications_name_lower_active_uq')
+      .on(sql`lower(trim(${t.name}))`)
+      .where(sql`${t.deletedAt} is null`),
+  ],
+);
 
 export const oauthClients = spectra.table(
   'oauth_clients',
@@ -147,6 +194,8 @@ export const oauthClients = spectra.table(
       .references(() => applications.id, { onDelete: 'cascade' }),
     clientId: text('client_id').notNull(),
     secretHash: text('secret_hash').notNull(),
+    oauthClientType: text('oauth_client_type').notNull().default('confidential'),
+    oauthGrantType: text('oauth_grant_type').notNull().default('authorization_code'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()

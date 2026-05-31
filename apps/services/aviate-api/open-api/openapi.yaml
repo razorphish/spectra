@@ -77,6 +77,81 @@ components:
           type: string
         message:
           type: string
+    SandboxSessionResponse:
+      type: object
+      required: [userId, orgId, email]
+      properties:
+        userId: { type: string, format: uuid }
+        orgId: { type: string, format: uuid }
+        email: { type: string, format: email }
+    SandboxApplicationSummary:
+      type: object
+      required: [id, name, updatedAt, clientId, hasClientSecret, oauthClientType, oauthGrantType]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        updatedAt: { type: string, format: date-time }
+        clientId: { type: string }
+        hasClientSecret: { type: boolean }
+        oauthClientType: { type: string }
+        oauthGrantType: { type: string }
+    SandboxApplicationCreateRequest:
+      type: object
+      required: [name, redirectUris, acceptSpectraTos]
+      properties:
+        name: { type: string }
+        redirectUris:
+          type: array
+          items: { type: string }
+        acceptSpectraTos: { type: boolean }
+        description: { type: string }
+        companyWebsiteUrl: { type: string }
+        privacyPolicyUrl: { type: string }
+        applicationTosUrl: { type: string }
+        supportEmail: { type: string }
+        supportPhone: { type: string }
+        developmentContacts: { type: string }
+        logoUploadId: { type: string, format: uuid }
+    SandboxApplicationCreateResponse:
+      type: object
+      required: [id, name, clientId, clientSecret, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        clientId: { type: string }
+        clientSecret: { type: string }
+        updatedAt: { type: string, format: date-time }
+    SandboxApplicationDetail:
+      type: object
+      required:
+        - id
+        - name
+        - updatedAt
+        - clientId
+        - hasClientSecret
+        - oauthClientType
+        - oauthGrantType
+        - redirectUris
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        updatedAt: { type: string, format: date-time }
+        clientId: { type: string }
+        hasClientSecret: { type: boolean }
+        oauthClientType: { type: string }
+        oauthGrantType: { type: string }
+        redirectUris:
+          type: array
+          items: { type: string }
+        description: { type: string, nullable: true }
+        companyWebsiteUrl: { type: string, nullable: true }
+        privacyPolicyUrl: { type: string, nullable: true }
+        applicationTosUrl: { type: string, nullable: true }
+        supportEmail: { type: string, nullable: true }
+        supportPhone: { type: string, nullable: true }
+        developmentContacts: { type: string, nullable: true }
+        logoUploadId: { type: string, format: uuid, nullable: true }
+        spectraTosAcceptedAt: { type: string, format: date-time, nullable: true }
 paths:
   /v1/platform/health:
     get:
@@ -171,6 +246,232 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           description: Uploads not configured (missing bucket env var).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/platform/sandbox/session:
+    get:
+      tags: [Sandbox]
+      summary: Bootstrap developer session (user + personal org)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Session identifiers for sandbox portal APIs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxSessionResponse'
+        '401':
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '503':
+          description: Database or Auth0 not configured.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/platform/sandbox/applications:
+    get:
+      tags: [Sandbox]
+      summary: List sandbox applications for the authenticated developer
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [applications]
+                properties:
+                  applications:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SandboxApplicationSummary'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+    post:
+      tags: [Sandbox]
+      summary: Create sandbox application (returns client secret once)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SandboxApplicationCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxApplicationCreateResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '409':
+          description: Application name not globally unique
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/platform/sandbox/applications/{id}/rotate-client-secret:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [Sandbox]
+      summary: Rotate OAuth client secret (invalidates the previous secret)
+      description: >-
+        Returns the new client secret once. The previous secret stops working immediately.
+        Use when the original secret was lost; secrets are stored hashed and cannot be read back.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [clientSecret]
+                properties:
+                  clientSecret: { type: string }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/platform/sandbox/applications/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Sandbox]
+      summary: Get sandbox application
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxApplicationDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags: [Sandbox]
+      summary: Update sandbox application
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SandboxApplicationCreateRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  id: { type: string, format: uuid }
+                  updatedAt: { type: string, format: date-time }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Name conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Sandbox]
+      summary: Soft-delete sandbox application
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '404':
+          description: Not found
           content:
             application/json:
               schema:

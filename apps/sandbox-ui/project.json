@@ -5,6 +5,7 @@
   "prefix": "sandbox",
   "sourceRoot": "apps/sandbox-ui/src",
   "tags": [],
+  "implicitDependencies": ["shared-ui"],
   "targets": {
     "env-sync": {
       "executor": "nx:run-commands",
@@ -25,6 +26,12 @@
       "dependsOn": ["env-sync"],
       "executor": "@angular/build:application",
       "outputs": ["{options.outputPath}"],
+      "inputs": [
+        "default",
+        "{workspaceRoot}/packages/shared-ui/src/styles/**/*.css",
+        "{workspaceRoot}/packages/shared-ui/src/assets/**/*",
+        "{workspaceRoot}/packages/shared-ui/src/lib/**/*.ts"
+      ],
       "options": {
         "outputPath": "dist/apps/sandbox-ui",
         "browser": "apps/sandbox-ui/src/main.ts",
@@ -33,16 +40,25 @@
           {
             "glob": "**/*",
             "input": "apps/sandbox-ui/public"
+          },
+          {
+            "glob": "**/*",
+            "input": "packages/shared-ui/src/assets",
+            "output": "/assets/spectra"
           }
         ],
-        "styles": ["apps/sandbox-ui/src/styles.css"]
+        "styles": [
+          "packages/shared-ui/src/styles/spectra-tokens.css",
+          "packages/shared-ui/src/styles/spectra-patterns.css",
+          "apps/sandbox-ui/src/styles.css"
+        ]
       },
       "configurations": {
         "production": {
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "500kb",
+              "maximumWarning": "600kb",
               "maximumError": "1mb"
             },
             {

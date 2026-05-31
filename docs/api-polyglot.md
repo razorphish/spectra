@@ -72,6 +72,10 @@ Node services use [`@spectra/auth`](../packages/auth). Polyglot stacks validate 
 
 Staff **admin-ui-api** uses the same middleware with a **staff** audience in its own `.env` — do not reuse that audience for sandbox.
 
+### Spectra M2M (planned)
+
+**Client-credentials** access tokens will be minted by **`auth.aviate.com`** (not Auth0) with **`iss`** and **`aud`** distinct from Auth0. Edge services will validate **issuer + audience + JWKS** on the M2M path using a **separate** configured API resource (e.g. `SPECTRA_M2M_AUDIENCE` — exact name in ADR); **`AUTH0_AUDIENCE`** stays for user and staff Auth0 tokens only. See [m2m-client-credentials-edge-auth.md](plans/m2m-client-credentials-edge-auth.md) (Decisions rows 2 and 8).
+
 ## Local development
 
 ```bash

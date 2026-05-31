@@ -1,6 +1,28 @@
 import { Route } from '@angular/router';
-import { HomeComponent } from './pages/home.component';
+import { AuthGuard } from '@auth0/auth0-angular';
+import { AccountPageComponent } from './pages/account.page';
+import { ApplicationFormPageComponent } from './pages/application-form.page';
+import { ApplicationViewPageComponent } from './pages/application-view.page';
+import { DashboardPageComponent } from './pages/dashboard.page';
+import { LandingPageComponent } from './pages/landing.page';
 
 export const appRoutes: Route[] = [
-  { path: '', pathMatch: 'full', component: HomeComponent },
+  { path: '', pathMatch: 'full', component: LandingPageComponent },
+  { path: 'dashboard', component: DashboardPageComponent, canActivate: [AuthGuard] },
+  { path: 'account', component: AccountPageComponent, canActivate: [AuthGuard] },
+  {
+    path: 'applications/new',
+    component: ApplicationFormPageComponent,
+    canActivate: [AuthGuard],
+  },
+  {
+    path: 'applications/:id/edit',
+    component: ApplicationFormPageComponent,
+    canActivate: [AuthGuard],
+  },
+  {
+    path: 'applications/:id',
+    component: ApplicationViewPageComponent,
+    canActivate: [AuthGuard],
+  },
 ];

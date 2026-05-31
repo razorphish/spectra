@@ -1,0 +1,24 @@
+---
+description: Run a full workspace build before committing when the user asks to commit changes
+alwaysApply: true
+---
+
+# Build before commit
+
+When the user asks to **commit**, **stage and commit**, **commit changes**, or similar:
+
+1. **Run a production build first** from the repository root:
+
+   ```bash
+   npm run build
+   ```
+
+   This runs `nx run-many -t build --all` for this monorepo.
+
+2. **If the build fails**, fix the errors and re-run the build until it succeeds. Do **not** create the commit while the build is red.
+
+3. **Only skip the build** if the user explicitly says to skip it (e.g. “commit without building”, “docs-only, skip build”).
+
+4. After a green build, proceed with `git add` / `git commit` as requested.
+
+This complements pushing to CI: catching TypeScript and build failures locally avoids wasted pipeline runs.

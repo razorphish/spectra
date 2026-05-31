@@ -22,6 +22,8 @@ Copy [apps/sandbox-ui/.env.example](../.env.example) to `apps/sandbox-ui/.env`:
 | `SANDBOX_UI_AUTH0_CLIENT_ID` | SPA client ID |
 | `SANDBOX_UI_AUTH0_AUDIENCE` | Public API identifier |
 
+The header “Spectra” link uses `environment.spectraMarketingUrl` (`http://localhost:4200` in the development build for local `nx serve spectra-ui`; set in [environment.ts](../src/environments/environment.ts) for production when the marketing app is on another origin).
+
 Run `npx nx run sandbox-ui:env-sync` before serve/build.
 
 ## Backend alignment

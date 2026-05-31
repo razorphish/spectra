@@ -5,10 +5,17 @@
   "prefix": "spectra",
   "sourceRoot": "apps/spectra-ui/src",
   "tags": [],
+  "implicitDependencies": ["shared-ui"],
   "targets": {
     "build": {
       "executor": "@angular/build:application",
       "outputs": ["{options.outputPath}"],
+      "inputs": [
+        "default",
+        "{workspaceRoot}/packages/shared-ui/src/styles/**/*.css",
+        "{workspaceRoot}/packages/shared-ui/src/assets/**/*",
+        "{workspaceRoot}/packages/shared-ui/src/lib/**/*.ts"
+      ],
       "options": {
         "outputPath": "dist/apps/spectra-ui",
         "browser": "apps/spectra-ui/src/main.ts",
@@ -17,9 +24,18 @@
           {
             "glob": "**/*",
             "input": "apps/spectra-ui/public"
+          },
+          {
+            "glob": "**/*",
+            "input": "packages/shared-ui/src/assets",
+            "output": "/assets/spectra"
           }
         ],
-        "styles": ["apps/spectra-ui/src/styles.css"]
+        "styles": [
+          "packages/shared-ui/src/styles/spectra-tokens.css",
+          "packages/shared-ui/src/styles/spectra-patterns.css",
+          "apps/spectra-ui/src/styles.css"
+        ]
       },
       "configurations": {
         "production": {

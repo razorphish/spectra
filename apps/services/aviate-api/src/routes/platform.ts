@@ -10,6 +10,7 @@ import {
 } from '@spectra/database';
 
 import { createHelloHandler } from './hello';
+import { createSandboxPortalRouter } from './sandbox-portal';
 
 const SEGMENT = 'platform';
 const requireAuth0AccessToken = createRequireAuth0AccessToken({
@@ -70,5 +71,6 @@ export function createPlatformRouter() {
   r.get('/info', info);
   r.get('/stats', stats);
   r.get('/hello', requireAuth0AccessToken, createHelloHandler('aviate-api', SEGMENT));
+  r.use('/sandbox', createSandboxPortalRouter());
   return r;
 }

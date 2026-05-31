@@ -1,27 +1,159 @@
-.auth-shell {
-  font-family: system-ui, sans-serif;
-  max-width: 42rem;
-  margin: 1rem auto;
+/* App-specific overrides (global tokens and patterns ship from @spectra/shared-ui). */
+
+/* Flat layout (no ng-content): matches spectra-ui sticky navy bar. */
+.sandbox-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--spectra-color-surface);
+}
+
+.sandbox-chrome-header {
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: #0c1e35;
+  background-color: var(--spectra-color-navy);
+  color: #e8edf4;
+  box-shadow: var(--spectra-shadow-md);
+}
+
+.sandbox-app-main {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.spectra-shell-header {
+  color: #e8edf4;
+}
+
+.sandbox-nav-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.sandbox-nav-main a {
+  color: #dbe4f0;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.sandbox-nav-main a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.sandbox-nav-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.sandbox-nav-actions .user-email {
+  color: #dbe4f0;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.sandbox-nav-actions .user-email:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.btn-login {
+  background: var(--spectra-color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--spectra-radius-sm);
+  padding: 0.4rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-login:hover {
+  background: var(--spectra-color-accent-hover);
+}
+
+.muted {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.spectra-sandbox-logout {
+  background: var(--spectra-color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--spectra-radius-sm);
+  padding: 0.35rem 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.spectra-sandbox-logout:hover {
+  background: var(--spectra-color-accent-hover);
+}
+
+.sandbox-oauth-banner {
+  max-width: var(--spectra-max-width);
+  margin: 0 auto;
+  padding: 0.75rem 1.25rem 0;
+}
+
+.sandbox-oauth-banner-inner {
+  border-radius: var(--spectra-radius-md);
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #7f1d1d;
   padding: 1rem 1.25rem;
-  border-radius: 8px;
-  background: #0f172a;
-  color: #e2e8f0;
+  font-size: 0.95rem;
 }
 
-.auth-shell pre {
-  overflow: auto;
-  font-size: 0.8rem;
-  background: #020617;
-  padding: 0.75rem;
-  border-radius: 6px;
+.sandbox-oauth-banner-inner strong {
+  display: block;
+  margin-bottom: 0.5rem;
 }
 
-.auth-shell button {
-  margin-right: 0.5rem;
-  margin-top: 0.5rem;
+.sandbox-oauth-code {
+  margin: 0.25rem 0;
 }
 
-.auth-error {
-  color: #fecaca;
+.sandbox-oauth-desc {
+  margin: 0.5rem 0;
+  word-break: break-word;
 }
 
+.sandbox-oauth-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.88rem;
+  color: #991b1b;
+}
+
+.sandbox-oauth-dismiss {
+  margin-top: 0.75rem;
+  background: #fff;
+  border: 1px solid #fca5a5;
+  border-radius: var(--spectra-radius-sm);
+  padding: 0.35rem 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #7f1d1d;
+}
+
+.sandbox-oauth-dismiss:hover {
+  background: #fee2e2;
+}

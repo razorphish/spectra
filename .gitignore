@@ -13,6 +13,12 @@ npm-full-install.log
 # admin-ui: generated from apps/admin-ui/.env (see scripts/sync-admin-ui-env.mjs)
 apps/admin-ui/src/environments/environment.auth0.local.ts
 
+# sandbox-ui: generated from apps/sandbox-ui/.env (see scripts/sync-sandbox-ui-env.mjs)
+apps/sandbox-ui/src/environments/environment.auth0.local.ts
+
+# Expo local device/cache state
+**/.expo/
+
 # local secrets
 .env
 .env.local
