@@ -1,8 +1,13 @@
-import { apiBaseUrlFromDotEnv, auth0FromDotEnv } from './environment.auth0.local';
+import {
+  apiBaseUrlFromDotEnv,
+  auth0FromDotEnv,
+  publicApiDocsBaseUrlFromDotEnv,
+} from './environment.auth0.local';
 
 export const environment = {
   production: false,
   apiBaseUrl: apiBaseUrlFromDotEnv,
+  publicApiDocsBaseUrl: publicApiDocsBaseUrlFromDotEnv,
   /** Local `nx serve spectra-ui` (port 4200). */
   spectraMarketingUrl: 'http://localhost:4200',
   auth0: {

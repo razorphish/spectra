@@ -5,6 +5,7 @@ import { NgbNavModule, NgbNavOutlet } from '@ng-bootstrap/ng-bootstrap';
 import { PageBreadcrumb } from '@app/components/page-breadcrumb';
 import { AdminAuthPlatformApiService } from '@core/services/admin-auth-platform-api.service';
 import { AdminNavVisibilityApiService } from '@core/services/admin-nav-visibility-api.service';
+import { AdminPlatformUiApiService } from '@core/services/admin-platform-ui-api.service';
 import { SidebarNavVisibilityService } from '@core/services/sidebar-nav-visibility.service';
 import {
   TEMPLATE_NAV_MENU_KEYS,
@@ -29,6 +30,7 @@ import { firstValueFrom } from 'rxjs';
 export class GeneralSettingsPage implements OnInit {
   private readonly api = inject(AdminNavVisibilityApiService);
   private readonly authPlatform = inject(AdminAuthPlatformApiService);
+  private readonly platformUiApi = inject(AdminPlatformUiApiService);
   private readonly toastr = inject(ToastrService);
   private readonly navVisibility = inject(SidebarNavVisibilityService);
 
@@ -43,12 +45,17 @@ export class GeneralSettingsPage implements OnInit {
   readonly authSaveError = signal<string | null>(null);
   jwtClockSkewDraft = signal(30);
 
+  readonly platformLoading = signal(false);
+  readonly platformSaveError = signal<string | null>(null);
+  developerApplicationsUiDraft = signal(false);
+
   readonly keys = TEMPLATE_NAV_MENU_KEYS;
   readonly labels = TEMPLATE_NAV_MENU_LABELS;
 
   ngOnInit(): void {
     void this.load();
     void this.loadAuthJwtSkew();
+    void this.loadDeveloperPortalUi();
   }
 
   isVisible(key: TemplateNavMenuKey): boolean {
@@ -139,6 +146,53 @@ export class GeneralSettingsPage implements OnInit {
       this.authSaveError.set(msg);
     } finally {
       this.authLoading.set(false);
+    }
+  }
+
+  setDeveloperApplicationsUi(enabled: boolean): void {
+    this.developerApplicationsUiDraft.set(enabled);
+  }
+
+  async loadDeveloperPortalUi(): Promise<void> {
+    this.platformLoading.set(true);
+    this.platformSaveError.set(null);
+    try {
+      const r = await firstValueFrom(this.platformUiApi.get());
+      this.developerApplicationsUiDraft.set(r.developerApplicationsUiEnabled);
+    } catch (e: unknown) {
+      let msg = 'Failed to load platform settings';
+      if (e instanceof HttpErrorResponse) {
+        const body = e.error as { message?: string } | null;
+        msg = body?.message ?? e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      this.platformSaveError.set(msg);
+    } finally {
+      this.platformLoading.set(false);
+    }
+  }
+
+  async saveDeveloperPortalUi(): Promise<void> {
+    this.platformLoading.set(true);
+    this.platformSaveError.set(null);
+    try {
+      const v = this.developerApplicationsUiDraft();
+      const res = await firstValueFrom(this.platformUiApi.patch({ developerApplicationsUiEnabled: v }));
+      this.developerApplicationsUiDraft.set(res.developerApplicationsUiEnabled);
+      this.toastr.success('Saved', 'Developer sandbox applications UI updated.');
+    } catch (e: unknown) {
+      let msg = 'Failed to save platform settings';
+      if (e instanceof HttpErrorResponse) {
+        const body = e.error as { message?: string } | null;
+        msg = body?.message ?? e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      this.platformSaveError.set(msg);
+      this.toastr.error('Save failed', msg);
+    } finally {
+      this.platformLoading.set(false);
     }
   }
 

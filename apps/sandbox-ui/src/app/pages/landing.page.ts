@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Auth0ClientService, AuthService } from '@auth0/auth0-angular';
 import { filter, take } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import { buildPublicApiSwaggerUrl } from '../public-api-docs-url';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -18,8 +19,7 @@ import { environment } from '../../environments/environment';
           <h1>Spectra developer sandbox</h1>
           <p class="sandbox-hero-lede">
             Register applications, manage OAuth-style client credentials, and explore the unified
-            OpenAPI platform behind Spectra’s public APIs — aligned with a CMS Blue Button–style
-            developer experience.
+            OpenAPI platform behind Spectra's public APIs — built for a clear, developer-first experience.
           </p>
           <div class="sandbox-hero-actions">
             @if (environment.auth0.enabled) {
@@ -173,7 +173,10 @@ export class LandingPageComponent {
   private readonly auth0 = inject(Auth0ClientService);
   private readonly router = inject(Router);
 
-  protected readonly swaggerUrl = `${environment.apiBaseUrl.replace(/\/$/, '')}/docs`;
+  protected readonly swaggerUrl = buildPublicApiSwaggerUrl(
+    environment.apiBaseUrl,
+    environment.publicApiDocsBaseUrl,
+  );
 
   constructor() {
     if (!environment.auth0.enabled) return;

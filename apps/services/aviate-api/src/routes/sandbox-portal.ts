@@ -1,6 +1,5 @@
 import { and, desc, eq, isNull, notExists } from 'drizzle-orm';
-import { Router } from 'express';
-import type { RequestHandler } from 'express';
+import { Router, type RequestHandler } from 'express';
 
 import { createRequireAuth0AccessToken, isKnownM2mScope } from '@spectra/auth';
 import {
@@ -13,6 +12,9 @@ import {
   oauthClients,
   orgMemberships,
   orgs,
+  parseDeveloperApplicationsUiEnabled,
+  platformSettings,
+  PLATFORM_DEVELOPER_APPLICATIONS_UI_KEY,
   redirectUris,
   resolveSpectraDatabaseUrl,
   userDeveloperContext,
@@ -55,6 +57,37 @@ function syntheticEmail(sub: string): string {
   const safe = sub.replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 120);
   return `sandbox_${safe}@users.spectra.local`;
 }
+
+async function fetchDeveloperApplicationsUiEnabled(): Promise<boolean> {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) return false;
+  const db = getDb();
+  const [row] = await db
+    .select({ value: platformSettings.value })
+    .from(platformSettings)
+    .where(eq(platformSettings.key, PLATFORM_DEVELOPER_APPLICATIONS_UI_KEY))
+    .limit(1);
+  return parseDeveloperApplicationsUiEnabled(row?.value);
+}
+
+const requireDeveloperApplicationsUi: RequestHandler = async (_req, res, next) => {
+  try {
+    const ok = await fetchDeveloperApplicationsUiEnabled();
+    if (!ok) {
+      res.status(403).json({
+        error: 'feature_disabled',
+        message: 'Sandbox applications are disabled for this deployment.',
+      });
+      return;
+    }
+    next();
+  } catch {
+    res.status(503).json({
+      error: 'service_unavailable',
+      message: 'Could not resolve developer portal feature flags.',
+    });
+  }
+};
 
 async function ensureSession(
   sub: string,
@@ -182,7 +215,8 @@ const session: RequestHandler = async (req, res) => {
     res.status(500).json({ error: 'bootstrap_failed', message: 'Could not create developer session.' });
     return;
   }
-  res.json(sessionRow);
+  const developerApplicationsUiEnabled = await fetchDeveloperApplicationsUiEnabled();
+  res.json({ ...sessionRow, developerApplicationsUiEnabled });
 };
 
 const listApplications: RequestHandler = async (req, res) => {
@@ -794,7 +828,7 @@ const createIntegration: RequestHandler = async (req, res) => {
     if (code === '23505') {
       res.status(409).json({
         error: 'conflict',
-        message: 'An active M2M client already exists for this integration slot.',
+        message: 'An OAuth client already exists for this integration.',
       });
       return;
     }
@@ -851,6 +885,127 @@ const getIntegration: RequestHandler = async (req, res) => {
   res.json({ ...row, hasClientSecret: true });
 };
 
+const patchIntegration: RequestHandler = async (req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    noDatabase(res);
+    return;
+  }
+  const sub = req.auth?.sub;
+  if (!sub) {
+    res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+    return;
+  }
+  const sessionRow = await ensureSession(sub, req.auth?.claims ?? {});
+  if (!sessionRow) {
+    res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+    return;
+  }
+  const id = req.params['id'];
+  if (!id) {
+    res.status(400).json({ error: 'bad_request', message: 'Missing id.' });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  let nameNext: string | undefined;
+  if ('name' in body) {
+    if (typeof body['name'] !== 'string' || !body['name'].trim()) {
+      res.status(400).json({
+        error: 'invalid_request',
+        message: 'name must be a non-empty string when provided.',
+      });
+      return;
+    }
+    nameNext = body['name'].trim();
+  }
+  let descNext: string | null | undefined;
+  if ('description' in body) {
+    const d = body['description'];
+    if (d === null) {
+      descNext = null;
+    } else if (typeof d === 'string') {
+      descNext = d.trim() || null;
+    } else {
+      res.status(400).json({
+        error: 'invalid_request',
+        message: 'description must be a string or null.',
+      });
+      return;
+    }
+  }
+  let scopesNext: string | undefined;
+  if ('grantedScopes' in body) {
+    const parsed = parseGrantedScopes(body['grantedScopes']);
+    if (parsed === null) {
+      res.status(400).json({
+        error: 'invalid_scope',
+        message: 'grantedScopes must use known scopes only.',
+      });
+      return;
+    }
+    scopesNext = parsed;
+  }
+  if (nameNext === undefined && descNext === undefined && scopesNext === undefined) {
+    res.status(400).json({
+      error: 'invalid_request',
+      message: 'Provide at least one of name, description, grantedScopes.',
+    });
+    return;
+  }
+
+  const db = getDb();
+  const rows = await db
+    .select({
+      integrationId: integrations.id,
+      m2mId: m2mOauthClients.id,
+      curName: integrations.name,
+      curDesc: integrations.description,
+    })
+    .from(integrations)
+    .innerJoin(m2mOauthClients, eq(m2mOauthClients.integrationId, integrations.id))
+    .where(
+      and(
+        eq(integrations.id, id),
+        eq(integrations.orgId, sessionRow.orgId),
+        isNull(integrations.deletedAt),
+        isNull(m2mOauthClients.deletedAt),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) {
+    res.status(404).json({ error: 'not_found', message: 'Integration not found.' });
+    return;
+  }
+
+  const actor = buildActorJson({ name: sessionRow.email, userId: sessionRow.userId });
+  const nextName = nameNext ?? row.curName;
+  const nextDesc = descNext !== undefined ? descNext : row.curDesc;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(integrations)
+      .set({
+        name: nextName,
+        description: nextDesc,
+        updatedBy: actor,
+      })
+      .where(eq(integrations.id, id));
+    if (scopesNext !== undefined) {
+      await tx
+        .update(m2mOauthClients)
+        .set({ grantedScopes: scopesNext, updatedBy: actor })
+        .where(eq(m2mOauthClients.id, row.m2mId));
+    }
+  });
+
+  const [fresh] = await db
+    .select({ updatedAt: integrations.updatedAt })
+    .from(integrations)
+    .where(eq(integrations.id, id))
+    .limit(1);
+  res.json({ ok: true, id, updatedAt: fresh?.updatedAt ?? new Date().toISOString() });
+};
+
 const rotateIntegrationSecret: RequestHandler = async (req, res) => {
   if (!resolveSpectraDatabaseUrl()) {
     noDatabase(res);
@@ -898,6 +1053,114 @@ const rotateIntegrationSecret: RequestHandler = async (req, res) => {
     .set({ secretHash, updatedBy: actor })
     .where(eq(m2mOauthClients.id, row.m2mId));
   res.json({ clientSecret });
+};
+
+function resolveAuthApiBaseUrl(): string | null {
+  const raw = process.env['SPECTRA_AUTH_API_URL']?.trim();
+  if (!raw) return null;
+  return raw.replace(/\/$/, '');
+}
+
+const mintIntegrationAccessToken: RequestHandler = async (req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    noDatabase(res);
+    return;
+  }
+  const authBase = resolveAuthApiBaseUrl();
+  if (!authBase) {
+    res.status(503).json({
+      error: 'mint_not_configured',
+      message:
+        'M2M token mint is not wired from this API. Set SPECTRA_AUTH_API_URL to your auth-api base URL (e.g. http://127.0.0.1:9100).',
+    });
+    return;
+  }
+  const sub = req.auth?.sub;
+  if (!sub) {
+    res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+    return;
+  }
+  const sessionRow = await ensureSession(sub, req.auth?.claims ?? {});
+  if (!sessionRow) {
+    res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+    return;
+  }
+  const id = req.params['id'];
+  if (!id) {
+    res.status(400).json({ error: 'bad_request', message: 'Missing id.' });
+    return;
+  }
+  const db = getDb();
+  const rows = await db
+    .select({
+      clientId: m2mOauthClients.clientId,
+    })
+    .from(integrations)
+    .innerJoin(m2mOauthClients, eq(m2mOauthClients.integrationId, integrations.id))
+    .where(
+      and(
+        eq(integrations.id, id),
+        eq(integrations.orgId, sessionRow.orgId),
+        isNull(integrations.deletedAt),
+        isNull(m2mOauthClients.deletedAt),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) {
+    res.status(404).json({ error: 'not_found', message: 'Integration not found.' });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  const clientSecret = typeof body['clientSecret'] === 'string' ? body['clientSecret'] : '';
+  if (!clientSecret.trim()) {
+    res.status(400).json({ error: 'invalid_request', message: 'clientSecret is required.' });
+    return;
+  }
+  const scopeRaw = body['scope'];
+  const form = new URLSearchParams();
+  form.set('grant_type', 'client_credentials');
+  if (typeof scopeRaw === 'string' && scopeRaw.trim()) {
+    form.set('scope', scopeRaw.trim());
+  }
+  const basic = Buffer.from(`${row.clientId}:${clientSecret}`, 'utf8').toString('base64');
+  const tokenUrl = `${authBase}/oauth/token`;
+  let authRes: globalThis.Response;
+  try {
+    authRes = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: form.toString(),
+    });
+  } catch (e: unknown) {
+    res.status(502).json({
+      error: 'mint_upstream_unreachable',
+      message: e instanceof Error ? e.message : 'Could not reach auth-api.',
+    });
+    return;
+  }
+  const text = await authRes.text();
+  const ct = authRes.headers.get('content-type') ?? '';
+  let payload: unknown;
+  if (ct.includes('application/json')) {
+    try {
+      payload = JSON.parse(text) as unknown;
+    } catch {
+      payload = {
+        error: 'invalid_response',
+        error_description: text.slice(0, 400),
+      };
+    }
+  } else {
+    payload = {
+      error: 'invalid_response',
+      error_description: text ? text.slice(0, 400) : `HTTP ${authRes.status} from auth-api`,
+    };
+  }
+  res.status(authRes.status).json(payload);
 };
 
 const revokeIntegration: RequestHandler = async (req, res) => {
@@ -951,13 +1214,20 @@ export function createSandboxPortalRouter(): Router {
   r.get('/integrations', listIntegrations);
   r.post('/integrations', createIntegration);
   r.get('/integrations/:id', getIntegration);
+  r.patch('/integrations/:id', patchIntegration);
   r.post('/integrations/:id/rotate-secret', rotateIntegrationSecret);
+  r.post('/integrations/:id/mint-access-token', mintIntegrationAccessToken);
   r.delete('/integrations/:id', revokeIntegration);
-  r.get('/applications', listApplications);
-  r.post('/applications', createApplication);
-  r.get('/applications/:id', getApplication);
-  r.post('/applications/:id/rotate-client-secret', rotateClientSecret);
-  r.patch('/applications/:id', patchApplication);
-  r.delete('/applications/:id', deleteApplication);
+
+  const applicationsRouter = Router();
+  applicationsRouter.use(requireDeveloperApplicationsUi);
+  applicationsRouter.get('/', listApplications);
+  applicationsRouter.post('/', createApplication);
+  applicationsRouter.get('/:id', getApplication);
+  applicationsRouter.post('/:id/rotate-client-secret', rotateClientSecret);
+  applicationsRouter.patch('/:id', patchApplication);
+  applicationsRouter.delete('/:id', deleteApplication);
+  r.use('/applications', applicationsRouter);
+
   return r;
 }

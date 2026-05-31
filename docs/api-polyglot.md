@@ -108,4 +108,4 @@ Polyglot services are **not** in the Node lambda matrix once their native build 
 npx nx run openapi:merge
 ```
 
-Writes `packages/openapi/dist/spectra-public-api.json` and copies to aviate-api assets for `/docs`.
+Writes **`packages/openapi/dist/spectra-public-api.json`** (public limited) and **`spectra-integration-api.json`** (full catalog), copies both to **`apps/services/aviate-api/src/assets/`** for **`GET /openapi.json`** / **`/docs`** vs **`GET /integration/openapi.json`** / **`/integration/docs`** on aviate-api.

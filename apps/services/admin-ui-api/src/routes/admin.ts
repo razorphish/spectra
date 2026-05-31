@@ -15,6 +15,7 @@ import { createAdminMeSyncHandler } from './admin-me-sync';
 import { registerAdminLoggingRoutes } from './admin-logging';
 import { registerAdminMigrationsRoutes } from './admin-migrations';
 import { registerAdminNavVisibilityRoutes } from './admin-nav-visibility';
+import { registerAdminPlatformUiRoutes } from './admin-platform-ui';
 
 const SEGMENT = 'admin';
 
@@ -78,5 +79,6 @@ export function createAdminRouter() {
   registerAdminLoggingRoutes(r);
   registerAdminMigrationsRoutes(r);
   registerAdminNavVisibilityRoutes(r);
+  registerAdminPlatformUiRoutes(r);
   return r;
 }

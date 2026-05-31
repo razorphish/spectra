@@ -4,6 +4,7 @@ import { RouterModule } from '@angular/router';
 import { Auth0ClientService, AuthService } from '@auth0/auth0-angular';
 import { SpectraBrandBarComponent } from '@spectra/shared-ui';
 import { environment } from '../environments/environment';
+import { buildPublicApiSwaggerUrl } from './public-api-docs-url';
 
 @Component({
   imports: [RouterModule, AsyncPipe, SpectraBrandBarComponent],
@@ -29,7 +30,10 @@ export class App {
     '/docs',
   );
   protected readonly supportUrl = joinExternal(environment.spectraMarketingUrl, '/support');
-  protected readonly apiDocsUrl = `${environment.apiBaseUrl.replace(/\/$/, '')}/docs`;
+  protected readonly apiDocsUrl = buildPublicApiSwaggerUrl(
+    environment.apiBaseUrl,
+    environment.publicApiDocsBaseUrl,
+  );
 
   protected readonly auth0Configured = Boolean(
     environment.auth0.enabled &&

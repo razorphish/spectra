@@ -3,6 +3,7 @@ import { Router, type RequestHandler } from 'express';
 import { requireAuth0AccessToken } from '../lib/auth';
 
 const proxyOpenApi: RequestHandler = async (_req, res) => {
+  // Full merged OpenAPI on aviate-api — use .../integration/openapi.json (not /openapi.json, which is public limited).
   const url = process.env['AVIATE_API_OPENAPI_URL']?.trim();
   const key = process.env['SPECTRA_INTEGRATION_OPENAPI_KEY']?.trim();
   if (!url || !key) {

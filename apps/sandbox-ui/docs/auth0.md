@@ -17,6 +17,7 @@ Copy [apps/sandbox-ui/.env.example](../.env.example) to `apps/sandbox-ui/.env`:
 | Variable | Purpose |
 |----------|---------|
 | `SANDBOX_UI_API_BASE_URL` | Default `http://127.0.0.1:3000` (local-edge) |
+| `SANDBOX_UI_PUBLIC_API_DOCS_BASE_URL` | Optional. Origin for public Swagger (`/docs`) only; defaults to `SANDBOX_UI_API_BASE_URL`. Use when API calls hit a private host but the “API reference” link must open the **public limited** catalog on the edge/public gateway (never `/integration/docs`). |
 | `SANDBOX_UI_AUTH0_ENABLED` | `true` to enable Universal Login |
 | `SANDBOX_UI_AUTH0_DOMAIN` | Auth0 tenant host |
 | `SANDBOX_UI_AUTH0_CLIENT_ID` | SPA client ID |
@@ -49,6 +50,8 @@ curl -sS -u '$CLIENT_ID:$CLIENT_SECRET' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   http://127.0.0.1:9100/oauth/token
 ```
+
+From the **Developer dashboard** (`/dashboard`), each integration row has **Get token**: enter the client secret and the portal calls aviate-api `POST /v1/platform/sandbox/integrations/:id/mint-access-token`, which proxies to auth-api (no browser CORS to port 9100). Configure **`SPECTRA_AUTH_API_URL`** on **aviate-api** (e.g. `http://127.0.0.1:9100`) and keep **`M2M_MINT_ENABLED=true`** on auth-api.
 
 Call the platform API with the JWT (requires **`M2M_VERIFY_ENABLED_AVIATE_API=true`** on aviate-api and matching `SPECTRA_M2M_*` env — see [docs/adr/m2m-client-credentials-phase0.md](../../../docs/adr/m2m-client-credentials-phase0.md)):
 

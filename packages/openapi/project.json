@@ -17,7 +17,9 @@
       ],
       "outputs": [
         "{workspaceRoot}/packages/openapi/dist/spectra-public-api.json",
-        "{workspaceRoot}/apps/services/aviate-api/src/assets/spectra-public-api.json"
+        "{workspaceRoot}/packages/openapi/dist/spectra-integration-api.json",
+        "{workspaceRoot}/apps/services/aviate-api/src/assets/spectra-public-api.json",
+        "{workspaceRoot}/apps/services/aviate-api/src/assets/spectra-integration-api.json"
       ],
       "options": {
         "command": "node scripts/merge-public-openapi.mjs"
@@ -35,6 +37,7 @@
       }
     },
     "test": {
+      "dependsOn": ["merge"],
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {

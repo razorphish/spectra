@@ -55,12 +55,15 @@ app.use(express.json({ limit: '64kb' }));
 app.use('/v1/platform', createPlatformRouter());
 app.use('/v1/platform/uploads', createUploadsRouter());
 
-function loadMergedOpenApiSpec(): Record<string, unknown> {
-  const candidates = [
-    join(__dirname, 'assets', 'spectra-public-api.json'),
-    join(root, 'apps/services/aviate-api/src/assets/spectra-public-api.json'),
-    join(root, 'packages/openapi/dist/spectra-public-api.json'),
-  ];
+function loadJsonCandidates(filenames: string[]): Record<string, unknown> {
+  const candidates: string[] = [];
+  for (const name of filenames) {
+    candidates.push(
+      join(__dirname, 'assets', name),
+      join(root, 'apps/services/aviate-api/src/assets', name),
+      join(root, 'packages/openapi/dist', name)
+    );
+  }
   for (const p of candidates) {
     if (existsSync(p)) {
       return JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>;
@@ -68,15 +71,50 @@ function loadMergedOpenApiSpec(): Record<string, unknown> {
   }
   return {
     openapi: '3.0.3',
-    info: { title: 'Spectra Public API', version: '0.0.1' },
+    info: { title: 'Spectra API', version: '0.0.1' },
     paths: {},
   };
 }
 
-const openApiSpec = loadMergedOpenApiSpec();
+function loadMergedOpenApiSpecs(): {
+  publicLimited: Record<string, unknown>;
+  full: Record<string, unknown>;
+} {
+  return {
+    publicLimited: loadJsonCandidates(['spectra-public-api.json']),
+    full: loadJsonCandidates(['spectra-integration-api.json']),
+  };
+}
+
+function truthyEnv(name: string): boolean {
+  const v = process.env[name]?.trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+/** Optional HTML banner in public OpenAPI description — off by default so /docs stays integrator-only. */
+function applyDeveloperDashboardBanner(spec: Record<string, unknown>): Record<string, unknown> {
+  const base = process.env['SPECTRA_SANDBOX_UI_URL']?.trim();
+  if (!base || !truthyEnv('SPECTRA_SWAGGER_SHOW_DASHBOARD_LINK')) return spec;
+  const dashboardUrl = `${base.replace(/\/$/, '')}/dashboard`;
+  const info = (spec['info'] as Record<string, unknown> | undefined) ?? {};
+  const existing =
+    typeof info['description'] === 'string' ? (info['description'] as string) : '';
+  const banner = `<p><a href="${dashboardUrl}">Sandbox UI (dashboard)</a></p>\n\n`;
+  return {
+    ...spec,
+    info: {
+      ...info,
+      description: banner + existing,
+    },
+  };
+}
+
+const { publicLimited: publicOpenApiSpecRaw, full: integrationOpenApiSpec } =
+  loadMergedOpenApiSpecs();
+const publicOpenApiSpec = applyDeveloperDashboardBanner(publicOpenApiSpecRaw);
 
 app.get('/openapi.json', (_req, res) => {
-  res.json(openApiSpec);
+  res.json(publicOpenApiSpec);
 });
 
 app.get('/integration/openapi.json', (req, res) => {
@@ -88,23 +126,31 @@ app.get('/integration/openapi.json', (req, res) => {
     });
     return;
   }
-  res.json(openApiSpec);
+  res.json(integrationOpenApiSpec);
 });
+
+/** Public limited Swagger — must use serveFiles (not shared serve) so init.js is not overwritten by /integration/docs. */
+const publicSwaggerUiOptions = {
+  customSiteTitle: 'Spectra API reference (public)',
+  // swagger-ui-express defaults `url` to `window.location.origin` when unset, which is not a spec.
+  // Point at unauthenticated public contract so the UI always loads the limited catalog.
+  swaggerUrl: '/openapi.json',
+};
+
+const integrationSwaggerUiOptions = {
+  customSiteTitle: 'Spectra Integration API (authenticated spec)',
+};
 
 app.use(
   '/docs',
-  swaggerUi.serve,
-  swaggerUi.setup(openApiSpec, {
-    customSiteTitle: 'Spectra Public API',
-  })
+  ...swaggerUi.serveFiles(publicOpenApiSpec, publicSwaggerUiOptions),
+  swaggerUi.setup(publicOpenApiSpec, publicSwaggerUiOptions),
 );
 
 app.use(
   '/integration/docs',
-  swaggerUi.serve,
-  swaggerUi.setup(openApiSpec, {
-    customSiteTitle: 'Spectra Integration API (authenticated spec)',
-  })
+  ...swaggerUi.serveFiles(integrationOpenApiSpec, integrationSwaggerUiOptions),
+  swaggerUi.setup(integrationOpenApiSpec, integrationSwaggerUiOptions),
 );
 
 app.get('/', (_req, res) => {

@@ -57,6 +57,7 @@ Local admin UI reads **Auth0 and API base URL from dotenv**, not from hand-editi
 | Variable | Purpose |
 | --- | --- |
 | `ADMIN_UI_API_BASE_URL` | Optional. Default `http://127.0.0.1:3002`. |
+| `ADMIN_UI_AVIATE_SWAGGER_URL` | Optional. Full URL for the topbar **full** OpenAPI (Swagger) UI on aviate-api — default `http://127.0.0.1:3001/integration/docs/` (not public `/docs`). |
 | `ADMIN_UI_AUTH0_ENABLED` | `true` / `1` / `yes` when you want Universal Login (requires domain + client id). |
 | `ADMIN_UI_AUTH0_DOMAIN` | Auth0 tenant domain (no `https://`). |
 | `ADMIN_UI_AUTH0_CLIENT_ID` | SPA Client ID. |
@@ -90,6 +91,7 @@ Optional env vars for the same script (set in CI when you are ready):
 
 | Variable | Purpose |
 | --- | --- |
+| `STAFF_AVIATE_SWAGGER_URL` | Optional. Full URL to staff **full** OpenAPI (Swagger) on aviate-api, e.g. `https://aviate.internal.example.com/integration/docs/`. When empty, the topbar Swagger link is omitted in the generated bundle. |
 | `STAFF_AUTH0_ENABLED` | Set to `true` to enable Auth0 in the generated bundle |
 | `STAFF_AUTH0_DOMAIN` | Auth0 tenant domain |
 | `STAFF_AUTH0_CLIENT_ID` | SPA client ID |
@@ -108,6 +110,7 @@ export STAFF_API_URL='https://your-staff-api.example.com'
 # export STAFF_AUTH0_AUDIENCE='...'
 # export STAFF_AUTH0_REDIRECT_URI='https://admin.example.com/auth/callback'
 # export STAFF_AUTH0_LOGOUT_RETURN_TO='https://admin.example.com/auth/login'
+# export STAFF_AVIATE_SWAGGER_URL='https://aviate.internal.example.com/integration/docs/'
 node scripts/write-admin-ui-build-environment.mjs
 npx nx build admin-ui --configuration=ci-staff
 ```

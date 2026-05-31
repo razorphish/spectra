@@ -6,6 +6,8 @@ export type SandboxSession = {
   userId: string;
   orgId: string;
   email: string;
+  /** Staff-controlled via admin-ui → `sandbox_portal.developer_applications_ui_enabled`. */
+  developerApplicationsUiEnabled?: boolean;
 };
 
 export type SandboxApplicationSummary = {
@@ -134,6 +136,16 @@ export class SandboxPortalService {
     }>(`${this.apiRoot()}/v1/platform/sandbox/integrations/${id}`);
   }
 
+  updateIntegration(
+    id: string,
+    body: { name?: string; description?: string | null; grantedScopes?: string },
+  ) {
+    return this.http.patch<{ ok: boolean; id: string; updatedAt: string }>(
+      `${this.apiRoot()}/v1/platform/sandbox/integrations/${id}`,
+      body,
+    );
+  }
+
   rotateIntegrationSecret(id: string) {
     return this.http.post<{ clientSecret: string }>(
       `${this.apiRoot()}/v1/platform/sandbox/integrations/${id}/rotate-secret`,
@@ -145,6 +157,19 @@ export class SandboxPortalService {
     return this.http.delete(`${this.apiRoot()}/v1/platform/sandbox/integrations/${id}`, {
       observe: 'response',
     });
+  }
+
+  /**
+   * Proxies to auth-api `POST /oauth/token` (client_credentials). Requires aviate-api
+   * `SPECTRA_AUTH_API_URL` (e.g. http://127.0.0.1:9100) and `M2M_MINT_ENABLED` on auth-api.
+   */
+  mintIntegrationAccessToken(id: string, body: { clientSecret: string; scope?: string }) {
+    return this.http.post<{
+      access_token: string;
+      token_type: string;
+      expires_in: number;
+      scope: string;
+    }>(`${this.apiRoot()}/v1/platform/sandbox/integrations/${id}/mint-access-token`, body);
   }
 
   initUpload(body: {

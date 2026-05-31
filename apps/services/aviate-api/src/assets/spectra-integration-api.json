@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Spectra Public API (limited)",
+    "title": "Spectra API (full catalog)",
     "version": "0.0.1",
     "description": "Unified contract for platform, seq, quantum, and corridor segments. Local dev base URL: http://127.0.0.1:3000 (local-edge). Public `GET /openapi.json` serves a filtered catalog; full paths: `GET /integration/openapi.json`."
   },
@@ -16,6 +16,20 @@
     }
   ],
   "paths": {
+    "/v1/platform/health": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/v1/platform/ready": {
       "x-spectra-audience": "public",
       "get": {
@@ -43,6 +57,23 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/platform/stats": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Control-plane table row counts (MVP; authenticate in production)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Database unavailable"
           }
         }
       }
@@ -93,6 +124,473 @@
           }
         },
         "x-spectra-testing": "curl -s -H \"Authorization: Bearer $ACCESS_TOKEN\" http://127.0.0.1:3000/v1/platform/hello\n"
+      }
+    },
+    "/v1/platform/uploads/init": {
+      "x-spectra-audience": "internal",
+      "post": {
+        "tags": [
+          "Uploads"
+        ],
+        "summary": "Initialize an object upload (returns presigned PUT URL)",
+        "description": "Creates an `uploads` row in Neon and returns a single-part PUT URL\nscoped to the env's uploads bucket. The client must `PUT` the\npayload using the same `Content-Type` (and `Content-Length` if\nprovided) used in this request. Default cap: 1 GiB.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upload initialized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Uploads not configured (missing bucket env var).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/sandbox/session": {
+      "x-spectra-audience": "integration",
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Bootstrap developer session (user + personal org)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session identifiers for sandbox portal APIs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or Auth0 not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/sandbox/applications": {
+      "x-spectra-audience": "integration",
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "List sandbox applications for the authenticated developer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "applications"
+                  ],
+                  "properties": {
+                    "applications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SandboxApplicationSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Create sandbox application (returns client secret once)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SandboxApplicationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxApplicationCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Application name not globally unique",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/sandbox/applications/{id}/rotate-client-secret": {
+      "x-spectra-audience": "integration",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Rotate OAuth client secret (invalidates the previous secret)",
+        "description": "Returns the new client secret once. The previous secret stops working immediately. Use when the original secret was lost; secrets are stored hashed and cannot be read back.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "clientSecret"
+                  ],
+                  "properties": {
+                    "clientSecret": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/sandbox/applications/{id}": {
+      "x-spectra-audience": "integration",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Get sandbox application",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxApplicationDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Update sandbox application",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SandboxApplicationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Soft-delete sandbox application",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/seq/health": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/v1/seq/ready": {
@@ -157,6 +655,20 @@
         "x-spectra-testing": "curl -s -H \"Authorization: Bearer $ACCESS_TOKEN\" http://127.0.0.1:3000/v1/seq/hello\n"
       }
     },
+    "/v1/quantum/health": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/v1/quantum/ready": {
       "x-spectra-audience": "public",
       "get": {
@@ -217,6 +729,20 @@
           }
         },
         "x-spectra-testing": "curl -s -H \"Authorization: Bearer $ACCESS_TOKEN\" http://127.0.0.1:3000/v1/quantum/hello\n"
+      }
+    },
+    "/v1/corridor/health": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/v1/corridor/ready": {

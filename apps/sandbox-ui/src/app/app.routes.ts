@@ -4,6 +4,8 @@ import { AccountPageComponent } from './pages/account.page';
 import { ApplicationFormPageComponent } from './pages/application-form.page';
 import { ApplicationViewPageComponent } from './pages/application-view.page';
 import { DashboardPageComponent } from './pages/dashboard.page';
+import { developerApplicationsGuard } from './guards/developer-applications.guard';
+import { IntegrationEditPageComponent } from './pages/integration-edit.page';
 import { IntegrationNewPageComponent } from './pages/integration-new.page';
 import { IntegrationViewPageComponent } from './pages/integration-view.page';
 import { LandingPageComponent } from './pages/landing.page';
@@ -18,6 +20,11 @@ export const appRoutes: Route[] = [
     canActivate: [AuthGuard],
   },
   {
+    path: 'integrations/:id/edit',
+    component: IntegrationEditPageComponent,
+    canActivate: [AuthGuard],
+  },
+  {
     path: 'integrations/:id',
     component: IntegrationViewPageComponent,
     canActivate: [AuthGuard],
@@ -25,16 +32,16 @@ export const appRoutes: Route[] = [
   {
     path: 'applications/new',
     component: ApplicationFormPageComponent,
-    canActivate: [AuthGuard],
+    canActivate: [AuthGuard, developerApplicationsGuard],
   },
   {
     path: 'applications/:id/edit',
     component: ApplicationFormPageComponent,
-    canActivate: [AuthGuard],
+    canActivate: [AuthGuard, developerApplicationsGuard],
   },
   {
     path: 'applications/:id',
     component: ApplicationViewPageComponent,
-    canActivate: [AuthGuard],
+    canActivate: [AuthGuard, developerApplicationsGuard],
   },
 ];

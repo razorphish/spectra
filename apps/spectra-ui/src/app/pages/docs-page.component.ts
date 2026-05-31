@@ -18,9 +18,8 @@ import { environment } from '../../environments/environment';
     <div class="spectra-page docs-page">
       <h1>API Documentation</h1>
       <p class="lede">
-        Placeholder hub aligned with
-        <a href="https://bluebutton.cms.gov/" rel="noopener noreferrer" target="_blank">CMS Blue Button</a>
-        API Documentation navigation. Use the header menu to jump to a section.
+        Guides for discovering Spectra APIs, using the developer sandbox, and integrating your systems. Use the
+        header menu to jump to a section.
       </p>
 
       @for (item of docsNavItems; track item.fragment) {
@@ -38,7 +37,28 @@ import { environment } from '../../environments/environment';
               <p class="stub">Configure <code>sandboxUiUrl</code> in this environment to enable the Sandbox link.</p>
             }
           }
-          <p class="stub">Content coming soon.</p>
+          @if (item.fragment === 'integrations') {
+            <p>
+              <strong>Integrations</strong> are server-to-server OAuth2 clients you register in the Spectra developer
+              sandbox. Each integration has a <code>client_id</code> and <code>client_secret</code> used with the
+              <code>client_credentials</code> grant to obtain access tokens for calling Spectra APIs from your backends
+              and automation — without an interactive user login.
+            </p>
+            <p>
+              Tokens are minted by Spectra's auth service and are separate from end-user sessions (for example Auth0
+              access tokens used in the sandbox UI). You choose a display name, optional description, and which
+              <strong>scopes</strong> the client is allowed to request; those scopes limit what the issued token can do
+              at the API edge.
+            </p>
+            <p>
+              Create and manage integrations from the developer dashboard after you sign in to the sandbox. Legacy
+              <em>sandbox applications</em> (redirect-based OAuth clients) may be shown or hidden by your organization's
+              settings; integrations are the supported path for machine-to-machine API access.
+            </p>
+          }
+          @if (item.fragment !== 'integrations') {
+            <p class="stub">Content coming soon.</p>
+          }
         </section>
       }
     </div>

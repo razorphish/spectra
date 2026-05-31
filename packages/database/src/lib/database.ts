@@ -9,5 +9,6 @@ export * from './admin-migrations';
 export * from './migration-sql-metadata';
 export * from './connection';
 export * from './logging-platform-settings';
+export * from './platform-developer-applications-ui';
 export * from './stats';
 export * from './uploads';

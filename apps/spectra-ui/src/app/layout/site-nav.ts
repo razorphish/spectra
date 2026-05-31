@@ -1,20 +1,20 @@
-/** Top-level routes before the API Documentation menu (Blue Button order). */
+/** Top-level routes before the API Documentation menu. */
 export const primaryNavLinksBeforeDocs = [{ path: '/use-cases', label: 'Use Cases' }] as const;
 
-/** Top-level routes after Data, before Sandbox (Blue Button order). */
+/** Top-level routes after Data, before Sandbox. */
 export const primaryNavLinksAfterDocs = [
   { path: '/production-access', label: 'Production Access' },
   { path: '/support', label: 'Support' },
 ] as const;
 
 /**
- * API Documentation submenu — mirrors
- * [CMS Blue Button API](https://bluebutton.cms.gov/) → fragments on `/docs`.
+ * API Documentation sections — each `fragment` maps to `GET /docs#&lt;fragment&gt;`.
  */
 export const docsNavItems = [
   { fragment: 'get-started', label: 'Get Started' },
   { fragment: 'explore-the-api', label: 'Explore the API' },
   { fragment: 'get-started-with-sandbox', label: 'Get Started with Sandbox' },
+  { fragment: 'integrations', label: 'Integrations' },
   { fragment: 'authorization', label: 'Authorization' },
   { fragment: 'consuming-the-data', label: 'Consuming the Data' },
   { fragment: 'calling-the-api', label: 'Calling the API' },
@@ -26,7 +26,7 @@ export const docsNavItems = [
 }>;
 
 /**
- * Data submenu — mirrors Blue Button Data → fragments on `/data`.
+ * Data submenu — fragments on `/data`.
  */
 export const dataNavItems = [
   { fragment: 'overview', label: 'Overview' },

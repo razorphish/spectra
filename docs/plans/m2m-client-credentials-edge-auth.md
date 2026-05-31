@@ -90,7 +90,7 @@ Day-to-day **developer** lifecycle (create / list own clients / rotate / revoke 
 
 ## Integration catalog vs sandbox portal
 
-Sandbox **self-service** APIs (session bootstrap, applications, rotate secret, etc.) are **not** part of the **public limited** API contract and must not be callable with **M2M** tokens. Today they live under `/v1/platform/sandbox/...` on the platform router ([platform.ts](apps/services/aviate-api/src/routes/platform.ts)) and may appear in the merged [spectra-public-api.json](apps/services/aviate-api/src/assets/spectra-public-api.json) served with `/docs` on aviate-api — **tighten** both docs and authz per [OpenAPI URLs, spec variants, and deprecation](#openapi-urls-spec-variants-and-deprecation).
+Sandbox **self-service** APIs (session bootstrap, applications, rotate secret, etc.) are **not** part of the **public limited** API contract and must not be callable with **M2M** tokens. They live under `/v1/platform/sandbox/...` on the platform router ([platform.ts](apps/services/aviate-api/src/routes/platform.ts)); they remain in the **full** merged spec (`spectra-integration-api.json` / **`GET /integration/openapi.json`**) but are **excluded** from the public limited artifact (`spectra-public-api.json` / **`GET /openapi.json`**) via **`x-spectra-audience`** and prefix rules — **tighten** runtime authz per [OpenAPI URLs, spec variants, and deprecation](#openapi-urls-spec-variants-and-deprecation) and [Public limited spec: drift risk, MVP bridge, and recommended fix](#public-limited-spec-drift-risk-mvp-bridge-and-recommended-fix).
 
 - **Contract (OpenAPI):** Align with **three-tier** path model in [Decisions](#decisions-phase-0-lock) row 6. The **public limited** spec at `GET /openapi.json` (and public `/docs`) includes **tier (a) Public** integrator routes only — **excludes** BFF-only (`/v1/**/sandbox/**`, etc.), **tier (c)**, staff-only platform routes (**`/health`**, **`/stats`**, **`/uploads`** on `platform` per [Platform policies](#platform-policies-agreed)), and other non-catalog paths. **Tier (b) Authenticated** routes appear in the **full** spec at **`GET /integration/openapi.json`** (auth per [Decisions](#decisions-phase-0-lock) row 7).
 - **Authorization:** On `/v1/platform/sandbox/**` (and any sibling “portal only” prefixes agreed in Phase 0), require **Auth0 user** access tokens only; **reject** Spectra-issued M2M bearer tokens with **403** (distinct `error` from `invalid_token`). Do not attach “M2M allowed” middleware to these routers.
@@ -126,6 +126,21 @@ Sandbox **self-service** APIs (session bootstrap, applications, rotate secret, e
 4. **Step 4 — Restrict:** Then restrict or retire the old URL (auth required, 404, or removal) per policy.
 
 **Optional pattern (header gate, no 401 for public):** For automation that can pass a shared secret header (e.g. `X-Integration-Key`), return the **full** OpenAPI JSON; without the header, return the **reduced** public spec (same URL). Use only when it fits threat model — prefer separate authenticated path for staff clarity.
+
+### Public limited spec: drift risk, MVP bridge, and recommended fix
+
+**Drift risk:** If the merge pipeline filters the **public limited** artifact using only a **prefix denylist** (e.g. strip `/v1/platform/sandbox`, `/v1/platform/uploads`, `/v1/platform/health`, `/v1/platform/stats`), then any **new** private or portal-only path can leak into `GET /openapi.json` if the list is not updated — a documentation / integrator-expectation mismatch even when runtime authz is correct.
+
+**MVP bridge (ship first):** Keep a **single centralized denylist** in the merge script (e.g. [`scripts/merge-public-openapi.mjs`](../../scripts/merge-public-openapi.mjs)) and add **merge-time or CI assertions** that the emitted public JSON contains **no** paths under those prefixes. That unblocks a clean **public vs full** split immediately without annotating every path in YAML.
+
+**Recommended end state (best fix):** Treat visibility as **data in the spec**, not URL trivia:
+
+1. Add an OpenAPI **vendor extension** on each path or operation, e.g. **`x-spectra-audience`**: `public` | `integration` | `internal` (exact enum and semantics documented here and in merge tooling). Map them to this plan’s tiers: **`public`** ≈ tier **(a)** public limited catalog; **`integration`** ≈ tier **(b)** (and optionally staff-visible integrator routes in the **full** artifact); **`internal`** / non-`public` entries must never appear in the public limited artifact.
+2. **Merge filter:** Build the public limited JSON by **excluding** paths whose effective audience is not `public` (policy for missing extension: **fail-closed in CI** after a cutover date). Build the full authenticated artifact from `public` + `integration` (or all paths) per product choice.
+3. **CI:** Assert no non-public paths leak into the public artifact; after cutover, **fail the build** if a path lacks `x-spectra-audience` so every new route requires an explicit product classification.
+4. **Deprecate** the prefix denylist once YAML coverage is complete.
+
+**Alignment:** Reuse the same `public` / `integration` / `internal` vocabulary in merge scripts, CI messages, and runtime authz discussions so published OpenAPI cannot drift from “what M2M may call” without a deliberate spec change.
 
 ## Decisions (Phase 0 lock)
 
@@ -731,6 +746,7 @@ The ADR **must** still define at minimum:
 
 ## Implementation pointers (existing code)
 
+**OpenAPI artifact split (implemented):** `nx run openapi:merge` runs [`scripts/merge-public-openapi.mjs`](../../scripts/merge-public-openapi.mjs), which emits **`spectra-public-api.json`** (public limited) and **`spectra-integration-api.json`** (full) into `packages/openapi/dist/` and `apps/services/aviate-api/src/assets/`. Each merged path carries **`x-spectra-audience`** (`public` \| `integration` \| `internal`); the public artifact also applies a prefix denylist for known portal/staff trees. Aviate serves the limited spec at **`GET /openapi.json`** and **`/docs`**, and the full spec at **`GET /integration/openapi.json`** and **`/integration/docs`** ([OpenAPI URLs](#openapi-urls-spec-variants-and-deprecation), [drift / extension notes](#public-limited-spec-drift-risk-mvp-bridge-and-recommended-fix)). Optional link back to the sandbox UI in **`info.description`**: set **`SPECTRA_SWAGGER_SHOW_DASHBOARD_LINK=true`** and **`SPECTRA_SANDBOX_UI_URL`** (default is off so public Swagger stays integrator-only).
 
 | Concern                                              | Location                                                                                                                                                                                                          |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -743,7 +759,7 @@ The ADR **must** still define at minimum:
 | OAuth / Integration schema                           | [control-plane.ts](../../packages/database/src/schema/control-plane.ts) — **`integrations`**, **`m2m_oauth_clients`**, **`m2m_token_issuance_log`**, etc. (MVP M2M separate from legacy `applications` / `oauthClients`) |
 | Sandbox UI secret handling                           | `apps/sandbox-ui/src/app/pages/application-form.page.ts`, `application-view.page.ts`                                                                                                                              |
 | Authenticated OpenAPI proxy + integration key        | [apps/services/admin-ui-api](apps/services/admin-ui-api) — proxy `GET /integration/openapi.json`, static key in platform secrets                                                                                  |
-| Merged public OpenAPI (today includes sandbox paths) | `packages/openapi` build → `apps/services/aviate-api/src/assets/spectra-public-api.json`                                                                                                                          |
+| Merged OpenAPI artifacts (public limited + full)     | `nx run openapi:merge` → [`scripts/merge-public-openapi.mjs`](../../scripts/merge-public-openapi.mjs) — **`spectra-public-api.json`** + **`spectra-integration-api.json`** in `packages/openapi/dist/` and aviate assets; see [Implementation pointers](#implementation-pointers-existing-code) above |
 | Docs hosts (OpenAPI + Swagger)                       | [apps/services/aviate-api/src/main.ts](apps/services/aviate-api/src/main.ts) — `GET /openapi.json`, `GET /docs`, `**GET /integration/openapi.json`**, `**GET /integration/docs**`, optional `/openapi/v2/...`     |
 | Admin UI Auth settings (clock skew)                  | [apps/admin-ui](apps/admin-ui) General settings → **Auth** tab; [apps/services/admin-ui-api](apps/services/admin-ui-api) persistence                                                                              |
 | M2M principal / `hello` contract                     | Polyglot `hello` handlers + [M2M principal JSON shape](#m2m-principal-json-shape-service-facing)                                                                                                                  |

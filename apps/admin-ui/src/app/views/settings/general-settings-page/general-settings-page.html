@@ -3,7 +3,7 @@
     <app-page-breadcrumb
       title="General"
       subTitle1="Settings"
-      subText="Template sidebar sections and related routes (stored in spectra.platform_settings)."
+      subText="Template sidebar, Auth0 verification tuning, and developer sandbox portal visibility (stored in spectra.platform_settings)."
     />
 
     <ul
@@ -61,6 +61,70 @@
                       Save
                     </button>
                     <button type="button" class="btn btn-outline-secondary" (click)="load()" [disabled]="loading()">
+                      Reload
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </li>
+      <li ngbNavItem="platform">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#cpu"></use>
+          </svg>
+          Platform
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            @if (platformSaveError(); as pe) {
+              <div class="alert alert-danger" role="alert">{{ pe }}</div>
+            }
+            @if (platformLoading()) {
+              <div class="text-muted py-4">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Loading…
+              </div>
+            } @else {
+              <div class="card shadow-sm border">
+                <div class="card-body">
+                  <h6 class="fw-semibold mb-2">Developer sandbox — applications UI</h6>
+                  <p class="text-muted small mb-3">
+                    Controls <strong>Add an application</strong> and the <strong>My Sandbox Apps</strong> panel on the
+                    public developer dashboard (<code>sandbox-ui</code>, e.g.
+                    <code>/dashboard</code>). M2M integrations are unchanged. Stored in
+                    <code>spectra.platform_settings</code> key
+                    <code>sandbox_portal.developer_applications_ui_enabled</code>.
+                  </p>
+                  <div class="form-check form-switch mb-4">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="dev-apps-ui"
+                      [checked]="developerApplicationsUiDraft()"
+                      (change)="setDeveloperApplicationsUi($any($event.target).checked)"
+                    />
+                    <label class="form-check-label" for="dev-apps-ui">
+                      Show sandbox applications (add + list) in developer dashboard
+                    </label>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      (click)="saveDeveloperPortalUi()"
+                      [disabled]="platformLoading()"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      (click)="loadDeveloperPortalUi()"
+                      [disabled]="platformLoading()"
+                    >
                       Reload
                     </button>
                   </div>

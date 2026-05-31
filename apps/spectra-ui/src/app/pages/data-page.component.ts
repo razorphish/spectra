@@ -17,9 +17,8 @@ import { dataNavItems } from '../layout/site-nav';
     <div class="spectra-page data-page">
       <h1>Data</h1>
       <p class="lede">
-        Placeholder hub aligned with
-        <a href="https://bluebutton.cms.gov/" rel="noopener noreferrer" target="_blank">Blue Button</a>
-        Data navigation. Use the header menu to jump to a section.
+        Overview of Spectra platform data: how it is organized, exposed, and consumed. Use the header menu to jump to
+        a section.
       </p>
 
       @for (item of dataNavItems; track item.fragment) {
@@ -54,10 +53,6 @@ import { dataNavItems } from '../layout/site-nav';
     .stub {
       margin: 0;
       color: var(--spectra-color-muted);
-    }
-
-    .lede a {
-      color: var(--spectra-color-link);
     }
   `,
 })
