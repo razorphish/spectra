@@ -89,7 +89,8 @@
                   <code class="small">0002_users_auth_subject.sql</code> was edited after apply). Remove
                   the orphan row(s) with SQL (example:
                   <code class="small">DELETE FROM spectra.__drizzle_migrations WHERE hash = '…';</code>),
-                  then <strong>Run Pending</strong> so idempotent migrations re-record the correct hash.
+                  then <strong>Run Pending</strong> so idempotent migrations re-record the correct hash. You can
+                  also use <strong>Reconcile</strong> below to do this in one step (after confirming in the modal).
                 </p>
                 <ul class="mb-0 font-monospace small">
                   @for (h of chk.orphanDbHashes; track h) {
@@ -115,7 +116,7 @@
           type="button"
           class="btn btn-primary d-inline-flex align-items-center gap-2"
           (click)="state.runPending()"
-          [disabled]="state.runPendingBusy()"
+          [disabled]="state.runPendingBusy() || state.reconcileBusy()"
         >
           @if (state.runPendingBusy()) {
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -130,7 +131,7 @@
           type="button"
           class="btn btn-warning text-dark d-inline-flex align-items-center gap-2"
           (click)="state.runAll()"
-          [disabled]="state.runAllBusy()"
+          [disabled]="state.runAllBusy() || state.reconcileBusy()"
         >
           @if (state.runAllBusy()) {
             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
@@ -147,11 +148,32 @@
           </svg>
           Check
         </button>
+        @if (state.checkStatus(); as chkBtn) {
+          @if (!chkBtn.isValid) {
+            <button
+              type="button"
+              class="btn btn-outline-primary d-inline-flex align-items-center gap-2"
+              (click)="openReconcileConfirm()"
+              [disabled]="
+                state.reconcileBusy() || state.runPendingBusy() || state.runAllBusy() || state.refreshing()
+              "
+            >
+              @if (state.reconcileBusy()) {
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+              } @else {
+                <svg class="sa-icon" aria-hidden="true">
+                  <use href="/assets/icons/sprite.svg#tool"></use>
+                </svg>
+              }
+              Reconcile
+            </button>
+          }
+        }
         <button
           type="button"
           class="btn btn-outline-secondary d-inline-flex align-items-center justify-content-center"
           (click)="state.refresh()"
-          [disabled]="state.refreshing()"
+          [disabled]="state.refreshing() || state.reconcileBusy()"
           title="Refresh"
         >
           @if (state.refreshing()) {
@@ -166,3 +188,62 @@
     </div>
   </div>
 </div>
+
+<ng-template #reconcileTpl let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title d-inline-flex align-items-center gap-2">
+      <svg class="sa-icon text-primary" aria-hidden="true">
+        <use href="/assets/icons/sprite.svg#tool"></use>
+      </svg>
+      Reconcile migration history
+    </h5>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    @if (state.checkStatus(); as chk) {
+      <p class="small mb-3">
+        This runs the same server steps as
+        <strong>Run Pending</strong> after removing <strong>orphan</strong> rows in
+        <code class="small">spectra.__drizzle_migrations</code> (hashes that no longer match any file in the repo
+        journal). Use only when the database schema already matches what you expect; ensure backups first. See
+        <code class="small">packages/database/README.md</code>.
+      </p>
+      @if (chk.orphanDbHashes.length > 0) {
+        <p class="fw-semibold small mb-1">Orphan hash(es) to remove:</p>
+        <ul class="font-monospace small text-break mb-3">
+          @for (h of chk.orphanDbHashes; track h) {
+            <li>{{ h }}</li>
+          }
+        </ul>
+      } @else {
+        <p class="alert alert-info small mb-3 py-2">
+          No orphan hashes — reconcile will only run hash-order repair and Drizzle migrate (for example to fix a
+          <strong>gap</strong> in the applied sequence).
+        </p>
+      }
+      @if (chk.hasGaps) {
+        <p class="text-warning-emphasis small mb-0">
+          <strong>Gaps</strong> were detected in the migration sequence; the migrate pass may apply pending SQL.
+        </p>
+      }
+    }
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">Cancel</button>
+    <button
+      type="button"
+      class="btn btn-primary d-inline-flex align-items-center gap-2"
+      [disabled]="state.reconcileBusy()"
+      (click)="confirmReconcile(modal)"
+    >
+      @if (state.reconcileBusy()) {
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      } @else {
+        <svg class="sa-icon" aria-hidden="true">
+          <use href="/assets/icons/sprite.svg#tool"></use>
+        </svg>
+      }
+      Reconcile
+    </button>
+  </div>
+</ng-template>

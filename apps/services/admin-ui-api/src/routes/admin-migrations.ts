@@ -13,6 +13,7 @@ import {
   getMigrationInventory,
   getAdminMigrationsUseSharedHttpClient,
   readMigrationSqlFile,
+  reconcileAndRunMigrations,
   resolveMigrationHashForTag,
   resolveSpectraDatabaseUrl,
   runDrizzleMigrationsWithRunnerMode,
@@ -184,6 +185,50 @@ const postRun: RequestHandler = async (req, res) => {
   }
 };
 
+const postReconcile: RequestHandler = async (_req, res) => {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+
+  const root = workspaceRoot();
+  const db = getDb();
+
+  try {
+    const useShared = await getAdminMigrationsUseSharedHttpClient(db);
+    const result = await reconcileAndRunMigrations(db, root, useShared);
+    if (result.nothingToDo) {
+      res.status(409).json({
+        error: 'nothing_to_reconcile',
+        message: 'Migration journal and spectra.__drizzle_migrations already match (no reconcile needed).',
+        inventory: result.inventory,
+      });
+      return;
+    }
+    res.status(200).json({
+      ok: true,
+      inventory: result.inventory,
+      deletedOrphanHashes: result.deletedOrphanHashes,
+      hashRepairedTags: result.hashRepairedTags,
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    let cause: string | undefined;
+    if (e instanceof Error && 'cause' in e && e.cause instanceof Error) {
+      cause = e.cause.message;
+    }
+    res.status(500).json({
+      error: 'reconcile_failed',
+      message,
+      ...(cause ? { cause } : {}),
+    });
+  }
+};
+
 const deleteRecord: RequestHandler = async (req, res) => {
   const dbUrl = resolveSpectraDatabaseUrl();
   if (!dbUrl) {
@@ -316,5 +361,6 @@ export function registerAdminMigrationsRoutes(r: Router): void {
   r.put('/migrations/runner-config', requireAuth0AccessToken, putRunnerConfig);
   r.delete('/migrations/runner-config', requireAuth0AccessToken, deleteRunnerConfig);
   r.post('/migrations/run', requireAuth0AccessToken, postRun);
+  r.post('/migrations/reconcile', requireAuth0AccessToken, postReconcile);
   r.delete('/migrations/record', requireAuth0AccessToken, deleteRecord);
 }

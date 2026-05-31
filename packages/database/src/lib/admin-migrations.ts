@@ -548,6 +548,67 @@ export async function deleteMigrationRecordByHash(db: SpectraDb, hash: string): 
   `);
 }
 
+export interface ReconcileMigrationsResult {
+  /** When true, no orphan deletes or migrate ran (inventory already passed `check.isValid`). */
+  nothingToDo: boolean;
+  inventory: MigrationInventory;
+  /** Orphan DB hashes removed from `spectra.__drizzle_migrations` (subset of journal-unknown hashes). */
+  deletedOrphanHashes: string[];
+  /** Tags repaired by hash-order apply + Drizzle migrate (same semantics as `runDrizzleMigrationsWithRunnerMode`). */
+  hashRepairedTags: string[];
+}
+
+/**
+ * Staff reconcile: drop orphan migration rows (hashes not on the current repo journal), then run
+ * the same migration pass as Settings → Run Pending (hash-order repair + Drizzle migrate).
+ */
+export async function reconcileAndRunMigrations(
+  db: SpectraDb,
+  workspaceRoot: string,
+  useSharedHttpClient: boolean,
+): Promise<ReconcileMigrationsResult> {
+  const initial = await getMigrationInventory(db, workspaceRoot);
+  if (initial.check.isValid) {
+    return {
+      nothingToDo: true,
+      inventory: initial,
+      deletedOrphanHashes: [],
+      hashRepairedTags: [],
+    };
+  }
+
+  const deletedOrphanHashes = [...initial.check.orphanDbHashes];
+  for (const hash of initial.check.orphanDbHashes) {
+    await deleteMigrationRecordByHash(db, hash);
+  }
+
+  const hashRepairedTags = await runDrizzleMigrationsWithRunnerMode(
+    db,
+    workspaceRoot,
+    useSharedHttpClient,
+  );
+  const inventory = await getMigrationInventory(db, workspaceRoot);
+
+  databasePackageLog.info('Migration reconcile finished', {
+    module: 'database|src/lib/admin-migrations.ts|reconcileAndRunMigrations',
+    action: 'database.migrations.reconcile',
+    metadata: {
+      attrs: {
+        deletedOrphans: deletedOrphanHashes.length,
+        hashRepairedTags: hashRepairedTags.length,
+        isValidAfter: inventory.check.isValid,
+      },
+    },
+  });
+
+  return {
+    nothingToDo: false,
+    inventory,
+    deletedOrphanHashes,
+    hashRepairedTags,
+  };
+}
+
 /** First pending migration tag in journal order, if any. */
 export function getFirstPendingTag(rows: MigrationInventoryRow[]): string | null {
   const pending = rows.filter((r) => r.status === 'pending');

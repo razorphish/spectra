@@ -20,6 +20,8 @@ npx drizzle-kit migrate
 
 Configuration lives in [`drizzle.config.ts`](../../drizzle.config.ts). Migrations are emitted under [`drizzle/`](./drizzle/) and tracked in [`drizzle/meta/_journal.json`](./drizzle/meta/_journal.json).
 
+Staff **Settings → Migrations → Reconcile** calls `POST /v1/admin/migrations/reconcile`: it removes orphan rows in `spectra.__drizzle_migrations` (hashes not present on the current repo journal), then runs the same migration pass as **Run Pending** (hash-order repair + Drizzle `migrate()`).
+
 **Idempotency:** Prefer `IF NOT EXISTS` / guarded DML where re-runs are plausible (branches, journal repair). Cursor applies [`.cursor/rules/sql-migrations-idempotent.mdc`](../../.cursor/rules/sql-migrations-idempotent.mdc) to new `.sql` files. The admin **View migration SQL** modal shows a heuristic **Idempotent** flag (overridable with `-- @spectra-migration: idempotent` / `non-idempotent` in the file header); see `src/lib/migration-sql-metadata.ts`. Changing bytes in a migration that is **already recorded** in `spectra.__drizzle_migrations` changes its hash and will show as a mismatch until you repair the row (same hash as on disk) or follow the delete-record + re-apply flow in this README—avoid editing applied migrations in shared environments unless coordinated.
 
 ### Admin UI migration runner (`admin-ui-api`)

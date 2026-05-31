@@ -117,6 +117,20 @@ export class AdminMigrationsApiService {
     }>(`${this.adminBaseUrl()}/migrations/run`, { scope, ...(tag ? { tag } : {}) });
   }
 
+  postReconcile(): Observable<{
+    ok: boolean;
+    inventory: MigrationsInventoryDto;
+    deletedOrphanHashes: string[];
+    hashRepairedTags: string[];
+  }> {
+    return this.http.post<{
+      ok: boolean;
+      inventory: MigrationsInventoryDto;
+      deletedOrphanHashes: string[];
+      hashRepairedTags: string[];
+    }>(`${this.adminBaseUrl()}/migrations/reconcile`, {});
+  }
+
   deleteMigrationRecord(tag: string): Observable<{ ok: boolean; inventory: MigrationsInventoryDto }> {
     return this.http.delete<{ ok: boolean; inventory: MigrationsInventoryDto }>(
       `${this.adminBaseUrl()}/migrations/record`,
