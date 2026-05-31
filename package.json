@@ -134,7 +134,7 @@
     "jest-util": "^30.0.2",
     "jsonc-eslint-parser": "^2.1.0",
     "metro-config": "~0.83.0",
-    "metro-resolver": "~0.83.0",
+    "metro-resolver": "~0.84.4",
     "nx": "22.7.1",
     "pg": "^8.20.0",
     "prettier": "3.8.3",
