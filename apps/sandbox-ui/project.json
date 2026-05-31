@@ -107,7 +107,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "apps/sandbox-ui/jest.config.cts",
+        "jestConfig": "apps/sandbox-ui/jest.config.js",
         "tsConfig": "apps/sandbox-ui/tsconfig.spec.json"
       }
     },

@@ -2,12 +2,14 @@ import { and, desc, eq, isNull, notExists } from 'drizzle-orm';
 import { Router } from 'express';
 import type { RequestHandler } from 'express';
 
-import { createRequireAuth0AccessToken } from '@spectra/auth';
+import { createRequireAuth0AccessToken, isKnownM2mScope } from '@spectra/auth';
 import {
   applications,
   buildActorJson,
   CATALOG_IDS,
   getDb,
+  integrations,
+  m2mOauthClients,
   oauthClients,
   orgMemberships,
   orgs,
@@ -671,11 +673,286 @@ const deleteApplication: RequestHandler = async (req, res) => {
   res.status(204).send();
 };
 
+function parseGrantedScopes(raw: unknown): string | null {
+  if (raw === undefined || raw === null) return 'platform:read';
+  if (typeof raw !== 'string') return null;
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'platform:read';
+  for (const p of parts) {
+    if (!isKnownM2mScope(p)) return null;
+  }
+  return parts.join(' ');
+}
+
+const listIntegrations: RequestHandler = async (req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    noDatabase(res);
+    return;
+  }
+  const sub = req.auth?.sub;
+  if (!sub) {
+    res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+    return;
+  }
+  const sessionRow = await ensureSession(sub, req.auth?.claims ?? {});
+  if (!sessionRow) {
+    res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+    return;
+  }
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: integrations.id,
+      name: integrations.name,
+      updatedAt: integrations.updatedAt,
+      clientId: m2mOauthClients.clientId,
+      grantedScopes: m2mOauthClients.grantedScopes,
+    })
+    .from(integrations)
+    .innerJoin(m2mOauthClients, eq(m2mOauthClients.integrationId, integrations.id))
+    .where(
+      and(
+        eq(integrations.orgId, sessionRow.orgId),
+        isNull(integrations.deletedAt),
+        isNull(m2mOauthClients.deletedAt),
+      ),
+    )
+    .orderBy(desc(integrations.updatedAt));
+  res.json({ integrations: rows });
+};
+
+const createIntegration: RequestHandler = async (req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    noDatabase(res);
+    return;
+  }
+  const sub = req.auth?.sub;
+  if (!sub) {
+    res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+    return;
+  }
+  const sessionRow = await ensureSession(sub, req.auth?.claims ?? {});
+  if (!sessionRow) {
+    res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+    return;
+  }
+  const body = req.body as Record<string, unknown>;
+  const name = typeof body['name'] === 'string' ? body['name'].trim() : '';
+  if (!name) {
+    res.status(400).json({ error: 'invalid_request', message: 'name is required.' });
+    return;
+  }
+  const grantedScopes = parseGrantedScopes(body['grantedScopes']);
+  if (grantedScopes === null) {
+    res.status(400).json({
+      error: 'invalid_scope',
+      message: `grantedScopes must use known scopes only.`,
+    });
+    return;
+  }
+  const description = typeof body['description'] === 'string' ? body['description'].trim() : null;
+  const db = getDb();
+  const actor = buildActorJson({ name: sessionRow.email, userId: sessionRow.userId });
+  const clientId = generateClientId();
+  const clientSecret = generateClientSecret();
+  const secretHash = hashClientSecret(clientSecret);
+  try {
+    const out = await db.transaction(async (tx) => {
+      const [integ] = await tx
+        .insert(integrations)
+        .values({
+          orgId: sessionRow.orgId,
+          name,
+          description,
+          statusId: CATALOG_IDS.status.active,
+          createdBy: actor,
+          updatedBy: actor,
+        })
+        .returning();
+      if (!integ) throw new Error('integration insert failed');
+      await tx.insert(m2mOauthClients).values({
+        integrationId: integ.id,
+        clientId,
+        secretHash,
+        grantedScopes,
+        statusId: CATALOG_IDS.status.active,
+        createdBy: actor,
+        updatedBy: actor,
+      });
+      return integ;
+    });
+    res.status(201).json({
+      id: out.id,
+      name: out.name,
+      clientId,
+      clientSecret,
+      grantedScopes,
+      updatedAt: out.updatedAt,
+    });
+  } catch (e: unknown) {
+    const code = e && typeof e === 'object' && 'code' in e ? (e as { code: string }).code : '';
+    if (code === '23505') {
+      res.status(409).json({
+        error: 'conflict',
+        message: 'An active M2M client already exists for this integration slot.',
+      });
+      return;
+    }
+    throw e;
+  }
+};
+
+const getIntegration: RequestHandler = async (req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    noDatabase(res);
+    return;
+  }
+  const sub = req.auth?.sub;
+  if (!sub) {
+    res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+    return;
+  }
+  const sessionRow = await ensureSession(sub, req.auth?.claims ?? {});
+  if (!sessionRow) {
+    res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+    return;
+  }
+  const id = req.params['id'];
+  if (!id) {
+    res.status(400).json({ error: 'bad_request', message: 'Missing id.' });
+    return;
+  }
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: integrations.id,
+      name: integrations.name,
+      description: integrations.description,
+      updatedAt: integrations.updatedAt,
+      clientId: m2mOauthClients.clientId,
+      grantedScopes: m2mOauthClients.grantedScopes,
+    })
+    .from(integrations)
+    .innerJoin(m2mOauthClients, eq(m2mOauthClients.integrationId, integrations.id))
+    .where(
+      and(
+        eq(integrations.id, id),
+        eq(integrations.orgId, sessionRow.orgId),
+        isNull(integrations.deletedAt),
+        isNull(m2mOauthClients.deletedAt),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) {
+    res.status(404).json({ error: 'not_found', message: 'Integration not found.' });
+    return;
+  }
+  res.json({ ...row, hasClientSecret: true });
+};
+
+const rotateIntegrationSecret: RequestHandler = async (req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    noDatabase(res);
+    return;
+  }
+  const sub = req.auth?.sub;
+  if (!sub) {
+    res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+    return;
+  }
+  const sessionRow = await ensureSession(sub, req.auth?.claims ?? {});
+  if (!sessionRow) {
+    res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+    return;
+  }
+  const id = req.params['id'];
+  if (!id) {
+    res.status(400).json({ error: 'bad_request', message: 'Missing id.' });
+    return;
+  }
+  const db = getDb();
+  const rows = await db
+    .select({ m2mId: m2mOauthClients.id })
+    .from(integrations)
+    .innerJoin(m2mOauthClients, eq(m2mOauthClients.integrationId, integrations.id))
+    .where(
+      and(
+        eq(integrations.id, id),
+        eq(integrations.orgId, sessionRow.orgId),
+        isNull(integrations.deletedAt),
+        isNull(m2mOauthClients.deletedAt),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) {
+    res.status(404).json({ error: 'not_found', message: 'Integration not found.' });
+    return;
+  }
+  const clientSecret = generateClientSecret();
+  const secretHash = hashClientSecret(clientSecret);
+  const actor = buildActorJson({ name: sessionRow.email, userId: sessionRow.userId });
+  await db
+    .update(m2mOauthClients)
+    .set({ secretHash, updatedBy: actor })
+    .where(eq(m2mOauthClients.id, row.m2mId));
+  res.json({ clientSecret });
+};
+
+const revokeIntegration: RequestHandler = async (req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    noDatabase(res);
+    return;
+  }
+  const sub = req.auth?.sub;
+  if (!sub) {
+    res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+    return;
+  }
+  const sessionRow = await ensureSession(sub, req.auth?.claims ?? {});
+  if (!sessionRow) {
+    res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+    return;
+  }
+  const id = req.params['id'];
+  if (!id) {
+    res.status(400).json({ error: 'bad_request', message: 'Missing id.' });
+    return;
+  }
+  const db = getDb();
+  const now = new Date();
+  const actor = buildActorJson({ name: sessionRow.email, userId: sessionRow.userId });
+  const updated = await db
+    .update(integrations)
+    .set({
+      deletedAt: now,
+      statusId: CATALOG_IDS.status.deleted,
+      updatedBy: actor,
+    })
+    .where(and(eq(integrations.id, id), eq(integrations.orgId, sessionRow.orgId), isNull(integrations.deletedAt)))
+    .returning();
+  if (!updated.length) {
+    res.status(404).json({ error: 'not_found', message: 'Integration not found.' });
+    return;
+  }
+  await db
+    .update(m2mOauthClients)
+    .set({ deletedAt: now, statusId: CATALOG_IDS.status.deleted, updatedBy: actor })
+    .where(and(eq(m2mOauthClients.integrationId, id), isNull(m2mOauthClients.deletedAt)));
+  res.status(204).send();
+};
+
 /** Authenticated sandbox developer portal (JWT Bearer). */
 export function createSandboxPortalRouter(): Router {
   const r = Router();
   r.use(requireAuth0AccessToken);
   r.get('/session', session);
+  r.get('/integrations', listIntegrations);
+  r.post('/integrations', createIntegration);
+  r.get('/integrations/:id', getIntegration);
+  r.post('/integrations/:id/rotate-secret', rotateIntegrationSecret);
+  r.delete('/integrations/:id', revokeIntegration);
   r.get('/applications', listApplications);
   r.post('/applications', createApplication);
   r.get('/applications/:id', getApplication);

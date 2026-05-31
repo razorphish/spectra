@@ -38,7 +38,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "packages/openapi/jest.config.cts"
+        "jestConfig": "packages/openapi/jest.config.js"
       }
     }
   }

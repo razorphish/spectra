@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NgbNavModule, NgbNavOutlet } from '@ng-bootstrap/ng-bootstrap';
 import { PageBreadcrumb } from '@app/components/page-breadcrumb';
+import { AdminAuthPlatformApiService } from '@core/services/admin-auth-platform-api.service';
 import { AdminNavVisibilityApiService } from '@core/services/admin-nav-visibility-api.service';
 import { SidebarNavVisibilityService } from '@core/services/sidebar-nav-visibility.service';
 import {
@@ -27,6 +28,7 @@ import { firstValueFrom } from 'rxjs';
 })
 export class GeneralSettingsPage implements OnInit {
   private readonly api = inject(AdminNavVisibilityApiService);
+  private readonly authPlatform = inject(AdminAuthPlatformApiService);
   private readonly toastr = inject(ToastrService);
   private readonly navVisibility = inject(SidebarNavVisibilityService);
 
@@ -37,11 +39,16 @@ export class GeneralSettingsPage implements OnInit {
   loading = signal(false);
   saveError = signal<string | null>(null);
 
+  readonly authLoading = signal(false);
+  readonly authSaveError = signal<string | null>(null);
+  jwtClockSkewDraft = signal(30);
+
   readonly keys = TEMPLATE_NAV_MENU_KEYS;
   readonly labels = TEMPLATE_NAV_MENU_LABELS;
 
   ngOnInit(): void {
     void this.load();
+    void this.loadAuthJwtSkew();
   }
 
   isVisible(key: TemplateNavMenuKey): boolean {
@@ -112,6 +119,54 @@ export class GeneralSettingsPage implements OnInit {
       this.toastr.error('Save failed', msg);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async loadAuthJwtSkew(): Promise<void> {
+    this.authLoading.set(true);
+    this.authSaveError.set(null);
+    try {
+      const r = await firstValueFrom(this.authPlatform.get());
+      this.jwtClockSkewDraft.set(r.jwtClockSkewSeconds);
+    } catch (e: unknown) {
+      let msg = 'Failed to load auth settings';
+      if (e instanceof HttpErrorResponse) {
+        const body = e.error as { message?: string } | null;
+        msg = body?.message ?? e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      this.authSaveError.set(msg);
+    } finally {
+      this.authLoading.set(false);
+    }
+  }
+
+  setJwtSkew(v: unknown): void {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (Number.isFinite(n)) this.jwtClockSkewDraft.set(n);
+  }
+
+  async saveAuthJwtSkew(): Promise<void> {
+    this.authLoading.set(true);
+    this.authSaveError.set(null);
+    try {
+      const v = this.jwtClockSkewDraft();
+      const res = await firstValueFrom(this.authPlatform.patch({ jwtClockSkewSeconds: v }));
+      this.jwtClockSkewDraft.set(res.jwtClockSkewSeconds);
+      this.toastr.success('Saved', 'JWT clock skew updated.');
+    } catch (e: unknown) {
+      let msg = 'Failed to save auth settings';
+      if (e instanceof HttpErrorResponse) {
+        const body = e.error as { message?: string } | null;
+        msg = body?.message ?? e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      this.authSaveError.set(msg);
+      this.toastr.error('Save failed', msg);
+    } finally {
+      this.authLoading.set(false);
     }
   }
 }

@@ -70,6 +70,67 @@
           </div>
         </ng-template>
       </li>
+      <li ngbNavItem="auth">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#lock"></use>
+          </svg>
+          Auth
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            @if (authSaveError(); as ae) {
+              <div class="alert alert-danger" role="alert">{{ ae }}</div>
+            }
+            @if (authLoading()) {
+              <div class="text-muted py-4">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Loading…
+              </div>
+            } @else {
+              <div class="card shadow-sm border">
+                <div class="card-body">
+                  <h6 class="fw-semibold mb-2">JWT clock skew</h6>
+                  <p class="text-muted small mb-3">
+                    Leeway (seconds) for <code>iat</code> / <code>exp</code> when verifying access tokens (Auth0
+                    and M2M). Stored in <code>spectra.platform_settings</code> key
+                    <code>auth.jwt_clock_skew_seconds</code>.
+                  </p>
+                  <label class="form-label" for="jwt-skew">Seconds (0–300)</label>
+                  <input
+                    id="jwt-skew"
+                    type="number"
+                    class="form-control mb-3"
+                    style="max-width: 12rem"
+                    min="0"
+                    max="300"
+                    [ngModel]="jwtClockSkewDraft()"
+                    (ngModelChange)="setJwtSkew($event)"
+                  />
+                  <div class="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      (click)="saveAuthJwtSkew()"
+                      [disabled]="authLoading()"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      (click)="loadAuthJwtSkew()"
+                      [disabled]="authLoading()"
+                    >
+                      Reload
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </li>
     </ul>
 
     <div class="tab-content pt-4" [ngbNavOutlet]="nav"></div>

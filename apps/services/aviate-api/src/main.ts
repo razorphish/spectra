@@ -79,11 +79,31 @@ app.get('/openapi.json', (_req, res) => {
   res.json(openApiSpec);
 });
 
+app.get('/integration/openapi.json', (req, res) => {
+  const key = process.env['SPECTRA_INTEGRATION_OPENAPI_KEY']?.trim();
+  if (!key || req.get('x-spectra-integration-key') !== key) {
+    res.status(401).json({
+      error: 'unauthorized',
+      message: 'Valid X-Spectra-Integration-Key header is required.',
+    });
+    return;
+  }
+  res.json(openApiSpec);
+});
+
 app.use(
   '/docs',
   swaggerUi.serve,
   swaggerUi.setup(openApiSpec, {
     customSiteTitle: 'Spectra Public API',
+  })
+);
+
+app.use(
+  '/integration/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(openApiSpec, {
+    customSiteTitle: 'Spectra Integration API (authenticated spec)',
   })
 );
 

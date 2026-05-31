@@ -8,9 +8,20 @@ function upstream(name: string, fallback: string): string {
 
 export function mountServiceProxies(app: Express): void {
   const aviate = upstream('AVIATE_API_URL', 'http://127.0.0.1:3001');
+  const auth = upstream('SPECTRA_AUTH_API_URL', 'http://127.0.0.1:9100');
   const seq = upstream('SEQ_API_URL', 'http://127.0.0.1:3003');
   const quantum = upstream('QUANTUM_API_URL', 'http://127.0.0.1:3004');
   const corridor = upstream('CORRIDOR_API_URL', 'http://127.0.0.1:3005');
+
+  app.use(
+    createProxyMiddleware({
+      target: auth,
+      changeOrigin: true,
+      pathFilter: (pathname, req) =>
+        pathname.startsWith('/.well-known/') ||
+        (pathname === '/oauth/token' && req.method === 'POST'),
+    })
+  );
 
   const routes: { path: string; target: string }[] = [
     { path: '/v1/platform', target: aviate },
@@ -19,6 +30,7 @@ export function mountServiceProxies(app: Express): void {
     { path: '/v1/corridor', target: corridor },
     { path: '/docs', target: aviate },
     { path: '/openapi.json', target: aviate },
+    { path: '/integration', target: aviate },
   ];
 
   for (const { path, target } of routes) {

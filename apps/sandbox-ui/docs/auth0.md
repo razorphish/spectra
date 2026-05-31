@@ -36,3 +36,24 @@ Set the same audience on every public-segment API:
 - `apps/services/corridor-api/.env.development`
 
 See [docs/api-polyglot.md](../../../docs/api-polyglot.md).
+
+## M2M integrations (`client_credentials`)
+
+Create **Integrations** from the developer dashboard (server-to-server OAuth2 clients). Tokens are minted by **`auth-api`** (default `http://127.0.0.1:9100`) when **`M2M_MINT_ENABLED=true`**.
+
+Example token request (Basic auth):
+
+```bash
+curl -sS -u '$CLIENT_ID:$CLIENT_SECRET' \
+  -d 'grant_type=client_credentials&scope=platform%3Aread' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  http://127.0.0.1:9100/oauth/token
+```
+
+Call the platform API with the JWT (requires **`M2M_VERIFY_ENABLED_AVIATE_API=true`** on aviate-api and matching `SPECTRA_M2M_*` env — see [docs/adr/m2m-client-credentials-phase0.md](../../../docs/adr/m2m-client-credentials-phase0.md)):
+
+```bash
+curl -sS -H "Authorization: Bearer $ACCESS_TOKEN" http://127.0.0.1:3001/v1/platform/hello
+```
+
+JWKS (local): `http://127.0.0.1:9100/.well-known/jwks.json` or via local-edge when `SPECTRA_AUTH_API_URL` points at auth-api.

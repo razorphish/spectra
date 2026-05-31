@@ -1,4 +1,4 @@
-import { createRequireAuth0AccessToken } from '@spectra/auth';
+import { createRequireSpectraAccessToken } from '@spectra/auth';
 import { Router } from 'express';
 import type { RequestHandler } from 'express';
 
@@ -9,12 +9,15 @@ import {
   resolveSpectraDatabaseUrl,
 } from '@spectra/database';
 
+import { loadM2mClientStatusForEdge } from '../lib/m2m-client-status';
 import { createHelloHandler } from './hello';
 import { createSandboxPortalRouter } from './sandbox-portal';
 
 const SEGMENT = 'platform';
-const requireAuth0AccessToken = createRequireAuth0AccessToken({
+const requireAccessToken = createRequireSpectraAccessToken({
   logLabel: 'aviate-api',
+  m2mVerifyEnvSegment: 'AVIATE_API',
+  loadM2mClientStatus: loadM2mClientStatusForEdge,
 });
 
 const health: RequestHandler = (_req, res) => {
@@ -70,7 +73,7 @@ export function createPlatformRouter() {
   r.get('/ready', ready);
   r.get('/info', info);
   r.get('/stats', stats);
-  r.get('/hello', requireAuth0AccessToken, createHelloHandler('aviate-api', SEGMENT));
+  r.get('/hello', requireAccessToken, createHelloHandler('aviate-api', SEGMENT));
   r.use('/sandbox', createSandboxPortalRouter());
   return r;
 }

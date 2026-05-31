@@ -90,7 +90,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "apps/spectra-ui/jest.config.cts",
+        "jestConfig": "apps/spectra-ui/jest.config.js",
         "tsConfig": "apps/spectra-ui/tsconfig.spec.json"
       }
     },

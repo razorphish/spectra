@@ -211,6 +211,93 @@ export const oauthClients = spectra.table(
   (t) => [uniqueIndex('oauth_clients_client_id_uq').on(t.clientId)]
 );
 
+/** Server-to-server integration (M2M); separate from browser `applications`. */
+export const integrations = spectra.table(
+  'integrations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => orgs.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    statusId: uuid('status_id')
+      .notNull()
+      .references(() => catalog.id, { onDelete: 'restrict' }),
+    createdBy: jsonb('created_by').notNull().default(systemActorJsonbDefault),
+    updatedBy: jsonb('updated_by').notNull().default(systemActorJsonbDefault),
+  },
+  (t) => [
+    index('integrations_org_id_idx').on(t.orgId),
+    index('integrations_status_id_idx').on(t.statusId),
+  ]
+);
+
+/** OAuth2 `client_credentials` client bound to one `integration` (MVP: one per integration). */
+export const m2mOauthClients = spectra.table(
+  'm2m_oauth_clients',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    integrationId: uuid('integration_id')
+      .notNull()
+      .references(() => integrations.id, { onDelete: 'cascade' }),
+    clientId: text('client_id').notNull(),
+    secretHash: text('secret_hash').notNull(),
+    /** Space-delimited OAuth scopes (ceiling for token requests). */
+    grantedScopes: text('granted_scopes').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    statusId: uuid('status_id')
+      .notNull()
+      .references(() => catalog.id, { onDelete: 'restrict' }),
+    createdBy: jsonb('created_by').notNull().default(systemActorJsonbDefault),
+    updatedBy: jsonb('updated_by').notNull().default(systemActorJsonbDefault),
+  },
+  (t) => [
+    uniqueIndex('m2m_oauth_clients_client_id_uq').on(t.clientId),
+    uniqueIndex('m2m_oauth_clients_integration_active_uq')
+      .on(t.integrationId)
+      .where(sql`${t.deletedAt} is null`),
+    index('m2m_oauth_clients_integration_id_idx').on(t.integrationId),
+  ]
+);
+
+/**
+ * One row per successful M2M access token mint (append-only; `jti` matches JWT).
+ * Exempt from full entity audit columns per M2M plan minimum schema.
+ */
+export const m2mTokenIssuanceLog = spectra.table(
+  'm2m_token_issuance_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    jti: text('jti').notNull(),
+    m2mOauthClientId: uuid('m2m_oauth_client_id')
+      .notNull()
+      .references(() => m2mOauthClients.id, { onDelete: 'cascade' }),
+    orgId: uuid('org_id')
+      .notNull()
+      .references(() => orgs.id, { onDelete: 'cascade' }),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdBy: jsonb('created_by').notNull().default(systemActorJsonbDefault),
+  },
+  (t) => [
+    uniqueIndex('m2m_token_issuance_log_jti_uq').on(t.jti),
+    index('m2m_token_issuance_log_client_issued_idx').on(t.m2mOauthClientId, t.issuedAt),
+  ]
+);
+
 export const redirectUris = spectra.table('redirect_uris', {
   id: uuid('id').primaryKey().defaultRandom(),
   oauthClientId: uuid('oauth_client_id')

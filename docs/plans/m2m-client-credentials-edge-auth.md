@@ -1,5 +1,21 @@
 # Plan: M2M client credentials for customer systems → Spectra edge APIs
 
+## Implementation status
+
+**As of 2026-05-31** (living document — update this section when major milestones land):
+
+| Area | Status |
+|------|--------|
+| **Phase 0 (design lock)** | **Done** — ADR accepted: [`docs/adr/m2m-client-credentials-phase0.md`](../adr/m2m-client-credentials-phase0.md). |
+| **Phase 1 — schema + portal** | **Implemented in main** — `integrations` / `m2m_oauth_clients` / issuance log in control-plane schema; sandbox portal + sandbox-ui flows for create / list / rotate / revoke (see [Implementation pointers](#implementation-pointers-existing-code)). |
+| **Phase 2–3 — token mint** | **Implemented in main** — [`apps/services/auth-api`](../../apps/services/auth-api): `client_credentials`, ES256 JWT, JWKS, issuance logging; gated at runtime by **`M2M_MINT_ENABLED`**. |
+| **Phase 4 — edge (Node)** | **Implemented in main** — dual-issuer auth in **`@spectra/auth`** ([`require-spectra-access-token.ts`](../../packages/auth/src/lib/require-spectra-access-token.ts)); aviate-api M2M verify + status cache behind **`M2M_VERIFY_ENABLED_AVIATE_API`**; tier **(c)** sandbox router does not accept M2M; scope enforcement from emitted **`scope-map.json`**. |
+| **OpenAPI tiers + polyglot verify** | **Partial** — public vs authenticated OpenAPI and CI↔map checks evolve incrementally (ADR notes); full Go / Python / .NET verifiers + contract matrix deferred per ADR. |
+| **Phase 5 — integrator docs** | **Partial** — e.g. curl + env notes in [`apps/sandbox-ui/docs/auth0.md`](../../apps/sandbox-ui/docs/auth0.md); expand as GA approaches. |
+| **Phase 6 — hardening + GA** | **Ongoing** — use [`m2m-ga-checklist.md`](./m2m-ga-checklist.md); production mint/verify remain **off** until that ordering and ops sign-off. |
+
+**Normative spec:** The rest of this document remains the **contract** (wire format, errors, revocation Option C, flags). **“Implemented”** here means **code on main**, not necessarily **production GA** (flags and checklist).
+
 ## Goal
 
 Allow **customer-owned backends and automation** (not interactive users) to call Spectra public APIs behind **local-edge** / production edge, using **credentials issued from Spectra** (sandbox portal or successor). Humans still sign into Spectra with **Auth0**; M2M credentials are **only** for server-to-server consumption.
@@ -509,7 +525,7 @@ Wire tokens are **ES256 JWTs** with standard claims (`iss`, `aud`, `iat`, `exp`,
 
 Use this section to **triage** work before implementation: what is already **decided in-repo** vs what still needs the **Phase 0 ADR** or explicit backlog owners.
 
-**Status (final):** The **design contract** in this plan is **complete** — no substantive gaps remain for MVP M2M. The **Ready to implement** subsection below lists everything engineering may take as normative after the ADR references it; **Blocked on Phase 0 ADR** is intentionally limited to **deployment instantiation** (repo paths, Nx project names, SLO numbers, env spellings, OpenAPI proxy wiring, portal copy, lifecycle UX edge cases) and proving alignment with the codebase — not reopening wire format or security defaults locked above.
+**Status (final):** The **design contract** in this plan is **complete** — no substantive gaps remain for MVP M2M. **Engineering status** (what is merged vs behind flags vs GA-pending) is summarized at **[Implementation status](#implementation-status)** and in the related ADR. The **Ready to implement** subsection below lists everything engineering may take as normative after the ADR references it. **Historically**, schema and mint work were **blocked on Phase 0 ADR**; with the ADR **accepted** and the Node MVP path in **`main`**, remaining gaps are **incremental** (OpenAPI filter maturity, polyglot runtime parity, dashboards, prod enablement) unless an amendment reopens wire format or security defaults.
 
 ### Ready to implement (after ADR closes dependencies)
 
@@ -522,7 +538,9 @@ These are **specified in this plan**; engineering should not reinterpret without
 
 ### Blocked on Phase 0 ADR (non-negotiable before schema / mint)
 
-The **[Solidified ADR contract](#solidified-adr-contract)** locks **defaults** (access token **10 min**, status cache **2 min**, customer-facing exposure **≤ 15 min**, rotate semantics, issuance log columns, tier **(c)** router isolation, `AUTH_ISSUER_OVERRIDE`, startup vs runtime errors, [status cache cold-start / DB failure](#status-cache-cold-start-and-db-failure-mvp-defaults), [scope polyglot strategy](#scope-management-m2m) + close-out [7–9](#adr-close-out-sequence-non-negotiable), [abuse lockout numbers](#client-credentials-abuse-lockout-defaults), [mixed credentials error](#token-endpoint-mixed-credentials-rfc-6749-52), [M2M JWT → principal mapping](#m2m-jwt-wire-claims--principal-mapping-normative), [client secret hashing](#m2m-client-secret-at-rest-hashing), [incident runbook](#incident-and-leak-runbook-minimum)). The ADR must still **instantiate**: **auth service repo path**, **Nx project name**, **SLO numbers**, full **env contract** spellings, **OpenAPI proxy** wiring, **portal copy**, and **lifecycle verb** edge cases. **[Token revocation (Phase 0 ADR)](#token-revocation-phase-0-adr)** remains the **security gate** for any deviation from plan defaults.
+**Note:** This subsection described **gating before** the Phase 0 ADR was written and accepted. **Repo paths, env spellings, router boundaries, and scope-map emission** are now instantiated in [`m2m-client-credentials-phase0.md`](../adr/m2m-client-credentials-phase0.md) and code; items below remain useful for **threat-model / ops** completeness (SLOs, dashboards, runbooks) and any **future** amendment cycle — not as a blanket “ADR missing” blocker for the merged MVP slice.
+
+The **[Solidified ADR contract](#solidified-adr-contract)** locks **defaults** (access token **10 min**, status cache **2 min**, customer-facing exposure **≤ 15 min**, rotate semantics, issuance log columns, tier **(c)** router isolation, `AUTH_ISSUER_OVERRIDE`, startup vs runtime errors, [status cache cold-start / DB failure](#status-cache-cold-start-and-db-failure-mvp-defaults), [scope polyglot strategy](#scope-management-m2m) + close-out [7–9](#adr-close-out-sequence-non-negotiable), [abuse lockout numbers](#client-credentials-abuse-lockout-defaults), [mixed credentials error](#token-endpoint-mixed-credentials-rfc-6749-52), [M2M JWT → principal mapping](#m2m-jwt-wire-claims--principal-mapping-normative), [client secret hashing](#m2m-client-secret-at-rest-hashing), [incident runbook](#incident-and-leak-runbook-minimum)). **Instantiation** of auth service path (**`apps/services/auth-api`**), Nx project name, **env contract** spellings, **OpenAPI proxy** wiring, tier **(c)** router boundary, portal lifecycle verbs, and **portal copy** for Integrations is recorded in the **accepted** ADR and **`main`** code paths. **Still typically tracked outside this plan** (ops / GA): formal **SLO numbers**, dashboards wired to every [observability](#observability-minimums) metric, and incremental **public limited** OpenAPI completeness. **[Token revocation (Phase 0 ADR)](#token-revocation-phase-0-adr)** remains the **security gate** for any deviation from plan defaults.
 
 ### Incident and leak runbook (minimum)
 
@@ -613,6 +631,8 @@ The ADR **must** still define at minimum:
 **Allowed earlier (dev / staging / flags):** Vertical slices of Phase 2 + 3 + 4 behind feature flags or non-prod environments are fine for engineering velocity — but **production** `client_credentials` mint on **`auth.aviate.com`** must remain **disabled** until Phase 1 prod exit criteria are met. **`M2M_MINT_ENABLED=false`** (or equivalent) in prod configs until the gate passes ([Rollout feature flags](#rollout-feature-flags)). Release automation or CI should **block** enabling prod token issuance if Phase 1 migrations / portal flows are not in the required state.
 
 ## Phased delivery
+
+**Roll-up:** See **[Implementation status](#implementation-status)** for what is already in **`main`** vs **partial** vs **GA-gated**. Phase headings below stay **normative** (exit criteria and intent).
 
 ### Phase 0 — Design lock (~1–2 days)
 
@@ -715,12 +735,12 @@ The ADR **must** still define at minimum:
 | Concern                                              | Location                                                                                                                                                                                                          |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Auth0 JWT middleware (user + staff tokens)           | [packages/auth/src/lib/require-auth0-access-token.ts](packages/auth/src/lib/require-auth0-access-token.ts)                                                                                                        |
-| Dedicated auth service                               | New deployable: `**auth.aviate.com`** — token `POST`, mint **ES256**, JWKS `/.well-known/jwks.json` (repo path TBD, e.g. `apps/services/auth-api/`)                                                               |
-| JWT validation (`iss` + `aud` + JWKS)                | [packages/auth](packages/auth) — M2M `aud` / `iss` per [Solidified ADR contract](#solidified-adr-contract); extend alongside [require-auth0-access-token.ts](packages/auth/src/lib/require-auth0-access-token.ts) |
-| M2M issuer + audience constants                      | `packages/auth` — export `**SPECTRA_M2M_ISSUER`** (or ADR-chosen name) + align `**SPECTRA_M2M_AUDIENCE**` with [Solidified ADR contract](#solidified-adr-contract); CI asserts `iss` on fixture tokens            |
-| M2M scope → route map (MVP)                          | `[packages/auth/scope-map.ts](packages/auth/scope-map.ts)` + generated **`scope-map.json`** (or ADR-chosen artifact) per [Scope management](#scope-management-m2m); **CI** validates map against OpenAPI ([Decisions](#decisions-phase-0-lock) row 9) + cross-runtime contract test ([ADR close-out](#adr-close-out-sequence-non-negotiable) item 7)                                                         |
-| Sandbox portal (apps, secrets, rotate)               | `apps/services/aviate-api/src/routes/sandbox-portal.ts`                                                                                                                                                           |
-| OAuth / Integration schema                           | [packages/database/src/schema/control-plane.ts](packages/database/src/schema/control-plane.ts) — new **Integration** + M2M client linkage (extend beyond `applications` / `oauthClients` only)                    |
+| Dedicated auth service                               | [`apps/services/auth-api`](../../apps/services/auth-api) — `POST` token (`client_credentials`), mint **ES256**, **`GET /.well-known/jwks.json`** (base path / env per [ADR](../adr/m2m-client-credentials-phase0.md)); prod host **`auth.aviate.com`**. |
+| JWT validation (`iss` + `aud` + JWKS)                | [packages/auth](packages/auth) — **`createRequireSpectraAccessToken`** in [require-spectra-access-token.ts](../../packages/auth/src/lib/require-spectra-access-token.ts); M2M `aud` / `iss` per [Solidified ADR contract](#solidified-adr-contract); Auth0 path remains [require-auth0-access-token.ts](../../packages/auth/src/lib/require-auth0-access-token.ts) |
+| M2M issuer + audience constants                      | `packages/auth` + service env — **`SPECTRA_M2M_ISSUER`**, **`SPECTRA_M2M_AUDIENCE`**, **`SPECTRA_M2M_JWKS_URL`** per [ADR](../adr/m2m-client-credentials-phase0.md) and [Solidified ADR contract](#solidified-adr-contract); CI asserts `iss` / `aud` on fixture tokens where present |
+| M2M scope → route map (MVP)                          | [packages/auth/src/lib/scope-map.ts](../../packages/auth/src/lib/scope-map.ts) + emitted **`packages/auth/dist/scope-map.json`** via **`nx run auth:emit-scope-map`** per [ADR](../adr/m2m-client-credentials-phase0.md); **CI** / contract script per [Scope management](#scope-management-m2m) and [Decisions](#decisions-phase-0-lock) row 9 |
+| Sandbox portal (apps, secrets, rotate)               | [sandbox-portal.ts](../../apps/services/aviate-api/src/routes/sandbox-portal.ts) — includes **Integration** / M2M client lifecycle alongside legacy applications                                                                                                                      |
+| OAuth / Integration schema                           | [control-plane.ts](../../packages/database/src/schema/control-plane.ts) — **`integrations`**, **`m2m_oauth_clients`**, **`m2m_token_issuance_log`**, etc. (MVP M2M separate from legacy `applications` / `oauthClients`) |
 | Sandbox UI secret handling                           | `apps/sandbox-ui/src/app/pages/application-form.page.ts`, `application-view.page.ts`                                                                                                                              |
 | Authenticated OpenAPI proxy + integration key        | [apps/services/admin-ui-api](apps/services/admin-ui-api) — proxy `GET /integration/openapi.json`, static key in platform secrets                                                                                  |
 | Merged public OpenAPI (today includes sandbox paths) | `packages/openapi` build → `apps/services/aviate-api/src/assets/spectra-public-api.json`                                                                                                                          |

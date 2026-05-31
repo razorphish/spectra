@@ -9,6 +9,8 @@ import {
 } from '@spectra/database';
 
 import { requireAuth0AccessToken } from '../lib/auth';
+import { registerAdminAuthPlatformRoutes } from './admin-auth-platform';
+import { registerAdminAviateOpenApiRoutes } from './admin-aviate-openapi';
 import { createAdminMeSyncHandler } from './admin-me-sync';
 import { registerAdminLoggingRoutes } from './admin-logging';
 import { registerAdminMigrationsRoutes } from './admin-migrations';
@@ -71,6 +73,8 @@ export function createAdminRouter() {
   r.get('/info', info);
   r.get('/stats', requireAuth0AccessToken, stats);
   r.post('/me/sync', requireAuth0AccessToken, meSync);
+  registerAdminAuthPlatformRoutes(r);
+  registerAdminAviateOpenApiRoutes(r);
   registerAdminLoggingRoutes(r);
   registerAdminMigrationsRoutes(r);
   registerAdminNavVisibilityRoutes(r);

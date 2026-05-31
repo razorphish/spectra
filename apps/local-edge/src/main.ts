@@ -72,6 +72,7 @@ app.get('/', (_req, res) => {
       seq: process.env['SEQ_API_URL'] ?? 'http://127.0.0.1:3003',
       quantum: process.env['QUANTUM_API_URL'] ?? 'http://127.0.0.1:3004',
       corridor: process.env['CORRIDOR_API_URL'] ?? 'http://127.0.0.1:3005',
+      auth: process.env['SPECTRA_AUTH_API_URL'] ?? 'http://127.0.0.1:9100',
     },
   });
 });

@@ -99,6 +99,54 @@ export class SandboxPortalService {
     );
   }
 
+  listIntegrations() {
+    return this.http.get<{
+      integrations: {
+        id: string;
+        name: string;
+        updatedAt: string;
+        clientId: string;
+        grantedScopes: string;
+      }[];
+    }>(`${this.apiRoot()}/v1/platform/sandbox/integrations`);
+  }
+
+  createIntegration(body: { name: string; description?: string; grantedScopes?: string }) {
+    return this.http.post<{
+      id: string;
+      name: string;
+      clientId: string;
+      clientSecret: string;
+      grantedScopes: string;
+      updatedAt: string;
+    }>(`${this.apiRoot()}/v1/platform/sandbox/integrations`, body);
+  }
+
+  getIntegration(id: string) {
+    return this.http.get<{
+      id: string;
+      name: string;
+      description: string | null;
+      updatedAt: string;
+      clientId: string;
+      grantedScopes: string;
+      hasClientSecret: boolean;
+    }>(`${this.apiRoot()}/v1/platform/sandbox/integrations/${id}`);
+  }
+
+  rotateIntegrationSecret(id: string) {
+    return this.http.post<{ clientSecret: string }>(
+      `${this.apiRoot()}/v1/platform/sandbox/integrations/${id}/rotate-secret`,
+      {},
+    );
+  }
+
+  deleteIntegration(id: string) {
+    return this.http.delete(`${this.apiRoot()}/v1/platform/sandbox/integrations/${id}`, {
+      observe: 'response',
+    });
+  }
+
   initUpload(body: {
     orgId: string;
     applicationId?: string;

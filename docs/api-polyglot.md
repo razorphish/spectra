@@ -13,7 +13,7 @@ Spectra public APIs share URL layout and JSON contracts. Each service runs in it
 
 **Unified local entry:** [local-edge](../apps/local-edge) on **:3000** reverse-proxies to each upstream. [sandbox-ui](../apps/sandbox-ui) should use `apiBaseUrl` `http://127.0.0.1:3000`.
 
-**Merged API docs:** `GET http://127.0.0.1:3000/docs` (proxied to aviate-api) and `GET /openapi.json`.
+**Merged API docs:** `GET http://127.0.0.1:3000/docs` (proxied to aviate-api) and `GET /openapi.json`. For M2M scope-map parity across runtimes, see [api-polyglot-m2m.md](api-polyglot-m2m.md).
 
 ## Standard endpoints
 
