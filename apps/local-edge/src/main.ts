@@ -29,7 +29,7 @@ for (const [p, o] of [
 }
 
 /** Local dev only — CORS + optional passthrough. Not deployed. Production edge is AWS HTTP API (Terraform api_http). */
-const host = process.env.HOST ?? 'localhost';
+const host = process.env.HOST ?? '127.0.0.1';
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 const app = express();

@@ -1136,9 +1136,38 @@ const mintIntegrationAccessToken: RequestHandler = async (req, res) => {
       body: form.toString(),
     });
   } catch (e: unknown) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    const cause = 'cause' in err ? (err as Error & { cause?: unknown }).cause : undefined;
+    const causeObj =
+      cause && typeof cause === 'object'
+        ? {
+            name: 'name' in cause ? String((cause as { name?: unknown }).name) : '',
+            message: 'message' in cause ? String((cause as { message?: unknown }).message) : '',
+            code: 'code' in cause ? String((cause as { code?: unknown }).code) : '',
+            errno: 'errno' in cause ? String((cause as { errno?: unknown }).errno) : '',
+            syscall: 'syscall' in cause ? String((cause as { syscall?: unknown }).syscall) : '',
+            address: 'address' in cause ? String((cause as { address?: unknown }).address) : '',
+            port: 'port' in cause ? String((cause as { port?: unknown }).port) : '',
+          }
+        : { causeType: typeof cause, causeStr: cause === undefined ? '' : String(cause) };
+    const upstream =
+      'code' in causeObj && typeof causeObj.code === 'string' && causeObj.code
+        ? {
+            code: causeObj.code,
+            ...(causeObj.address ? { address: causeObj.address } : {}),
+            ...(causeObj.port ? { port: causeObj.port } : {}),
+          }
+        : undefined;
     res.status(502).json({
       error: 'mint_upstream_unreachable',
       message: e instanceof Error ? e.message : 'Could not reach auth-api.',
+      ...(upstream ? { upstream } : {}),
+      ...(upstream?.code === 'ECONNREFUSED'
+        ? {
+            hint:
+              'Nothing accepted TCP on this URL (auth-api likely not running). Use `nx serve auth-api` with M2M_MINT_ENABLED, or `npm run dev:apis` (includes auth-api).',
+          }
+        : {}),
     });
     return;
   }

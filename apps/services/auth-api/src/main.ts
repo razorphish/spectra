@@ -211,7 +211,8 @@ async function handleToken(req: Request, res: Response): Promise<void> {
   });
 }
 
-const host = process.env['HOST'] ?? 'localhost';
+/** Default IPv4 loopback so peers using `http://127.0.0.1:9100` (e.g. aviate-api mint) connect; `localhost` can bind ::1-only on some Node/OS stacks. */
+const host = process.env['HOST'] ?? '127.0.0.1';
 const port = process.env['PORT'] ? Number(process.env['PORT']) : 9100;
 
 if (process.env['NODE_ENV'] === 'production' && process.env['AUTH_ISSUER_OVERRIDE']?.trim()) {

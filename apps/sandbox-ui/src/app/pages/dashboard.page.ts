@@ -368,12 +368,6 @@ type SandboxIntegrationSummary = {
               <a [href]="docu" target="_blank" rel="noopener noreferrer">{{ docu }}</a>
             </p>
           }
-          @if (integrationSwaggerDocsUrl(); as idoc) {
-            <p class="modal-doc-hint">
-              Integration API Swagger:
-              <a [href]="idoc" target="_blank" rel="noopener noreferrer">{{ idoc }}</a>
-            </p>
-          }
           <label class="token-label" for="dash-mint-secret">Client secret</label>
           <input
             id="dash-mint-secret"
@@ -761,14 +755,6 @@ export class DashboardPageComponent {
     const api = environment.apiBaseUrl?.trim();
     const base = (pub || api || '').replace(/\/$/, '');
     return base ? `${base}/docs` : '';
-  });
-
-  /** Full integration OpenAPI UI — M2M bearer tokens typically apply here. */
-  protected readonly integrationSwaggerDocsUrl = computed(() => {
-    const pub = environment.publicApiDocsBaseUrl?.trim();
-    const api = environment.apiBaseUrl?.trim();
-    const base = (pub || api || '').replace(/\/$/, '');
-    return base ? `${base}/integration/docs` : '';
   });
 
   constructor() {

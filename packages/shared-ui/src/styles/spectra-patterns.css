@@ -126,7 +126,14 @@
   margin-top: 0.5rem;
 }
 
+/* Default: readable on white / light cards (modals, spectra-page). */
 .spectra-auth-error {
+  color: var(--spectra-color-error-text);
+  font-weight: 600;
+}
+
+.spectra-probe .spectra-auth-error,
+.spectra-auth-shell .spectra-auth-error {
   color: var(--spectra-color-panel-err);
 }
 

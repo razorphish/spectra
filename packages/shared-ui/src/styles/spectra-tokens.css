@@ -19,7 +19,10 @@
   --spectra-color-panel-border: #334155;
   --spectra-color-panel-link: #7dd3fc;
   --spectra-color-panel-link-hover: #bae6fd;
+  /* Light text for errors on dark panels (.spectra-probe, .spectra-auth-shell) */
   --spectra-color-panel-err: #fecaca;
+  /* Strong vivid red for inline errors on light surfaces (forms, modals, spectra-page) */
+  --spectra-color-error-text: #dc2626;
   --spectra-font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, Cantarell,
     'Noto Sans', sans-serif;
   --spectra-radius-sm: 6px;

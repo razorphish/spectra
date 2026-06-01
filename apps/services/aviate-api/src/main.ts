@@ -1,7 +1,8 @@
 import { config } from 'dotenv';
+import { timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import express from 'express';
+import express, { type RequestHandler } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import { createPlatformRouter } from './routes/platform';
 import { createUploadsRouter } from './routes/uploads';
@@ -141,6 +142,73 @@ const integrationSwaggerUiOptions = {
   customSiteTitle: 'Spectra Integration API (authenticated spec)',
 };
 
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
+
+function parseBasicAuthHeader(header: string | undefined): { user: string; pass: string } | null {
+  if (!header?.toLowerCase().startsWith('basic ')) return null;
+  const raw = header.slice(6).trim();
+  try {
+    const decoded = Buffer.from(raw, 'base64').toString('utf8');
+    const i = decoded.indexOf(':');
+    if (i < 0) return null;
+    return { user: decoded.slice(0, i), pass: decoded.slice(i + 1) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * When `SPECTRA_INTEGRATION_OPENAPI_KEY` is set, the full OpenAPI JSON is header-gated.
+ * Browser Swagger needs HTTP Basic on every asset request, so gate `/integration/docs` with
+ * `SPECTRA_INTEGRATION_DOCS_BASIC_USER` + `SPECTRA_INTEGRATION_DOCS_BASIC_PASSWORD`.
+ * Without the integration key (local dev only), the UI stays open. In production without
+ * the key, the full-catalog UI is disabled.
+ */
+const integrationSwaggerUiGate: RequestHandler = (req, res, next) => {
+  const intKey = process.env['SPECTRA_INTEGRATION_OPENAPI_KEY']?.trim();
+  const isProd = process.env['NODE_ENV'] === 'production';
+
+  if (!intKey) {
+    if (isProd) {
+      res.status(404).json({
+        error: 'not_found',
+        message: 'Integration Swagger UI is not enabled in this deployment.',
+      });
+      return;
+    }
+    next();
+    return;
+  }
+
+  const docUser = process.env['SPECTRA_INTEGRATION_DOCS_BASIC_USER']?.trim();
+  const docPass = process.env['SPECTRA_INTEGRATION_DOCS_BASIC_PASSWORD']?.trim();
+  if (!docUser || !docPass) {
+    res.status(503).json({
+      error: 'integration_docs_unavailable',
+      message:
+        'Full-catalog Swagger UI requires SPECTRA_INTEGRATION_DOCS_BASIC_USER and SPECTRA_INTEGRATION_DOCS_BASIC_PASSWORD when SPECTRA_INTEGRATION_OPENAPI_KEY is set. Use GET /integration/openapi.json with header X-Spectra-Integration-Key, or the public catalog at GET /docs.',
+    });
+    return;
+  }
+
+  const creds = parseBasicAuthHeader(req.headers.authorization);
+  if (
+    !creds ||
+    !timingSafeStringEqual(creds.user, docUser) ||
+    !timingSafeStringEqual(creds.pass, docPass)
+  ) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Spectra integration API docs"');
+    res.status(401).send('Authentication required');
+    return;
+  }
+  next();
+};
+
 app.use(
   '/docs',
   ...swaggerUi.serveFiles(publicOpenApiSpec, publicSwaggerUiOptions),
@@ -149,6 +217,7 @@ app.use(
 
 app.use(
   '/integration/docs',
+  integrationSwaggerUiGate,
   ...swaggerUi.serveFiles(integrationOpenApiSpec, integrationSwaggerUiOptions),
   swaggerUi.setup(integrationOpenApiSpec, integrationSwaggerUiOptions),
 );

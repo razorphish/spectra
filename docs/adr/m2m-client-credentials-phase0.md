@@ -51,6 +51,7 @@ Per-customer Auth0 M2M as primary store; browser-held M2M secrets; OAuth discove
 - New migrations and services must ship behind flags until Phase 1 prod gate clears.  
 - Admin RBAC names `platform:integrations:read` / `export` for audit UI remain as in parent plan.  
 - Deviations from parent **Solidified ADR contract** require amending **this ADR** and the parent plan link section.
+- **Auditing:** Normative layering (append-only issuance rows in DB, redacted structured telemetry, lifecycle `created_by`/`updated_by`, OpenAPI ≠ audit) and related operational choices (**`jti` collision handling**, retention, enumeration logging, staff UI placement) are defined in the parent plan — [M2M auditing model](../plans/m2m-client-credentials-edge-auth.md#m2m-auditing-model), [Staff visibility (admin UI)](../plans/m2m-client-credentials-edge-auth.md#staff-visibility-admin-ui). **Rationale:** A single unified audit table was **not** chosen for MVP because token traffic volume and query patterns (ops vs compliance) differ; **logs-only** was **not** sufficient because log platforms are typically **mutable** and **purgeable** and do not provide the same **append-only proof** as Postgres for successful mint `jti` rows.
 
 ## References
 

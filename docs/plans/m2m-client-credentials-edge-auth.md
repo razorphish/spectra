@@ -82,7 +82,7 @@ Day-to-day **developer** lifecycle (create / list own clients / rotate / revoke 
 - **Forced lifecycle:** revoke or suspend a specific client, an entire org’s M2M clients, or a **global** feature flag / kill-switch for token issuance.
 - **Policy and quotas:** max M2M clients per org, plan-gated enablement, default TTL or allowed scopes templates; **scope catalog / templates** (see [Scope management](#scope-management-m2m)).
 - **Operations:** token-endpoint rate-limit tuning, abuse dashboards, maintenance mode; if signing keys are centrally operated, **who** may trigger rotation and audit trail.
-- **Compliance:** export or review audit of create / rotate / revoke and high-volume failed `client_credentials` attempts (restricted roles).
+- **Compliance:** export or review audit of create / rotate / revoke and high-volume failed `client_credentials` attempts (restricted roles). Normative layering, retention, and log redaction rules: [M2M auditing model](#m2m-auditing-model).
 
 **Hybrid model:** same underlying tables and APIs; **admin** routes require explicit staff permissions (e.g. `platform:integrations:manage` — exact names TBD in Phase 0). Avoid duplicating business rules between portals: shared service layer in **aviate-api** (or chosen host) with different authz guards.
 
@@ -230,7 +230,7 @@ Auth service **mints** all custom claims below at **issuance** — edge **does n
 
 - **Mint (auth service):** Refuse `client_credentials` for revoked or suspended Integration / client (hard stop).
 - **Edge:** After JWT crypto + `iss` + `aud` + scope, enforce **cached status**; **customer-facing maximum exposure** documented as **≤ 15 minutes** conservative ceiling under [Status cache and exposure](#status-cache-and-exposure-mvp-defaults) (ADR may tune down; not up without threat-model review).
-- **`jti`:** **Always** on every access token (UUID or ULID). **Phase 1** persists [Token issuance log](#token-issuance-log--minimum-schema-phase-1) row per mint. Edge **does not** query denylist for MVP.
+- **`jti`:** **Always** on every access token (UUID or ULID). **Phase 1** persists one row per successful mint in [Token issuance log](#token-issuance-log--minimum-schema-phase-1) (DB **`UNIQUE (jti)`**). Issuance log vs future denylist vs structured telemetry: [M2M auditing model](#m2m-auditing-model). Edge **does not** query denylist for MVP.
 - **Later:** Option B (denylist, e.g. Redis) **without** changing JWT wire format.
 
 ### Status cache and exposure (MVP defaults)
@@ -265,19 +265,73 @@ ADR **names** this three-way behavior so Node and polyglot implementations do no
 
 ### Token issuance log — minimum schema (Phase 1)
 
-One row per successful mint (**required**). Minimum columns (ADR maps to real table names / types):
+One row per **successful** mint (**required**). This table is **append-only proof** of issuance; it is **not** the edge revocation hot path ([Option C](#token-revocation-mvp-plan-default)). A future **`jti` denylist** (Option B) would be a **separate** store reconciled against `jti` here — see [M2M auditing model](#m2m-auditing-model).
+
+**`jti` uniqueness (DB-enforced):** Postgres enforces **`UNIQUE (jti)`** on `spectra.m2m_token_issuance_log` (see migration `packages/database/drizzle/0007_m2m_integrations.sql`). This is a **constraint**, not an informal convention: provability of “this `jti` was minted at most once” relies on the database.
+
+**`jti` generation:** Auth service generates **`jti`** with **`randomUUID()`** per mint ([`apps/services/auth-api/src/lib/m2m-jwt.ts`](../../apps/services/auth-api/src/lib/m2m-jwt.ts)). MVP supports **`client_credentials` only** (no refresh grant reusing a prior `jti`), so legitimate duplicate `jti` is not expected.
+
+**Duplicate `jti` insert (collision or bug):** **Do not** silently ignore. **Normative:** On unique violation when inserting the issuance row, the auth service **must not** return **`200`** with an access token unless the row is persisted; **must** emit a **critical** structured log / metric (e.g. `m2m_token_jti_collision_total` or equivalent) for operator alert; **must** return **`503`** or **`500`** with OAuth error **`server_error`** (exact JSON in ADR appendix). Product may additionally **retry once** with a fresh `jti` before failing — document the choice in auth-api if implemented.
+
+Minimum columns (implementation in [`packages/database/src/schema/control-plane.ts`](../../packages/database/src/schema/control-plane.ts); ADR maps names):
 
 | Column | Type | Notes |
 |--------|------|--------|
-| `id` | ULID/UUID | Primary key. |
-| `jti` | text | **Unique**, **indexed** — matches JWT `jti` claim (Option B denylist lookups). |
-| `client_id` | text | FK to M2M client row. |
-| `org_id` | text | Tenant-scoped audit and queries. |
+| `id` | UUID | Primary key (default random). |
+| `jti` | text | **NOT NULL**, **UNIQUE** — matches JWT `jti` claim; supports future Option B denylist lookups. |
+| `m2m_oauth_client_id` | UUID | **FK** → `spectra.m2m_oauth_clients.id` (internal id; wire OAuth2 `client_id` string lives on that row). |
+| `org_id` | UUID | **FK** → org; tenant-scoped audit and queries. |
 | `issued_at` | `timestamptz` | |
 | `expires_at` | `timestamptz` | Align with JWT `exp`. |
-| `revoked_at` | `timestamptz` nullable | **Nullable for MVP**; populated when/if Option B or admin revoke-by-`jti` semantics need it — avoids migration when denylist ships. |
+| `revoked_at` | `timestamptz` nullable | **Nullable for MVP**; populated when/if Option B or admin revoke-by-`jti` semantics need it. |
+| `created_by` | jsonb | **NOT NULL** — actor snapshot at insert ([Actor JSON](#actor-json-for-audit-columns)); issuance rows use service actor (e.g. `name: "auth-api"`, `userId: null`) unless extended later. |
 
-**Indexes:** **unique on `jti`**; composite **`(client_id, issued_at)`** for audit listings.
+**Optional backlog column — `granted_scope` (text):** If added, a single normative sentence applies: **values reflect OAuth2 `scope` entitlement at mint time only** and are **not** updated when portal staff or tenant later change `m2m_oauth_clients.granted_scopes`; compliance “what was this token authorized for at issuance?” uses **JWT `scope` + issuance row (if present) + this column**, not the current client row alone. If scope ceilings are tightened mid-lifecycle, **do not** rewrite old rows; optional future **`scope_superseded`** (boolean) or similar may flag policy drift — backlog until required. **Current code:** mint writes `scope` into JWT and response body but the issuance insert does **not** yet persist scope — see [`handleToken`](../../apps/services/auth-api/src/main.ts).
+
+**Indexes:** **unique on `jti`**; composite **`(m2m_oauth_client_id, issued_at)`** for audit listings.
+
+### M2M auditing model
+
+Normative **layers** (why split: a single “mega audit” table mixes **high-volume ops telemetry** with **low-volume compliance rows** and encourages wrong indexes / retention; **log backends** alone are **mutable**, **purgeable**, and not a substitute for **append-only DB proof** of successful mints — keep both concerns explicit):
+
+| Layer | Responsibility | Normative notes |
+|-------|----------------|-----------------|
+| **Control-plane DB** | Provable trail of **successful** token mints | `spectra.m2m_token_issuance_log` — one row per mint; **`jti`** unique; **no** secrets; **no** raw `access_token` in DB. |
+| **Structured logs + metrics** | Ops, security, abuse, sub-causes | Failed `client_credentials` (`invalid_client`, `invalid_scope`, `client_locked`, …), lockouts, JWKS / status `error_sub_cause`; align with [Observability minimums](#observability-minimums). **Never** log `client_secret`, `Authorization: Basic …`, or full JWTs. Optional correlation fields (when safe per [enumeration rules](#m2m-auditing-model) below): **`request_id`**, **`client_id`** (raw or hashed). |
+| **Lifecycle / entity audit** | Integration + M2M client CRUD, rotate, revoke, suspend | `integrations` / `m2m_oauth_clients` **`created_by` / `updated_by`** and status transitions; distinguish **tenant portal** vs **staff** actors where populated. |
+| **OpenAPI** | HTTP contract only | [Integration catalog vs sandbox portal](#integration-catalog-vs-sandbox-portal) — catalog does **not** replace audit. |
+
+**MVP vs backlog:** **MVP:** success rows in DB + metrics/logs for **success and failure** (and lockout) per [Observability minimums](#observability-minimums). **Backlog:** dedicated **failed-attempt** table in Postgres **only** if compliance requires **queryable** failure history beyond log-platform retention; otherwise avoid write amplification.
+
+**Clock skew vs bearer replay:** Configurable **JWT clock skew** ([Platform policies](#platform-policies-agreed)) governs **`iat` / `exp`** (and defensive **`nbf`**) tolerance — it is **not** “anti-replay” for bearer tokens. **Replay** of a still-valid JWT within its lifetime is expected unless a product adds **`jti` replay caches** at the edge (Option B / post-MVP). Document customer guidance: short TTL + revoke via status cache limits exposure.
+
+**Failed token requests — enumeration (normative for MVP):** Structured logs **may** include wire **`client_id`** only after credentials **resolve to a known** `m2m_oauth_clients` row (same request still failed, e.g. bad secret, suspended). For **unknown** `client_id` (no row), **omit** wire `client_id` from logs **or** log a **one-way hash** (algorithm + salt convention TBD with security; align with any platform-wide log hashing standard if one exists). **Do not** silently vary behavior per engineer — SRE runbooks must match.
+
+**RFC 7662 token introspection:** **Not in MVP** ([post-MVP note](../plans/m2m-client-credentials-post-mvp.md)). If added later, log **introspection calls** in the **structured** layer only (high volume); **do not** require DB rows per introspection by default.
+
+**Revocation vs natural expiry:** **Integration / client revoke** (portal or staff) is part of **lifecycle / entity audit** (`updated_by`, `status_id`, `deleted_at`). There is **no** dedicated OAuth **token** `/revoke` endpoint in MVP; outstanding JWTs die at **`exp`** per Option C. **Natural expiry** does **not** emit a separate audit event — it is **implied** by `expires_at` and absence of renewal. If product later adds **staff** vs **tenant** distinguishers, reflect them in **`updated_by`** / future event table.
+
+**Retention and purge:** Treat the **success issuance log** as **high-volume** over time (same caution as any future failed-attempt table). **Normative defaults (tunable):** **Hot query window** in Postgres **≤ 1 year** of rows for operational search unless metrics show otherwise; **compliance** may require **1–7 years** — satisfy via **scheduled export to cold/immutable storage** (S3 object lock, BigQuery, etc.) and **partitioned or batched purge** of hot store after retention policy. **Table partitioning by time** is **explicitly deferred** until volume warrants it (revisit when mint rate exceeds agreed threshold). Exact months/years are **legal/compliance** inputs — document chosen numbers in runbooks when set.
+
+**Cross-tenant export and meta-audit:** **`platform:integrations:export`** grants **staff cross-tenant** export of audit artifacts (issuance + lifecycle as exposed by admin-ui-api). **Tenant-scoped** “export my integration audit” is **not** defined in MVP RBAC — if added later, use a **distinct** permission string (e.g. `integrations:export` tenant scope) and **do not** overload `platform:*`. **Meta-audit (recommended):** staff exports that include other tenants’ data **should** emit an auditable event (who exported what window) — implement when admin-ui-api export routes ship.
+
+#### Actor JSON for audit columns
+
+Control-plane **`ActorRef`** is **`{ name: string; userId: string | null }`** ([`packages/database/src/lib/actor.ts`](../../packages/database/src/lib/actor.ts)); JSON columns store that shape. **`userId`** set when a human actor is known; service paths use **`userId: null`** and a stable **`name`** (e.g. `SYSTEM`, `auth-api`). **Issuance log** uses **NOT NULL** `created_by` — **no null actor** on new rows. Audit UI shows **`name`** + masked identifier for **`userId`** when present; for service actors, display a **system** label.
+
+### Staff visibility (admin UI)
+
+**Primary (target UX):** New **Integrations** / **Platform integrations** area in [admin-ui](../../apps/admin-ui) — cross-tenant list/search and **integration detail** with an **Activity / Audit** tab: issuance history (from `m2m_token_issuance_log`), lifecycle context, export for **`platform:integrations:export`**. APIs via **admin-ui-api** (staff Auth0 session + permission checks), not direct browser calls to auth-api / aviate-api.
+
+**Activity / Audit tab (minimal spec):** **Read-only** for all GA staff roles; default sort **newest first**; filters **date range** + **actor** where data exists; **cursor or offset pagination** (default page size **50**, max **200**); no inline edits. Follow existing admin-ui table patterns where possible ([Settings → Logging](../../apps/admin-ui/src/app/views/settings/logging-page/logging-page.html) as a loose visual reference — first-class M2M audit may be the first dedicated integration-audit surface).
+
+**Interim (until routes + UI exist):** Staff use **DB read replica / SQL** with RBAC governance, **log/metric backends**, and a **named runbook** (add link when published) for mint failures and lockouts; do not assume Admin UI is the only GA audit path.
+
+**Optional:** A supplemental tab under **Settings → Logging** for “M2M token activity” — secondary to the Integrations home above ([`logging-page`](../../apps/admin-ui/src/app/views/settings/logging-page/logging-page.html) remains **`application_logs`**-centric).
+
+**Menu wiring:** When routes exist, extend [menuItems](../../apps/admin-ui/src/app/layouts/components/data.ts) (and [settings.route.ts](../../apps/admin-ui/src/app/views/settings/settings.route.ts) or a new `integrations.route.ts`) and respect existing **nav visibility** patterns if used (`/v1/admin/nav-sidebar-visibility` per admin-ui-api OpenAPI).
+
+**Non-goal for normative plan text:** Implementing admin-ui pages or new admin-ui-api routes is a **follow-up engineering task** once APIs exist; this section defines **product placement and UX** only.
 
 ### Token endpoint: `scope` request parameter
 
@@ -383,15 +437,14 @@ WWW-Authenticate: Bearer realm="https://api.aviate.com/", error="insufficient_sc
 
 These are **admin-ui-api** route permission strings (staff Auth0 session), **not** values inside M2M JWT `scope`.
 
-
 | Permission                          | GA      | Purpose                                                                          |
 | ----------------------------------- | ------- | -------------------------------------------------------------------------------- |
-| `platform:integrations:read`        | Yes     | View M2M / Integration metadata, audit, failed auth counts (cross-tenant staff). |
-| `platform:integrations:export`      | Yes     | Export audit records (stricter/compliance).                                      |
+| `platform:integrations:read`        | Yes     | View M2M / Integration metadata, audit, failed auth counts (cross-tenant staff). Surfaces: [Staff visibility (admin UI)](#staff-visibility-admin-ui). |
+| `platform:integrations:export`      | Yes     | **Cross-tenant** export of audit artifacts (issuance log + lifecycle as exposed by APIs). Stricter/compliance gate. Surfaces: [Staff visibility (admin UI)](#staff-visibility-admin-ui). **Meta-audit:** exporting staff actions **should** be auditable when export routes ship ([M2M auditing model](#m2m-auditing-model)). |
 | `platform:integrations:revoke`      | Post-GA | Force-revoke any org’s M2M clients.                                              |
 | `platform:integrations:suspend-org` | Post-GA | Org-level kill-switch for token issuance.                                        |
 
-
+**Tenant-scoped export:** MVP does **not** define a tenant permission mirroring `platform:integrations:export`. If product adds “tenant admin exports own org’s integration audit,” introduce a **distinct** string (e.g. `integrations:audit:export`) and document it here — **do not** overload `platform:*` for tenant self-service.
 ### Rollout feature flags
 
 Three-level matrix; values **read at process startup** and **logged explicitly** (no silent permissive default in production):
@@ -421,7 +474,7 @@ Three-level matrix; values **read at process startup** and **logged explicitly**
 - `jwks_fetch_duration_seconds`
 - `jwks_stale_serving_total`
 
-**Logging:** Never log secrets or full JWTs. **`client_id`**, **`org_id`**, **`jti`**, and structured **`error_sub_cause`** (e.g. `jwks_fetch_failed` vs `status_db_unavailable` for **`auth_unavailable`**) are safe correlation / ops fields.
+**Logging:** Never log secrets or full JWTs. **`org_id`**, **`jti`** (after successful mint), and structured **`error_sub_cause`** (e.g. `jwks_fetch_failed` vs `status_db_unavailable` for **`auth_unavailable`**) are safe correlation / ops fields. **`client_id`** in logs follows [enumeration rules](#m2m-auditing-model) under **M2M auditing model**. See also [GA checklist](./m2m-ga-checklist.md) for redaction verification.
 
 ### ADR close-out sequence (non-negotiable)
 
@@ -464,7 +517,7 @@ Decisions to carry into ADR, admin-ui, and implementation.
 
 **Token endpoint:** Secret compare runs on the **hot path** — validate end-to-end latency under expected load in **Phase 2** load tests; adjust Argon2 parameters (or bcrypt cost) so p95 token latency stays compatible with rate limits and abuse lockout UX, **without** weakening to trivially fast hashes.
 
-- **JWT clock skew:** Default **30 seconds** leeway for `iat` / `exp` (and `nbf` if used) validation, **identical** across Node, Go, Python, .NET. Make leeway **configurable** via **Admin UI → General settings → new “Auth” tab** (persisted platform setting, e.g. `platform_settings` / control-plane row); document env default for CI and local dev.
+- **JWT clock skew:** Default **30 seconds** leeway for `iat` / `exp` (and `nbf` if used) validation, **identical** across Node, Go, Python, .NET. Make leeway **configurable** via **Admin UI → General settings → new “Auth” tab** (persisted platform setting, e.g. `platform_settings` / control-plane row); document env default for CI and local dev. **Skew is not anti-replay:** it does not prevent reuse of a still-valid bearer JWT within its lifetime; see [M2M auditing model](#m2m-auditing-model) (clock skew vs bearer replay).
 - **HA signing:** **Asymmetric EC (ES256)** per [Decisions](#decisions-phase-0-lock); private key in KMS or approved secret store on **auth.aviate.com**; **JWKS** at `https://auth.aviate.com/.well-known/jwks.json`; all API runtimes fetch JWKS from this URL (configurable per env). **Availability, JWKS caching, and key rotation** follow the subsection below and infra runbooks.
 
 ### Auth service availability, JWKS caching, and key rotation
@@ -757,6 +810,7 @@ The ADR **must** still define at minimum:
 | M2M scope → route map (MVP)                          | [packages/auth/src/lib/scope-map.ts](../../packages/auth/src/lib/scope-map.ts) + emitted **`packages/auth/dist/scope-map.json`** via **`nx run auth:emit-scope-map`** per [ADR](../adr/m2m-client-credentials-phase0.md); **CI** / contract script per [Scope management](#scope-management-m2m) and [Decisions](#decisions-phase-0-lock) row 9 |
 | Sandbox portal (apps, secrets, rotate)               | [sandbox-portal.ts](../../apps/services/aviate-api/src/routes/sandbox-portal.ts) — includes **Integration** / M2M client lifecycle alongside legacy applications                                                                                                                      |
 | OAuth / Integration schema                           | [control-plane.ts](../../packages/database/src/schema/control-plane.ts) — **`integrations`**, **`m2m_oauth_clients`**, **`m2m_token_issuance_log`**, etc. (MVP M2M separate from legacy `applications` / `oauthClients`) |
+| M2M auditing model + staff UI (normative)            | This document — [M2M auditing model](#m2m-auditing-model), [Staff visibility (admin UI)](#staff-visibility-admin-ui) |
 | Sandbox UI secret handling                           | `apps/sandbox-ui/src/app/pages/application-form.page.ts`, `application-view.page.ts`                                                                                                                              |
 | Authenticated OpenAPI proxy + integration key        | [apps/services/admin-ui-api](apps/services/admin-ui-api) — proxy `GET /integration/openapi.json`, static key in platform secrets                                                                                  |
 | Merged OpenAPI artifacts (public limited + full)     | `nx run openapi:merge` → [`scripts/merge-public-openapi.mjs`](../../scripts/merge-public-openapi.mjs) — **`spectra-public-api.json`** + **`spectra-integration-api.json`** in `packages/openapi/dist/` and aviate assets; see [Implementation pointers](#implementation-pointers-existing-code) above |
