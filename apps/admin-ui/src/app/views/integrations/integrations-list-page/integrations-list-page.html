@@ -1,0 +1,110 @@
+<div class="main-content">
+  <div class="container-xl py-4">
+    <app-page-breadcrumb
+      title="Integrations"
+      subTitle1="Platform"
+      subText="Cross-tenant M2M integrations and OAuth client_credentials clients (staff audit). Requires Auth0 permission platform:integrations:read."
+    />
+
+    @if (error(); as err) {
+      <div class="alert alert-danger" role="alert">{{ err }}</div>
+    }
+
+    <div class="card shadow-sm border mt-4">
+      <div class="card-body">
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-md-4">
+            <label class="form-label" for="int-q">Search</label>
+            <input
+              id="int-q"
+              class="form-control"
+              [(ngModel)]="searchDraft"
+              (keyup.enter)="page.set(1); load()"
+              placeholder="Name, org, client id, UUID…"
+            />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="int-org">Org ID</label>
+            <input
+              id="int-org"
+              class="form-control font-monospace small"
+              [(ngModel)]="orgIdDraft"
+              (keyup.enter)="page.set(1); load()"
+              placeholder="Optional UUID filter"
+            />
+          </div>
+          <div class="col-md-auto">
+            <button type="button" class="btn btn-primary" (click)="page.set(1); load()" [disabled]="loading()">
+              Search
+            </button>
+          </div>
+        </div>
+
+        @if (loading()) {
+          <div class="text-muted py-4">
+            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            Loading…
+          </div>
+        } @else {
+          <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Organization</th>
+                  <th>Client ID</th>
+                  <th>Status</th>
+                  <th>Updated</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of items(); track row.id) {
+                  <tr>
+                    <td class="fw-semibold">{{ row.name }}</td>
+                    <td>{{ row.orgName }}</td>
+                    <td><code class="small">{{ row.clientId ?? '—' }}</code></td>
+                    <td>{{ row.statusName ?? row.statusId }}</td>
+                    <td class="text-muted small">{{ row.updatedAt | date: 'medium' }}</td>
+                    <td>
+                      <a class="btn btn-sm btn-outline-primary" [routerLink]="['/integrations', row.id]">View</a>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="6" class="text-muted py-4">No integrations found.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between mt-3">
+            <span class="text-muted small">Total {{ total() }}</span>
+            <div class="btn-group">
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                (click)="setPage(page() - 1)"
+                [disabled]="loading() || page() <= 1"
+              >
+                Prev
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" disabled>
+                Page {{ page() }} / {{ totalPages() }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                (click)="setPage(page() + 1)"
+                [disabled]="loading() || page() >= totalPages()"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</div>

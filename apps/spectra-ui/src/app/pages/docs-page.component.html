@@ -1,0 +1,207 @@
+<div class="spectra-page docs-page">
+  <h1>API Documentation</h1>
+  <p class="lede">
+    Guides for discovering Spectra APIs, using the developer sandbox, and integrating your systems. Use the header
+    menu to jump to a section. For the <strong>public</strong> HTTP catalog, use <code>GET /openapi.json</code> and
+    interactive <code>/docs</code> on your Spectra API gateway—not the staff-only integration catalog.
+  </p>
+
+  @for (item of docsNavItems; track item.fragment) {
+    <section class="doc-section" [id]="item.fragment">
+      <h2>{{ item.label }}</h2>
+      @switch (item.fragment) {
+        @case ('get-started') {
+          <p>
+            Spectra exposes versioned REST APIs behind a unified gateway. Start here to learn how to obtain
+            credentials, call endpoints with a valid bearer token, and access <strong>your organization’s</strong> data
+            according to the scopes you were granted.
+          </p>
+          <p>
+            Typical flow:
+            <strong>read this site</strong>
+            →
+            <a [href]="sandboxUiUrl || '#'" class="sandbox-link" [class.disabled]="!sandboxUiUrl" target="_blank" rel="noopener noreferrer">open the developer sandbox</a>
+            → create an <strong>Integration</strong> (machine-to-machine) or, when enabled, a <strong>sandbox application</strong> (user-delegated OAuth)
+            → obtain an access token → call the API using the same base URL and audience documented for your environment.
+          </p>
+          <p>
+            <strong>Environments and data:</strong> the developer <strong>sandbox</strong> uses <strong>synthetic or subset</strong> data for safe experimentation.
+            <strong>Staging</strong> reflects real integration behavior with <strong>PII-cleaned</strong> datasets; <strong>production</strong> holds real customer data and requires
+            approved access (see <a routerLink="/production-access">Production Access</a>).
+          </p>
+          @if (!sandboxUiUrl) {
+            <p class="stub">Configure <code>sandboxUiUrl</code> in this environment to enable the direct sandbox link above.</p>
+          }
+        }
+        @case ('explore-the-api') {
+          <p>
+            The <strong>public integrator catalog</strong> is published as OpenAPI 3 JSON at
+            <code>GET /openapi.json</code> on the API gateway, with interactive Swagger UI at <code>GET /docs</code>.
+            Use these for discovery, codegen, and “try it” flows with a token that is valid for that gateway.
+          </p>
+          <p>
+            A separate <strong>full integration</strong> OpenAPI document and UI exist for staff and tooling
+            (<code>GET /integration/openapi.json</code>, <code>/integration/docs</code>). Those surfaces are gated and
+            <strong>not</strong> part of the customer self-service path—if an operation you need is missing from the
+            public catalog, contact Spectra support rather than using integration keys in customer environments.
+          </p>
+          @if (apiGatewayOrigin()) {
+            <p class="meta-line">
+              <span class="label">Example gateway origin (this build)</span>
+              <code>{{ apiGatewayOrigin() }}</code>
+              — append <code>/docs</code> or <code>/openapi.json</code>.
+            </p>
+          }
+        }
+        @case ('get-started-with-sandbox') {
+          @if (sandboxUiUrl) {
+            <p class="sandbox-lead">
+              <a [href]="sandboxUiUrl" class="sandbox-link" target="_blank" rel="noopener noreferrer">Open Spectra Sandbox</a>
+              — authenticated developer UI (<code>sandbox-ui</code>): create integrations, mint short-lived M2M tokens
+              for testing, and jump to public Swagger.
+            </p>
+          } @else {
+            <p class="stub">Configure <code>sandboxUiUrl</code> in this environment to enable the Sandbox link.</p>
+          }
+          <ol class="doc-steps">
+            <li>Sign in to the sandbox with your Spectra developer account (Auth0).</li>
+            <li>Create an <strong>Integration</strong> and note the <code>client_id</code>; store the <code>client_secret</code> securely.</li>
+            <li>
+              Use <strong>Get access token</strong> in the dashboard to mint a bearer token, or call
+              <code>POST /oauth/token</code> on the auth service with <code>client_credentials</code> from your own
+              backend in production.
+            </li>
+            <li>
+              Open public <code>/docs</code> on the gateway, choose <strong>Authorize</strong>, paste
+              <code>Bearer &lt;access_token&gt;</code>, and invoke a documented operation.
+            </li>
+          </ol>
+          <p>
+            If your sandbox UI calls a private API host but Swagger must open on the public gateway, set
+            <code>SANDBOX_UI_PUBLIC_API_DOCS_BASE_URL</code> in <code>sandbox-ui</code> (see
+            <code>apps/sandbox-ui/docs/auth0.md</code>).
+          </p>
+        }
+        @case ('integrations') {
+          <p>
+            <strong>Integrations</strong> are server-to-server OAuth2 clients you register in the Spectra developer
+            sandbox. Each integration has a <code>client_id</code> and <code>client_secret</code> used with the
+            <code>client_credentials</code> grant to obtain access tokens for calling Spectra APIs from your backends
+            and automation—without an interactive user login.
+          </p>
+          <p>
+            Tokens are minted by Spectra's auth service and are separate from end-user sessions (for example Auth0
+            access tokens used in the sandbox UI). You choose a display name, optional description, and which
+            <strong>scopes</strong> the client is allowed to request; those scopes limit what the issued token can do
+            at the API edge.
+          </p>
+          <p>
+            Create and manage integrations from the developer dashboard after you sign in to the sandbox. Legacy
+            <em>sandbox applications</em> (redirect-based OAuth clients) may be shown or hidden by your organization's
+            settings; integrations are the supported path for machine-to-machine API access.
+          </p>
+          <p><strong>Choosing Integrations vs sandbox applications</strong></p>
+          <ul class="doc-steps">
+            <li>
+              <strong>Integration (recommended for backends):</strong> <code>client_credentials</code> — no interactive
+              user; your server calls Spectra with a minted JWT scoped to your org.
+            </li>
+            <li>
+              <strong>Sandbox application (when enabled):</strong> OAuth2 app with redirect URIs — for
+              <strong>user-delegated</strong> flows where a person signs in through your product.
+            </li>
+            <li>If “Add an application” is missing, your org has disabled legacy sandbox apps — use integrations only.</li>
+          </ul>
+        }
+        @case ('authorization') {
+          <p>Spectra uses several distinct credentials; only one applies per request:</p>
+          <ul>
+            <li>
+              <strong>Portal session (Auth0)</strong> — When you use <code>sandbox-ui</code>, the SPA obtains an Auth0
+              access token to call <code>/v1/platform/sandbox/...</code> portal APIs. That token is <em>not</em> the same
+              as an M2M token for your integration.
+            </li>
+            <li>
+              <strong>Integration (M2M)</strong> — <code>client_id</code> + <code>client_secret</code> with grant type
+              <code>client_credentials</code> against the token endpoint documented for your deployment. Use the
+              resulting JWT as <code>Authorization: Bearer</code> when calling Spectra product APIs.
+            </li>
+            <li>
+              <strong>Sandbox applications</strong> — When your org enables them, OAuth2-style apps with redirect URIs
+              are for <strong>user-delegated</strong> flows (authorization code). Use them when the resource owner is a
+              person signing in through your app—not for unattended server jobs.
+            </li>
+          </ul>
+          <p>
+            Typing a <code>client_secret</code> into the sandbox “mint token” dialog is convenient for development; for
+            production traffic, mint tokens only from your secure servers. Rotate or revoke a leaked secret
+            immediately from the integration detail page.
+          </p>
+          @if (oauthMetadataUrl(); as meta) {
+            <p>
+              Machine clients can discover the token and JWKS endpoints from
+              <a [href]="meta" target="_blank" rel="noopener noreferrer">OAuth Authorization Server metadata</a>
+              (<code>GET /.well-known/oauth-authorization-server</code> on auth-api).
+            </p>
+          }
+        }
+        @case ('consuming-the-data') {
+          <p>
+            API responses are scoped to the organization tied to your integration or user token. Pagination, sorting,
+            and field selection follow each operation’s OpenAPI parameters where defined.
+          </p>
+          <p>
+            See also the <a routerLink="/data">Data</a> section of this site for conceptual overviews of platform
+            entities. Prefer <strong>read</strong> operations first when validating connectivity.
+          </p>
+        }
+        @case ('calling-the-api') {
+          <p>
+            Send <code>Authorization: Bearer &lt;access_token&gt;</code> on each request unless an operation explicitly
+            documents otherwise. Use the gateway base URL provided for your environment (for local development, the
+            unified edge is often <code>http://127.0.0.1:3000</code>).
+          </p>
+          <p>
+            If you open Swagger UI in a <strong>browser</strong> while the API lives on another origin, ensure CORS is
+            configured on the gateway for that origin; otherwise use curl, Postman, or server-side calls.
+          </p>
+          <p>
+            Include correlation identifiers when you have them (for example <code>X-Request-Id</code> if returned by
+            the gateway) so support can trace a call end-to-end.
+          </p>
+          <p><strong>Common HTTP errors</strong></p>
+          <ul class="doc-steps">
+            <li><code>401</code> — Missing or invalid bearer token, or expired session (portal vs M2M: check which credential you sent).</li>
+            <li><code>403</code> — Authenticated but not allowed (scopes, org, or feature flag).</li>
+            <li><code>429</code> — Rate limited; back off and retry per response hints.</li>
+            <li>
+              <code>503</code> with <code>auth_unavailable</code> (or similar) — Auth dependency temporarily unavailable;
+              see dedicated API status when published (v1 program requirement — not only corporate marketing status).
+            </li>
+          </ul>
+          <p>
+            <strong>Portal vs data API:</strong> JSON from <code>/v1/platform/sandbox/...</code> may use different
+            <code>error</code> / <code>message</code> shapes than public product routes; treat them separately in client
+            logging. See <code>docs/sandbox-portal.md</code> in the repository for sandbox portal behavior.
+          </p>
+        }
+        @case ('optimizing-your-application') {
+          <p>
+            Cache discovery responses where appropriate, respect <code>429</code> backoff hints, and request only the
+            scopes you need—broader scopes increase blast radius if a credential leaks.
+          </p>
+          <p>Prefer idempotent retries only for operations documented as idempotent.</p>
+        }
+        @case ('implementation-guides') {
+          <p>
+            Language-specific guides will expand here. Until then, generate a client from <code>openapi.json</code> with
+            your preferred OpenAPI generator, or start from curl examples in the Swagger descriptions.
+          </p>
+        }
+        @default {
+          <p class="stub">Unknown section.</p>
+        }
+      }
+    </section>
+  }
+</div>

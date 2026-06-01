@@ -5,7 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { docsNavItems } from '../layout/site-nav';
 import { environment } from '../../environments/environment';
@@ -14,55 +14,8 @@ import { environment } from '../../environments/environment';
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
   selector: 'spectra-docs-page',
-  template: `
-    <div class="spectra-page docs-page">
-      <h1>API Documentation</h1>
-      <p class="lede">
-        Guides for discovering Spectra APIs, using the developer sandbox, and integrating your systems. Use the
-        header menu to jump to a section.
-      </p>
-
-      @for (item of docsNavItems; track item.fragment) {
-        <section class="doc-section" [id]="item.fragment">
-          <h2>{{ item.label }}</h2>
-          @if (item.fragment === 'get-started-with-sandbox') {
-            @if (sandboxUiUrl) {
-              <p class="sandbox-lead">
-                <a [href]="sandboxUiUrl" class="sandbox-link" target="_blank" rel="noopener noreferrer"
-                  >Open Spectra Sandbox</a
-                >
-                — authenticated developer UI (<code>sandbox-ui</code>).
-              </p>
-            } @else {
-              <p class="stub">Configure <code>sandboxUiUrl</code> in this environment to enable the Sandbox link.</p>
-            }
-          }
-          @if (item.fragment === 'integrations') {
-            <p>
-              <strong>Integrations</strong> are server-to-server OAuth2 clients you register in the Spectra developer
-              sandbox. Each integration has a <code>client_id</code> and <code>client_secret</code> used with the
-              <code>client_credentials</code> grant to obtain access tokens for calling Spectra APIs from your backends
-              and automation — without an interactive user login.
-            </p>
-            <p>
-              Tokens are minted by Spectra's auth service and are separate from end-user sessions (for example Auth0
-              access tokens used in the sandbox UI). You choose a display name, optional description, and which
-              <strong>scopes</strong> the client is allowed to request; those scopes limit what the issued token can do
-              at the API edge.
-            </p>
-            <p>
-              Create and manage integrations from the developer dashboard after you sign in to the sandbox. Legacy
-              <em>sandbox applications</em> (redirect-based OAuth clients) may be shown or hidden by your organization's
-              settings; integrations are the supported path for machine-to-machine API access.
-            </p>
-          }
-          @if (item.fragment !== 'integrations') {
-            <p class="stub">Content coming soon.</p>
-          }
-        </section>
-      }
-    </div>
-  `,
+  imports: [RouterLink],
+  templateUrl: './docs-page.component.html',
   styles: `
     .docs-page {
       padding-bottom: 4rem;
@@ -100,21 +53,59 @@ import { environment } from '../../environments/environment';
       text-decoration: none;
     }
 
-    .sandbox-link:hover {
+    .sandbox-link:hover:not(.disabled) {
       color: var(--spectra-color-accent-hover);
       text-decoration: underline;
+    }
+
+    .sandbox-link.disabled {
+      pointer-events: none;
+      color: var(--spectra-color-muted);
+      cursor: default;
     }
 
     .lede a {
       color: var(--spectra-color-link);
     }
+
+    .doc-steps {
+      margin: 0.5rem 0 1rem;
+      padding-left: 1.25rem;
+      color: var(--spectra-color-panel-text);
+      line-height: 1.55;
+    }
+
+    .meta-line {
+      margin: 0.75rem 0 0;
+      font-size: 0.9rem;
+      color: var(--spectra-color-text);
+    }
+
+    .meta-line .label {
+      display: block;
+      font-weight: 600;
+      color: var(--spectra-color-muted);
+      margin-bottom: 0.2rem;
+    }
   `,
 })
 export class DocsPageComponent implements AfterViewInit {
   protected readonly docsNavItems = docsNavItems;
-  protected readonly sandboxUiUrl = environment.sandboxUiUrl;
+  protected readonly sandboxUiUrl = environment.sandboxUiUrl?.trim() || '';
 
   private readonly router = inject(Router);
+
+  /** Non-empty when this build knows a gateway origin (e.g. local dev). */
+  protected apiGatewayOrigin(): string {
+    return environment.apiBaseUrl?.replace(/\/$/, '') ?? '';
+  }
+
+  /** OAuth 2.0 Authorization Server metadata on auth-api (RFC 8414). */
+  protected oauthMetadataUrl(): string | null {
+    const b = environment.authApiPublicBaseUrl?.trim();
+    if (!b) return null;
+    return `${b.replace(/\/$/, '')}/.well-known/oauth-authorization-server`;
+  }
 
   constructor() {
     this.router.events

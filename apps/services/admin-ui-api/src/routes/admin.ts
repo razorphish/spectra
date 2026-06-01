@@ -11,6 +11,7 @@ import {
 import { requireAuth0AccessToken } from '../lib/auth';
 import { registerAdminAuthPlatformRoutes } from './admin-auth-platform';
 import { registerAdminAviateOpenApiRoutes } from './admin-aviate-openapi';
+import { registerAdminIntegrationsRoutes } from './admin-integrations';
 import { createAdminMeSyncHandler } from './admin-me-sync';
 import { registerAdminLoggingRoutes } from './admin-logging';
 import { registerAdminMigrationsRoutes } from './admin-migrations';
@@ -76,6 +77,7 @@ export function createAdminRouter() {
   r.post('/me/sync', requireAuth0AccessToken, meSync);
   registerAdminAuthPlatformRoutes(r);
   registerAdminAviateOpenApiRoutes(r);
+  registerAdminIntegrationsRoutes(r);
   registerAdminLoggingRoutes(r);
   registerAdminMigrationsRoutes(r);
   registerAdminNavVisibilityRoutes(r);

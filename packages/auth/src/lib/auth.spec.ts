@@ -22,9 +22,8 @@ describe('createRequireAuth0AccessToken', () => {
         this.body = payload;
         return this;
       },
-    } as Parameters<typeof handler>[1];
-
-    await handler(req, res, () => undefined);
+    };
+    await handler(req, res as unknown as Parameters<typeof handler>[1], () => undefined);
 
     expect(res.statusCode).toBe(503);
 

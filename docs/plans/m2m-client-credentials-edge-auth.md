@@ -12,6 +12,7 @@
 | **Phase 4 — edge (Node)** | **Implemented in main** — dual-issuer auth in **`@spectra/auth`** ([`require-spectra-access-token.ts`](../../packages/auth/src/lib/require-spectra-access-token.ts)); aviate-api M2M verify + status cache behind **`M2M_VERIFY_ENABLED_AVIATE_API`**; tier **(c)** sandbox router does not accept M2M; scope enforcement from emitted **`scope-map.json`**. |
 | **OpenAPI tiers + polyglot verify** | **Partial** — public vs authenticated OpenAPI and CI↔map checks evolve incrementally (ADR notes); full Go / Python / .NET verifiers + contract matrix deferred per ADR. |
 | **Phase 5 — integrator docs** | **Partial** — e.g. curl + env notes in [`apps/sandbox-ui/docs/auth0.md`](../../apps/sandbox-ui/docs/auth0.md); expand as GA approaches. |
+| **Admin UI — staff M2M audit** | **Implemented in main** — **Platform → Integrations** in [`apps/admin-ui`](../../apps/admin-ui) (`/integrations`, detail + Activity/Audit tab, export); **Settings → Logging → M2M token activity** supplement; APIs in [`admin-ui-api`](../../apps/services/admin-ui-api) `GET /v1/admin/integrations*`, `GET /v1/admin/m2m/token-activity` with Auth0 permissions `platform:integrations:read` / `platform:integrations:export` (see [`apps/admin-ui/docs/auth0.md`](../../apps/admin-ui/docs/auth0.md)). |
 | **Phase 6 — hardening + GA** | **Ongoing** — use [`m2m-ga-checklist.md`](./m2m-ga-checklist.md); production mint/verify remain **off** until that ordering and ops sign-off. |
 
 **Normative spec:** The rest of this document remains the **contract** (wire format, errors, revocation Option C, flags). **“Implemented”** here means **code on main**, not necessarily **production GA** (flags and checklist).
@@ -319,19 +320,25 @@ Normative **layers** (why split: a single “mega audit” table mixes **high-vo
 
 Control-plane **`ActorRef`** is **`{ name: string; userId: string | null }`** ([`packages/database/src/lib/actor.ts`](../../packages/database/src/lib/actor.ts)); JSON columns store that shape. **`userId`** set when a human actor is known; service paths use **`userId: null`** and a stable **`name`** (e.g. `SYSTEM`, `auth-api`). **Issuance log** uses **NOT NULL** `created_by` — **no null actor** on new rows. Audit UI shows **`name`** + masked identifier for **`userId`** when present; for service actors, display a **system** label.
 
-### Staff visibility (admin UI)
+### 4. Staff visibility (admin UI) — normative placement
 
-**Primary (target UX):** New **Integrations** / **Platform integrations** area in [admin-ui](../../apps/admin-ui) — cross-tenant list/search and **integration detail** with an **Activity / Audit** tab: issuance history (from `m2m_token_issuance_log`), lifecycle context, export for **`platform:integrations:export`**. APIs via **admin-ui-api** (staff Auth0 session + permission checks), not direct browser calls to auth-api / aviate-api.
+<span id="staff-visibility-admin-ui"></span>
 
-**Activity / Audit tab (minimal spec):** **Read-only** for all GA staff roles; default sort **newest first**; filters **date range** + **actor** where data exists; **cursor or offset pagination** (default page size **50**, max **200**); no inline edits. Follow existing admin-ui table patterns where possible ([Settings → Logging](../../apps/admin-ui/src/app/views/settings/logging-page/logging-page.html) as a loose visual reference — first-class M2M audit may be the first dedicated integration-audit surface).
+**Audience:** **Engineering and design** share this placement as the single normative answer for where staff see M2M audit data, aligned with GA audit RBAC: **`platform:integrations:read`** (view / search / detail) and **`platform:integrations:export`** (compliance export). See [RBAC names (GA audit)](#rbac-names-ga-audit).
+
+**Recommended (primary):** A dedicated **Integrations** (or **Platform integrations**) area in [admin-ui](../../apps/admin-ui) — **top-level nav** or a **Platform** nav group — **not** as the **only** home under **Settings → General**. **Settings → General** ([`general-settings-page`](../../apps/admin-ui/src/app/views/settings/general-settings-page/general-settings-page.ts)) stays the right surface for **platform-wide toggles** and **JWT clock skew–style** configuration; it is the wrong **primary** home for cross-tenant integration security audit (operators would conflate “platform config” with “who minted what for which integration”).
+
+That **Integrations** experience should support **cross-tenant list/search**, **integration detail**, and an **Activity / Audit** tab containing: **issuance** rows (`spectra.m2m_token_issuance_log`), **lifecycle** context (`created_by` / `updated_by` and status transitions on `integrations` / `m2m_oauth_clients`), and **export** for compliance (**`platform:integrations:export`**). **Wire future APIs through admin-ui-api** (staff Auth0 session + permission checks), **not** direct browser calls to **aviate-api** or **auth-api**.
+
+**Activity / Audit tab (minimal spec):** **Read-only** for all GA staff roles; default sort **newest first**; filters **date range** + **actor** where data exists; **cursor or offset pagination** (default page size **50**, max **200**); no inline edits. Follow existing admin-ui table patterns where possible ([Settings → Logging](../../apps/admin-ui/src/app/views/settings/logging-page/logging-page.html) as a loose visual reference only — first-class M2M audit is expected to be the first dedicated integration-audit surface).
 
 **Interim (until routes + UI exist):** Staff use **DB read replica / SQL** with RBAC governance, **log/metric backends**, and a **named runbook** (add link when published) for mint failures and lockouts; do not assume Admin UI is the only GA audit path.
 
-**Optional:** A supplemental tab under **Settings → Logging** for “M2M token activity” — secondary to the Integrations home above ([`logging-page`](../../apps/admin-ui/src/app/views/settings/logging-page/logging-page.html) remains **`application_logs`**-centric).
+**Optional (secondary):** A supplemental tab under **Settings → Logging** ([`logging-page`](../../apps/admin-ui/src/app/views/settings/logging-page/logging-page.html)) — e.g. **“M2M token activity”** — **only** as a supplement to the Integrations home above. **Logging** today targets **`application_logs`**-style trails via **`/v1/admin/logs`**; if M2M-specific history lived **only** there, operators would confuse generic admin application logs with **integration security audit**. Keep M2M’s **primary** narrative on **Integrations**.
 
 **Menu wiring:** When routes exist, extend [menuItems](../../apps/admin-ui/src/app/layouts/components/data.ts) (and [settings.route.ts](../../apps/admin-ui/src/app/views/settings/settings.route.ts) or a new `integrations.route.ts`) and respect existing **nav visibility** patterns if used (`/v1/admin/nav-sidebar-visibility` per admin-ui-api OpenAPI).
 
-**Non-goal for normative plan text:** Implementing admin-ui pages or new admin-ui-api routes is a **follow-up engineering task** once APIs exist; this section defines **product placement and UX** only.
+**Non-goal (this plan change set):** **No** admin-ui pages and **no** new admin-ui-api routes — this subsection is **normative guidance only**; implementation is a **follow-up** task once APIs exist.
 
 ### Token endpoint: `scope` request parameter
 
@@ -810,6 +817,7 @@ The ADR **must** still define at minimum:
 | M2M scope → route map (MVP)                          | [packages/auth/src/lib/scope-map.ts](../../packages/auth/src/lib/scope-map.ts) + emitted **`packages/auth/dist/scope-map.json`** via **`nx run auth:emit-scope-map`** per [ADR](../adr/m2m-client-credentials-phase0.md); **CI** / contract script per [Scope management](#scope-management-m2m) and [Decisions](#decisions-phase-0-lock) row 9 |
 | Sandbox portal (apps, secrets, rotate)               | [sandbox-portal.ts](../../apps/services/aviate-api/src/routes/sandbox-portal.ts) — includes **Integration** / M2M client lifecycle alongside legacy applications                                                                                                                      |
 | OAuth / Integration schema                           | [control-plane.ts](../../packages/database/src/schema/control-plane.ts) — **`integrations`**, **`m2m_oauth_clients`**, **`m2m_token_issuance_log`**, etc. (MVP M2M separate from legacy `applications` / `oauthClients`) |
+| Admin UI — staff M2M audit (Integrations + Logging tab) | [`apps/admin-ui`](../../apps/admin-ui) — `/integrations`, export; [`admin-integrations.ts`](../../apps/services/admin-ui-api/src/routes/admin-integrations.ts) |
 | M2M auditing model + staff UI (normative)            | This document — [M2M auditing model](#m2m-auditing-model), [Staff visibility (admin UI)](#staff-visibility-admin-ui) |
 | Sandbox UI secret handling                           | `apps/sandbox-ui/src/app/pages/application-form.page.ts`, `application-view.page.ts`                                                                                                                              |
 | Authenticated OpenAPI proxy + integration key        | [apps/services/admin-ui-api](apps/services/admin-ui-api) — proxy `GET /integration/openapi.json`, static key in platform secrets                                                                                  |

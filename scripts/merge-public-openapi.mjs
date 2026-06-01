@@ -183,6 +183,23 @@ for (const pathKey of Object.keys(publicLimited.paths)) {
 
 assertPublicLimitedNoDenylistedPaths(publicLimited);
 
+/** Every path in the public limited artifact must be explicitly `public` (defense in depth after audience filter). */
+function assertPublicLimitedAudiencePublicOnly(spec) {
+  const paths = spec.paths;
+  if (!paths || typeof paths !== 'object') return;
+  for (const pathKey of Object.keys(paths)) {
+    const item = /** @type {Record<string, unknown>} */ (paths[pathKey]);
+    const aud = getPathAudience(pathKey, item);
+    if (aud !== 'public') {
+      throw new Error(
+        `[openapi:merge] Public limited path "${pathKey}" has x-spectra-audience "${aud}"; only "public" is allowed in the customer catalog.`
+      );
+    }
+  }
+}
+
+assertPublicLimitedAudiencePublicOnly(publicLimited);
+
 const outDir = join(root, 'packages/openapi/dist');
 mkdirSync(outDir, { recursive: true });
 const integrationOut = join(outDir, 'spectra-integration-api.json');

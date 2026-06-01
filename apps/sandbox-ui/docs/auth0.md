@@ -21,7 +21,7 @@ Copy [apps/sandbox-ui/.env.example](../.env.example) to `apps/sandbox-ui/.env`:
 | `SANDBOX_UI_AUTH0_ENABLED` | `true` to enable Universal Login |
 | `SANDBOX_UI_AUTH0_DOMAIN` | Auth0 tenant host |
 | `SANDBOX_UI_AUTH0_CLIENT_ID` | SPA client ID |
-| `SANDBOX_UI_AUTH0_AUDIENCE` | Public API identifier |
+| `SANDBOX_UI_AUTH_API_PUBLIC_URL` | Optional. Public origin of **auth-api** for OAuth metadata links in the dashboard (defaults to `http://127.0.0.1:9100` in generated env when unset). |
 
 The header “Spectra” link uses `environment.spectraMarketingUrl` (`http://localhost:4200` in the development build for local `nx serve spectra-ui`; set in [environment.ts](../src/environments/environment.ts) for production when the marketing app is on another origin).
 
@@ -60,3 +60,5 @@ curl -sS -H "Authorization: Bearer $ACCESS_TOKEN" http://127.0.0.1:3001/v1/platf
 ```
 
 JWKS (local): `http://127.0.0.1:9100/.well-known/jwks.json` or via local-edge when `SPECTRA_AUTH_API_URL` points at auth-api.
+
+OAuth 2.0 Authorization Server metadata (RFC 8414): `GET http://127.0.0.1:9100/.well-known/oauth-authorization-server` — lists `issuer`, `token_endpoint`, `jwks_uri`, and supported grant types. The sandbox dashboard links this when `SANDBOX_UI_AUTH_API_PUBLIC_URL` is set (see env sync); default generated base is `http://127.0.0.1:9100`.

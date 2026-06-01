@@ -187,6 +187,88 @@
           </div>
         </ng-template>
       </li>
+      <li ngbNavItem="m2m">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#shield"></use>
+          </svg>
+          M2M token activity
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            <p class="text-muted small">
+              Supplemental view: successful token mint counts from
+              <code>m2m_token_issuance_log</code>. Primary audit lives under
+              <strong>Platform → Integrations</strong>.
+            </p>
+            @if (m2mError(); as mErr) {
+              <div class="alert alert-danger" role="alert">{{ mErr }}</div>
+            }
+            <div class="row g-2 align-items-end mb-3">
+              <div class="col-auto">
+                <label class="form-label small" for="m2m-days">Window (days)</label>
+                <input
+                  id="m2m-days"
+                  type="number"
+                  class="form-control form-control-sm"
+                  style="max-width: 5rem"
+                  min="1"
+                  max="90"
+                  name="m2mWindowDays"
+                  [(ngModel)]="m2mWindowDays"
+                />
+              </div>
+              <div class="col-auto">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  (click)="loadM2mActivity()"
+                  [disabled]="m2mLoading()"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+            @if (m2mLoading()) {
+              <div class="text-muted py-3">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Loading…
+              </div>
+            } @else if (m2mActivity(); as m) {
+              <div class="card border shadow-sm mb-3">
+                <div class="card-body">
+                  <p class="mb-1">
+                    <strong>{{ m.totalIssuances }}</strong> issuances since
+                    <code class="small">{{ m.since }}</code> ({{ m.windowDays }}d window).
+                  </p>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                  <thead>
+                    <tr>
+                      <th>Organization</th>
+                      <th class="text-end">Issuances</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of m.byOrg; track row.orgId) {
+                      <tr>
+                        <td>{{ row.orgName }}</td>
+                        <td class="text-end font-monospace">{{ row.count }}</td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="2" class="text-muted">No rows.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </li>
       <li ngbNavItem="settings">
         <a ngbNavLink>
           <svg class="sa-icon me-2">

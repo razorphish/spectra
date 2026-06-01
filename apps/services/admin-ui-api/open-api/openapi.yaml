@@ -306,3 +306,146 @@ paths:
           description: Update failed
         '503':
           description: Database not configured
+  /v1/admin/integrations:
+    get:
+      tags: [Integrations]
+      summary: Cross-tenant M2M integrations list (staff)
+      description: |
+        Requires Auth0 access token with API permission `platform:integrations:read` (Auth0 RBAC).
+        Local dev only: with `AUTH0_VERIFY_DISABLED=true`, set `ADMIN_UI_API_DEV_GRANT_ALL_STAFF_PERMISSIONS=true` to bypass permission checks.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Search integration name, org name, client id, UUIDs
+        - in: query
+          name: orgId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Missing platform:integrations:read
+        '500':
+          description: Query failed
+        '503':
+          description: Database not configured
+  /v1/admin/integrations/{integrationId}:
+    get:
+      tags: [Integrations]
+      summary: Integration detail with org and active M2M client (no secrets)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: integrationId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Missing platform:integrations:read
+        '404':
+          description: Not found
+        '500':
+          description: Query failed
+        '503':
+          description: Database not configured
+  /v1/admin/integrations/{integrationId}/token-issuance:
+    get:
+      tags: [Integrations]
+      summary: Paginated token issuance log for an integration
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: integrationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Missing platform:integrations:read
+        '404':
+          description: Integration not found
+        '500':
+          description: Query failed
+        '503':
+          description: Database not configured
+  /v1/admin/integrations/{integrationId}/export:
+    get:
+      tags: [Integrations]
+      summary: Export integration audit (JSON or CSV issuance)
+      description: Requires `platform:integrations:export`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: integrationId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: format
+          schema: { type: string, enum: [json, csv], default: json }
+      responses:
+        '200':
+          description: Attachment body
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Missing platform:integrations:export
+        '404':
+          description: Not found
+        '500':
+          description: Export failed
+        '503':
+          description: Database not configured
+  /v1/admin/m2m/token-activity:
+    get:
+      tags: [Integrations]
+      summary: Issuance counts by org (supplemental metrics)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 1, maximum: 90, default: 7 }
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Missing platform:integrations:read
+        '500':
+          description: Query failed
+        '503':
+          description: Database not configured

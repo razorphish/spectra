@@ -95,6 +95,12 @@ export const menuItems: MenuItemType[] = [
     ],
   },
   {
+    label: 'Platform',
+    isCollapsed: true,
+    icon: '/assets/icons/sprite.svg#cpu',
+    children: [{ label: 'Integrations', url: '/integrations' }],
+  },
+  {
     isCollapsed: true,
     icon: '/assets/icons/sprite.svg#settings',
     label: 'Settings',

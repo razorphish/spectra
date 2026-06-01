@@ -80,6 +80,19 @@ Enable Auth0 in practice by setting `ADMIN_UI_AUTH0_ENABLED=true` plus non-empty
 - **Register entry:** Links use `/auth/register?auth0=signup` to open Universal Login with **`screen_hint: signup`** (Auth0 hosted sign-up). Enable **sign ups** on your Database connection (Authentication → Database → connection → **Disable Sign Ups** off). If `screen_hint` does not show sign-up in your tenant’s New Universal Login experience, verify Auth0 docs for your login flow version.
 - **Auth0 disabled (local only):** the email/password form sets a **`sessionStorage`** flag via `AdminSessionService`. Logout clears it. Use Auth0 for any shared or deployed environment; the dev session is not a real auth boundary.
 
+## Integrations audit API (RBAC)
+
+Staff endpoints under **`/v1/admin/integrations`** and **`/v1/admin/m2m/token-activity`** require Auth0 **API Authorization** permissions on the same custom API as the SPA audience (`AUTH0_AUDIENCE`):
+
+| Permission | Purpose |
+| --- | --- |
+| `platform:integrations:read` | List/search integrations, detail, token issuance log, M2M activity tab |
+| `platform:integrations:export` | Download JSON/CSV export for an integration |
+
+Enable **RBAC** on the Auth0 API, create these permissions, add them to a **Role**, assign the role to staff users (or via an Action). The access token must include a `permissions` array (Auth0 default for RBAC).
+
+**Local dev without Auth0 RBAC:** with `AUTH0_VERIFY_DISABLED=true` on **admin-ui-api**, you may set `ADMIN_UI_API_DEV_GRANT_ALL_STAFF_PERMISSIONS=true` to bypass permission checks (never in shared environments).
+
 ## CI / staff deploy (`STAFF_API_URL`)
 
 The reusable workflow [.github/workflows/spectra-build-frontends.yml](../../../.github/workflows/spectra-build-frontends.yml) passes `STAFF_API_URL`. For **admin-ui** only, when the selected Angular configuration is `production`, the workflow:

@@ -33,6 +33,11 @@ export const VIEWS_ROUTES: Routes = [
       import('./settings/settings.route').then((m) => m.SETTINGS_ROUTES),
   },
   {
+    path: '',
+    loadChildren: () =>
+      import('./integrations/integrations.route').then((m) => m.INTEGRATIONS_ROUTES),
+  },
+  {
     path: 'blank-page',
     canActivate: [templateNavVisibilityGuard],
     component: BlankPage,

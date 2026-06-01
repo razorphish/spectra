@@ -36,7 +36,7 @@ import { footerColumns } from './site-nav';
             — try the authenticated developer UI.
           </p>
         }
-        <p class="footer-meta">© {{ year }} Spectra. Placeholder footer — content to be finalized.</p>
+        <p class="footer-meta">© {{ year }} CAMP Systems International, Inc.</p>
       </div>
     </footer>
   `,

@@ -5,6 +5,7 @@ import { environment } from '../../environments/environment';
 import {
   SandboxApplicationSummary,
   SandboxPortalService,
+  SandboxSession,
 } from '../services/sandbox-portal.service';
 
 type SandboxIntegrationSummary = {
@@ -40,6 +41,36 @@ type SandboxIntegrationSummary = {
           <button type="button" routerLink="/integrations/new" class="btn-add">New integration</button>
         </div>
       </header>
+
+      @if (!sessionError()) {
+        <section class="spectra-probe dash-context" aria-label="Sandbox context">
+          <p class="context-line">
+            <span class="env-badge">{{ customerSandboxLabel() }}</span>
+            @if (sandboxSession(); as sess) {
+              <span class="ctx-meta">
+                Signed in as <strong>{{ sess.email }}</strong>
+                · Org <code>{{ sess.orgId }}</code>
+              </span>
+            }
+          </p>
+          @if (swaggerDocsUrl(); as sw) {
+            <p class="context-swagger">
+              <strong>Public API reference:</strong>
+              <a [href]="sw" target="_blank" rel="noopener noreferrer">{{ sw }}</a>
+              <button type="button" class="linkish" (click)="copy(sw)">Copy URL</button>
+            </p>
+          }
+          <p class="context-path-hint">
+            <strong>Choose a path:</strong>
+            <strong>New integration</strong> for server-to-server <code>client_credentials</code>.
+            @if (developerApplicationsUiEnabled()) {
+              Use <strong>Add an application</strong> for redirect-based OAuth when a user signs in through your app.
+            } @else {
+              Sandbox applications are disabled for your org — use integrations for API access.
+            }
+          </p>
+        </section>
+      }
 
       @if (sessionError(); as se) {
         <p class="spectra-auth-error">{{ se }}</p>
@@ -358,6 +389,18 @@ type SandboxIntegrationSummary = {
             portal calls auth-api with <code>client_credentials</code> and shows the bearer token to paste into Swagger
             <strong>Authorize</strong>.
           </p>
+          <p class="modal-security-hint">
+            This runs in your browser: treat the machine as trusted. For production traffic, mint tokens only from
+            your own servers (never ship integration secrets to end-user devices). Rotate a leaked secret immediately
+            from the integration page; see Spectra API docs → Authorization and the M2M incident guidance in
+            <code>docs/plans/m2m-client-credentials-edge-auth.md</code>.
+          </p>
+          @if (oauthDiscoveryUrl(); as meta) {
+            <p class="modal-doc-hint">
+              OAuth 2.0 Authorization Server metadata (RFC 8414):
+              <a [href]="meta" target="_blank" rel="noopener noreferrer">{{ meta }}</a>
+            </p>
+          }
           <p class="modal-meta">
             <span class="modal-meta-label">Integration</span> {{ mintRow.name }} —
             <code class="modal-code">{{ mintRow.clientId }}</code>
@@ -399,6 +442,11 @@ type SandboxIntegrationSummary = {
                 <code>Authorization: Bearer …</code> in Swagger or curl.
               </p>
             }
+            @if (mintJwtPreview(); as jw) {
+              <p class="token-label">Token claims (debug)</p>
+              <pre class="token-jwt-preview">{{ jw }}</pre>
+              <p class="token-scope-hint">Decoded locally in your browser only — not sent to Spectra.</p>
+            }
             <button
               type="button"
               class="icon-btn icon-btn-accent token-copy-icon"
@@ -437,6 +485,78 @@ type SandboxIntegrationSummary = {
       .sandbox-dashboard {
         max-width: 56rem;
         padding-top: 1rem;
+      }
+      .dash-context {
+        margin-top: 1rem;
+        padding: 0.85rem 1rem;
+        font-size: 0.9rem;
+        line-height: 1.45;
+      }
+      .context-line {
+        margin: 0 0 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        align-items: center;
+      }
+      .env-badge {
+        display: inline-block;
+        padding: 0.2rem 0.55rem;
+        border-radius: var(--spectra-radius-sm);
+        background: var(--spectra-color-navy);
+        color: #e8edf4;
+        font-weight: 700;
+        font-size: 0.75rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .ctx-meta {
+        color: var(--spectra-color-panel-text);
+      }
+      .ctx-meta code {
+        font-size: 0.82rem;
+      }
+      .context-swagger {
+        margin: 0.35rem 0;
+        word-break: break-all;
+      }
+      .context-swagger a {
+        color: var(--spectra-color-panel-link);
+        font-weight: 600;
+      }
+      .context-path-hint {
+        margin: 0.5rem 0 0;
+        color: var(--spectra-color-muted);
+        font-size: 0.85rem;
+      }
+      .linkish {
+        margin-left: 0.5rem;
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--spectra-color-accent);
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: underline;
+        font: inherit;
+      }
+      .modal-security-hint {
+        margin: 0 0 0.75rem;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        color: var(--spectra-color-muted);
+      }
+      .token-jwt-preview {
+        margin: 0 0 0.5rem;
+        padding: 0.5rem 0.65rem;
+        max-height: 10rem;
+        overflow: auto;
+        font-size: 0.75rem;
+        line-height: 1.35;
+        border-radius: var(--spectra-radius-sm);
+        border: 1px solid var(--spectra-color-border);
+        background: var(--spectra-color-surface);
+        color: var(--spectra-color-text);
       }
       .dash-head {
         display: flex;
@@ -741,6 +861,20 @@ export class DashboardPageComponent {
   protected readonly mintBusy = signal(false);
   protected readonly mintTokenResult = signal<string | null>(null);
   protected readonly mintExpiresIn = signal<number | null>(null);
+  protected readonly mintJwtPreview = signal<string | null>(null);
+  protected readonly sandboxSession = signal<SandboxSession | null>(null);
+
+  protected readonly customerSandboxLabel = computed(() => {
+    const label = environment.customerSandboxLabel?.trim();
+    if (label) return label;
+    return environment.production ? 'Production' : 'Local';
+  });
+
+  protected readonly oauthDiscoveryUrl = computed(() => {
+    const b = environment.authApiPublicBaseUrl?.trim();
+    if (!b) return null;
+    return `${b.replace(/\/$/, '')}/.well-known/oauth-authorization-server`;
+  });
 
   /** Marketing site API docs — `#integrations` section (requires `spectraMarketingUrl`). */
   protected readonly integrationsDocHref = computed(() => {
@@ -760,6 +894,7 @@ export class DashboardPageComponent {
   constructor() {
     this.api.session().subscribe({
       next: (s) => {
+        this.sandboxSession.set(s);
         const enabled = s.developerApplicationsUiEnabled === true;
         this.developerApplicationsUiEnabled.set(enabled);
         this.sessionError.set(null);
@@ -774,6 +909,7 @@ export class DashboardPageComponent {
         this.sessionError.set(e instanceof Error ? e.message : 'Failed to load session');
         this.loading.set(false);
         this.developerApplicationsUiEnabled.set(false);
+        this.sandboxSession.set(null);
       },
     });
     void this.loadIntegrations();
@@ -828,6 +964,7 @@ export class DashboardPageComponent {
     this.mintErr.set(null);
     this.mintTokenResult.set(null);
     this.mintExpiresIn.set(null);
+    this.mintJwtPreview.set(null);
     this.mintSecret.set('');
     this.mintScope.set(row.grantedScopes?.trim() || 'platform:read');
     this.pendingMint.set(row);
@@ -840,6 +977,7 @@ export class DashboardPageComponent {
     this.mintSecret.set('');
     this.mintTokenResult.set(null);
     this.mintExpiresIn.set(null);
+    this.mintJwtPreview.set(null);
   }
 
   protected confirmMintToken(): void {
@@ -860,6 +998,7 @@ export class DashboardPageComponent {
           this.mintBusy.set(false);
           this.mintTokenResult.set(res.access_token);
           this.mintExpiresIn.set(typeof res.expires_in === 'number' ? res.expires_in : null);
+          this.mintJwtPreview.set(formatMintJwtPreview(res.access_token));
         },
         error: (e: unknown) => {
           this.mintBusy.set(false);
@@ -945,5 +1084,24 @@ export class DashboardPageComponent {
     void navigator.clipboard.writeText(
       'Client secret is only shown once when you create the application. Rotate flow not implemented.',
     );
+  }
+}
+
+function formatMintJwtPreview(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const seg = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = seg.length % 4;
+    const padded = pad ? seg + '='.repeat(4 - pad) : seg;
+    const json = JSON.parse(atob(padded)) as Record<string, unknown>;
+    const keys = ['iss', 'aud', 'sub', 'scope', 'exp', 'iat', 'client_id', 'org_id', 'integration_id'];
+    const lines: string[] = [];
+    for (const k of keys) {
+      if (k in json) lines.push(`${k}: ${JSON.stringify(json[k])}`);
+    }
+    return lines.length ? lines.join('\n') : null;
+  } catch {
+    return null;
   }
 }

@@ -17,7 +17,12 @@ import {
 
 import { isKnownM2mScope } from '@spectra/auth';
 
-import { mintM2mAccessJwt, loadM2mSigningMaterial, resolvedAudience, resolvedIssuer } from './lib/m2m-jwt';
+import {
+  mintM2mAccessJwt,
+  loadM2mSigningMaterial,
+  resolvedAudience,
+  resolvedIssuer,
+} from './lib/m2m-jwt';
 import { verifyClientSecret } from './lib/verify-scrypt';
 
 function workspaceRoot(): string {
@@ -224,6 +229,24 @@ const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json({ limit: '32kb' }));
 
+/** RFC 8414 OAuth 2.0 Authorization Server Metadata (subset for client_credentials only). */
+app.get('/.well-known/oauth-authorization-server', (req, res) => {
+  const issuer = resolvedIssuer();
+  const xfProto = req.get('x-forwarded-proto');
+  const proto = (xfProto && xfProto.split(',')[0]?.trim()) || req.protocol || 'http';
+  const hdrHost = req.get('host');
+  const effectiveHost = hdrHost || `${host}:${port}`;
+  const base = `${proto}://${effectiveHost}`.replace(/\/$/, '');
+  res.json({
+    issuer,
+    token_endpoint: `${base}/oauth/token`,
+    jwks_uri: `${base}/.well-known/jwks.json`,
+    grant_types_supported: ['client_credentials'],
+    token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post'],
+    scopes_supported: ['platform:read'],
+  });
+});
+
 app.get('/.well-known/jwks.json', async (_req, res) => {
   try {
     const { publicJwk } = await loadM2mSigningMaterial();
@@ -239,7 +262,12 @@ app.post('/oauth/token', (req, res, next) => {
 });
 
 app.get('/', (_req, res) => {
-  res.json({ service: 'auth-api', oauth: '/oauth/token', jwks: '/.well-known/jwks.json' });
+  res.json({
+    service: 'auth-api',
+    oauth: '/oauth/token',
+    jwks: '/.well-known/jwks.json',
+    oauth_authorization_server_metadata: '/.well-known/oauth-authorization-server',
+  });
 });
 
 app.use(
