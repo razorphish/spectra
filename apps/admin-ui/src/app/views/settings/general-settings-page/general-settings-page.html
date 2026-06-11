@@ -1,5 +1,5 @@
 <div class="main-content">
-  <div class="container-xl py-4">
+  <div class="container-fluid py-4">
     <app-page-breadcrumb
       title="General"
       subTitle1="Settings"
@@ -128,6 +128,83 @@
                       Reload
                     </button>
                   </div>
+                </div>
+              </div>
+              <div class="card shadow-sm border mt-4">
+                <div class="card-body">
+                  <h6 class="fw-semibold mb-2">Sandbox AI — custom endpoints</h6>
+                  <p class="text-muted small mb-3">
+                    Gates sandbox portal AI routes and tenant-runtime invoke. Keys
+                    <code>sandbox.ai.*</code> in <code>spectra.platform_settings</code>.
+                  </p>
+                  @if (sandboxAiSaveError(); as se) {
+                    <div class="alert alert-danger" role="alert">{{ se }}</div>
+                  }
+                  @if (sandboxAiLoading()) {
+                    <div class="text-muted py-2">
+                      <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                      Loading sandbox AI flags…
+                    </div>
+                  } @else {
+                    <div class="form-check form-switch mb-2">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="sandbox-ai-enabled"
+                        [checked]="sandboxAiEndpointsEnabled()"
+                        (change)="sandboxAiEndpointsEnabled.set($any($event.target).checked)"
+                      />
+                      <label class="form-check-label" for="sandbox-ai-enabled">Endpoints enabled</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="sandbox-ai-precheck"
+                        [checked]="sandboxAiPrecheckEnabled()"
+                        (change)="sandboxAiPrecheckEnabled.set($any($event.target).checked)"
+                      />
+                      <label class="form-check-label" for="sandbox-ai-precheck">Precheck enabled</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="sandbox-ai-auto"
+                        [checked]="sandboxAiAutomationEnabled()"
+                        (change)="sandboxAiAutomationEnabled.set($any($event.target).checked)"
+                      />
+                      <label class="form-check-label" for="sandbox-ai-auto">Approval automation enabled</label>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="sandbox-ai-machine"
+                        [checked]="sandboxAiMachineAutoApprove()"
+                        (change)="sandboxAiMachineAutoApprove.set($any($event.target).checked)"
+                      />
+                      <label class="form-check-label" for="sandbox-ai-machine">Machine auto-approve</label>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        class="btn btn-primary"
+                        (click)="saveSandboxAi()"
+                        [disabled]="sandboxAiLoading()"
+                      >
+                        Save sandbox AI flags
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        (click)="loadSandboxAi()"
+                        [disabled]="sandboxAiLoading()"
+                      >
+                        Reload
+                      </button>
+                    </div>
+                  }
                 </div>
               </div>
             }

@@ -3,7 +3,7 @@
  * @see docs/plans/m2m-client-credentials-edge-auth.md — Scope management (M2M)
  */
 
-export const SCOPE_MAP_VERSION = 1 as const;
+export const SCOPE_MAP_VERSION = 2 as const;
 
 /** Ordered: first match wins (prefer longer prefixes first in array order). */
 export const scopePathRules: readonly {
@@ -12,10 +12,15 @@ export const scopePathRules: readonly {
   readonly requiredScope: string;
 }[] = [
   { method: 'GET', pathPrefix: '/v1/platform/hello', requiredScope: 'platform:read' },
+  {
+    method: 'POST',
+    pathPrefix: '/v1/platform/tenant-runtime/endpoints',
+    requiredScope: 'custom_endpoints:invoke',
+  },
 ];
 
 /** Scopes that may appear on Integration / token ceiling (subset validated at mint). */
-export const KNOWN_M2M_SCOPES = ['platform:read'] as const;
+export const KNOWN_M2M_SCOPES = ['platform:read', 'custom_endpoints:invoke'] as const;
 
 export type KnownM2mScope = (typeof KNOWN_M2M_SCOPES)[number];
 

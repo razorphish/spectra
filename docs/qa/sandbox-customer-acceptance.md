@@ -30,3 +30,13 @@ Sandbox data must be **synthetic/subset**; staging is **PII-cleaned**; productio
 | Step | Action | Expected |
 |------|--------|----------|
 | 1 | `GET {auth-api}/.well-known/oauth-authorization-server` | JSON with `issuer`, `token_endpoint`, `jwks_uri`, `grant_types_supported`. |
+
+## Row C — Production access (PAR) v1 (baseline)
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 1 | Session/bootstrap includes `productionAccess*` flags from `platform_settings` | Booleans + SLA fields present when DB seeded (`0008` migration). |
+| 2 | `POST /v1/platform/sandbox/integrations/{id}/production-access-requests` with valid `documents.questionnaire` v1 | **201** + row id; **403** when `production_access.integrator_portal_enabled` is false. |
+| 3 | `GET /v1/platform/sandbox/integrations/{id}/production-access-request` | Latest row JSON for org-owned integration. |
+| 4 | `GET /v1/platform/sandbox/production-access/status-by-token/{any}` | **404** — no public token status (use authenticated portal). |
+| 5 | Staff `GET /v1/admin/production-access-requests` | **200** list when staff console enabled; **404** when disabled. |

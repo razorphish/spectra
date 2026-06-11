@@ -17,6 +17,28 @@ import { firstValueFrom } from 'rxjs';
   standalone: true,
   imports: [PageBreadcrumb, FormsModule, RouterLink, DatePipe],
   templateUrl: './integrations-list-page.html',
+  styles: `
+    /* Match Settings → Migrations list row actions (migrations-list-panel) */
+    .integrations-list-styled i.sa {
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .integrations-list-styled .btn-sm i.sa {
+      font-size: 0.95rem;
+    }
+    .integrations-list-styled .migration-tn-actions .btn-xs {
+      min-width: 1.85rem;
+      padding-left: 0.35rem;
+      padding-right: 0.35rem;
+    }
+    .integrations-list-styled .migration-tn-actions .btn-xs i.sa {
+      font-size: 0.75rem;
+      line-height: 1;
+    }
+    .integrations-list-styled .migration-actions-col {
+      min-width: 4.5rem;
+    }
+  `,
 })
 export class IntegrationsListPage {
   private readonly api = inject(AdminIntegrationsApiService);

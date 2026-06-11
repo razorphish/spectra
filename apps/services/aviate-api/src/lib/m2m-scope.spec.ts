@@ -31,8 +31,9 @@ function openApiHasOperation(
 describe('M2M scope map (contract)', () => {
   it('matches snapshot for known scopes', () => {
     const snap = exportScopeMapForContract();
-    expect(snap.version).toBe(1);
+    expect(snap.version).toBe(2);
     expect(snap.knownScopes).toContain('platform:read');
+    expect(snap.knownScopes).toContain('custom_endpoints:invoke');
   });
 
   it('allows platform:read for GET /v1/platform/hello', () => {

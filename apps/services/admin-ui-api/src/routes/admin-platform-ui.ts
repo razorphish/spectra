@@ -2,6 +2,7 @@ import type { RequestHandler, Router } from 'express';
 import { eq } from 'drizzle-orm';
 
 import {
+  fetchSandboxAiPlatformSettings,
   getDb,
   parseDeveloperApplicationsUiEnabled,
   platformSettings,
@@ -70,7 +71,98 @@ const patchPlatformUi: RequestHandler = async (req, res) => {
   }
 };
 
+const getSandboxAiSettings: RequestHandler = async (_req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+  try {
+    const s = await fetchSandboxAiPlatformSettings(getDb());
+    res.json(s);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({ error: 'sandbox_ai_settings_read_failed', message });
+  }
+};
+
+const patchSandboxAiSettings: RequestHandler = async (req, res) => {
+  if (!resolveSpectraDatabaseUrl()) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+  const body = req.body as Record<string, unknown> | null;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'invalid_request', message: 'Expected JSON body.' });
+    return;
+  }
+  const db = getDb();
+  try {
+    if (typeof body['endpointsEnabled'] === 'boolean') {
+      await db
+        .insert(platformSettings)
+        .values({ key: 'sandbox.ai.endpoints_enabled', value: body['endpointsEnabled'] as never })
+        .onConflictDoUpdate({
+          target: platformSettings.key,
+          set: { value: body['endpointsEnabled'] as never },
+        });
+    }
+    if (body['defaultLlmModelId'] === null || typeof body['defaultLlmModelId'] === 'string') {
+      await db
+        .insert(platformSettings)
+        .values({
+          key: 'sandbox.ai.default_llm_model_id',
+          value: (body['defaultLlmModelId'] === null ? null : body['defaultLlmModelId']) as never,
+        })
+        .onConflictDoUpdate({
+          target: platformSettings.key,
+          set: { value: (body['defaultLlmModelId'] === null ? null : body['defaultLlmModelId']) as never },
+        });
+    }
+    if (body['defaultPricingProfileId'] === null || typeof body['defaultPricingProfileId'] === 'string') {
+      await db
+        .insert(platformSettings)
+        .values({
+          key: 'sandbox.ai.default_pricing_profile_id',
+          value: (body['defaultPricingProfileId'] === null ? null : body['defaultPricingProfileId']) as never,
+        })
+        .onConflictDoUpdate({
+          target: platformSettings.key,
+          set: { value: (body['defaultPricingProfileId'] === null ? null : body['defaultPricingProfileId']) as never },
+        });
+    }
+    for (const key of [
+      'precheckEnabled',
+      'approvalAutomationEnabled',
+      'machineAutoApproveEnabled',
+    ] as const) {
+      if (typeof body[key] === 'boolean') {
+        const rowKey =
+          key === 'precheckEnabled' ? 'sandbox.ai.precheck_enabled'
+          : key === 'approvalAutomationEnabled' ? 'sandbox.ai.approval_automation_enabled'
+          : 'sandbox.ai.machine_auto_approve_enabled';
+        await db
+          .insert(platformSettings)
+          .values({ key: rowKey, value: body[key] as never })
+          .onConflictDoUpdate({ target: platformSettings.key, set: { value: body[key] as never } });
+      }
+    }
+    const s = await fetchSandboxAiPlatformSettings(db);
+    res.json(s);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({ error: 'sandbox_ai_settings_write_failed', message });
+  }
+};
+
 export function registerAdminPlatformUiRoutes(r: Router): void {
   r.get('/platform/developer-portal-ui', requireAuth0AccessToken, getPlatformUi);
   r.patch('/platform/developer-portal-ui', requireAuth0AccessToken, patchPlatformUi);
+  r.get('/platform/sandbox-ai-settings', requireAuth0AccessToken, getSandboxAiSettings);
+  r.patch('/platform/sandbox-ai-settings', requireAuth0AccessToken, patchSandboxAiSettings);
 }

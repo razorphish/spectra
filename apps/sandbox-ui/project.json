@@ -50,6 +50,7 @@
         "styles": [
           "packages/shared-ui/src/styles/spectra-tokens.css",
           "packages/shared-ui/src/styles/spectra-patterns.css",
+          "packages/shared-ui/src/styles/spectra-forms.css",
           "apps/sandbox-ui/src/styles.css"
         ]
       },

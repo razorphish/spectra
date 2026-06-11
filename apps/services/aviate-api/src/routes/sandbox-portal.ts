@@ -6,6 +6,8 @@ import {
   applications,
   buildActorJson,
   CATALOG_IDS,
+  fetchProductionAccessPortalFlags,
+  fetchSandboxAiPlatformSettings,
   getDb,
   integrations,
   m2mOauthClients,
@@ -20,6 +22,9 @@ import {
   userDeveloperContext,
   users,
 } from '@spectra/database';
+
+import { createSandboxPortalProductionAccessRouter } from './sandbox-portal-par';
+import { createSandboxPortalAiRouter } from './sandbox-portal-ai';
 
 import {
   generateClientId,
@@ -89,7 +94,7 @@ const requireDeveloperApplicationsUi: RequestHandler = async (_req, res, next) =
   }
 };
 
-async function ensureSession(
+export async function ensureSession(
   sub: string,
   claims: Record<string, unknown>,
 ): Promise<{ userId: string; orgId: string; email: string } | null> {
@@ -115,6 +120,7 @@ async function ensureSession(
         email,
         authSubject: sub,
         statusId: CATALOG_IDS.status.active,
+        principalKindId: CATALOG_IDS.userPrincipal.portal,
         createdBy: actor(null),
         updatedBy: actor(null),
       })
@@ -216,7 +222,19 @@ const session: RequestHandler = async (req, res) => {
     return;
   }
   const developerApplicationsUiEnabled = await fetchDeveloperApplicationsUiEnabled();
-  res.json({ ...sessionRow, developerApplicationsUiEnabled });
+  const db = getDb();
+  const sandboxAiSettings = await fetchSandboxAiPlatformSettings(db);
+  const parFlags = await fetchProductionAccessPortalFlags(db);
+  res.json({
+    ...sessionRow,
+    developerApplicationsUiEnabled,
+    productionAccessIntegratorPortalEnabled: parFlags.productionAccessIntegratorPortalEnabled,
+    productionAccessStaffConsoleEnabled: parFlags.productionAccessStaffConsoleEnabled,
+    productionAccessIntegratorCredentialsUiEnabled: parFlags.productionAccessIntegratorCredentialsUiEnabled,
+    productionAccessReviewSlaBusinessDays: parFlags.productionAccessReviewSlaBusinessDays,
+    productionAccessReviewSlaDisclaimer: parFlags.productionAccessReviewSlaDisclaimer,
+    sandboxAiEndpointsEnabled: sandboxAiSettings.endpointsEnabled,
+  });
 };
 
 const listApplications: RequestHandler = async (req, res) => {
@@ -1247,6 +1265,7 @@ export function createSandboxPortalRouter(): Router {
   r.post('/integrations/:id/rotate-secret', rotateIntegrationSecret);
   r.post('/integrations/:id/mint-access-token', mintIntegrationAccessToken);
   r.delete('/integrations/:id', revokeIntegration);
+  r.use('/integrations/:integrationId', createSandboxPortalProductionAccessRouter(ensureSession));
 
   const applicationsRouter = Router();
   applicationsRouter.use(requireDeveloperApplicationsUi);
@@ -1257,6 +1276,8 @@ export function createSandboxPortalRouter(): Router {
   applicationsRouter.patch('/:id', patchApplication);
   applicationsRouter.delete('/:id', deleteApplication);
   r.use('/applications', applicationsRouter);
+
+  r.use(createSandboxPortalAiRouter(ensureSession));
 
   return r;
 }

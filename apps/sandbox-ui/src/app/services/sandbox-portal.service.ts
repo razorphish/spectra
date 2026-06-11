@@ -8,6 +8,13 @@ export type SandboxSession = {
   email: string;
   /** Staff-controlled via admin-ui → `sandbox_portal.developer_applications_ui_enabled`. */
   developerApplicationsUiEnabled?: boolean;
+  productionAccessIntegratorPortalEnabled?: boolean;
+  productionAccessStaffConsoleEnabled?: boolean;
+  productionAccessIntegratorCredentialsUiEnabled?: boolean;
+  productionAccessReviewSlaBusinessDays?: number;
+  productionAccessReviewSlaDisclaimer?: string | null;
+  /** Mirrors admin `sandbox.ai.endpoints_enabled`; omit or false hides Custom API nav. */
+  sandboxAiEndpointsEnabled?: boolean;
 };
 
 export type SandboxApplicationSummary = {
@@ -172,6 +179,26 @@ export class SandboxPortalService {
     }>(`${this.apiRoot()}/v1/platform/sandbox/integrations/${id}/mint-access-token`, body);
   }
 
+  getProductionAccessRequest(integrationId: string) {
+    return this.http.get<{
+      id: string;
+      statusId: string;
+      customerStatusMessage: string | null;
+      documents: unknown;
+      productionAccessReviewSlaBusinessDays: number;
+      productionAccessReviewSlaDisclaimer: string | null;
+      productionAccessIntegratorPortalEnabled: boolean;
+      productionAccessIntegratorCredentialsUiEnabled: boolean;
+    }>(`${this.apiRoot()}/v1/platform/sandbox/integrations/${integrationId}/production-access-request`);
+  }
+
+  submitProductionAccessRequest(integrationId: string, body: { documents: { questionnaire: Record<string, unknown> } }) {
+    return this.http.post<{ id: string; statusId: string; integrationId: string | null }>(
+      `${this.apiRoot()}/v1/platform/sandbox/integrations/${integrationId}/production-access-requests`,
+      body,
+    );
+  }
+
   initUpload(body: {
     orgId: string;
     applicationId?: string;
@@ -186,5 +213,75 @@ export class SandboxPortalService {
       presignedPutUrl: string;
       expiresAt: string;
     }>(`${this.apiRoot()}/v1/platform/uploads/init`, body);
+  }
+
+  ensureRuntimeTenant(body?: { externalTenantRef?: string }) {
+    return this.http.post<{
+      tenantId: string;
+      orgId: string;
+      externalTenantRef: string | null;
+      created: boolean;
+    }>(`${this.apiRoot()}/v1/platform/sandbox/runtime-tenants`, body ?? {});
+  }
+
+  listCustomAiEndpoints() {
+    return this.http.get<{
+      items: { id: string; slug: string; statusId: string; approvedProductionVersionId: string | null; createdAt: string }[];
+      tenantId: string | null;
+    }>(`${this.apiRoot()}/v1/platform/sandbox/ai-endpoints`);
+  }
+
+  createCustomAiEndpoint(body: { slug: string; userPrompt: string; modelId?: string }) {
+    return this.http.post<{ endpoint: { id: string }; version: unknown }>(
+      `${this.apiRoot()}/v1/platform/sandbox/ai-endpoints`,
+      body,
+    );
+  }
+
+  submitCustomEndpointApproval(endpointId: string) {
+    return this.http.post<{ requestId: string; status: string }>(
+      `${this.apiRoot()}/v1/platform/sandbox/ai-endpoints/${endpointId}/submit-approval`,
+      {},
+    );
+  }
+
+  getCustomEndpointApproval(endpointId: string) {
+    return this.http.get<{
+      endpointId: string;
+      approvedProductionVersionId: string | null;
+      request: unknown;
+    }>(`${this.apiRoot()}/v1/platform/sandbox/ai-endpoints/${endpointId}/approval`);
+  }
+
+  getCustomAiEndpoint(id: string) {
+    return this.http.get<{
+      endpoint: Record<string, unknown>;
+      versions: Record<string, unknown>[];
+    }>(`${this.apiRoot()}/v1/platform/sandbox/ai-endpoints/${id}`);
+  }
+
+  generateCustomAiEndpoint(id: string, body?: { userPrompt?: string }) {
+    return this.http.post<{ version: Record<string, unknown> }>(
+      `${this.apiRoot()}/v1/platform/sandbox/ai-endpoints/${id}/generate`,
+      body ?? {},
+    );
+  }
+
+  invokeCustomAiEndpointPreview(id: string, body: object, revision?: number) {
+    const q =
+      revision !== undefined && Number.isFinite(revision) ?
+        `?revision=${encodeURIComponent(String(revision))}`
+      : '';
+    return this.http.post<unknown>(`${this.apiRoot()}/v1/platform/sandbox/ai-endpoints/${id}/invoke${q}`, body, {
+      observe: 'response',
+      responseType: 'json',
+    });
+  }
+
+  /** Parsed OpenAPI 3.0.3 JSON for org-private merged paths (session auth). */
+  getMergedSandboxCustomEndpointsOpenApi() {
+    return this.http.get<Record<string, unknown>>(
+      `${this.apiRoot()}/v1/platform/sandbox/ai-endpoints/openapi`,
+    );
   }
 }

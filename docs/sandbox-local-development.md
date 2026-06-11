@@ -18,9 +18,17 @@ Copies `SANDBOX_UI_*` from `.env` / `apps/sandbox-ui/.env` into `environment.aut
 
 | Variable | Role |
 |----------|------|
-| `SANDBOX_UI_API_BASE_URL` | Gateway for portal + API calls (often `http://127.0.0.1:3000` via **local-edge**). |
+| `SANDBOX_UI_API_BASE_URL` | Gateway for portal + API calls (often `http://localhost:3000` via **local-edge**). Prefer **`localhost`** over `127.0.0.1` when using a **Windows** browser against APIs in **WSL2** (see CORS section below). |
 | `SANDBOX_UI_PUBLIC_API_DOCS_BASE_URL` | Optional: where **public** `/docs` lives if different from API host. Never use `/integration/docs` for customers. |
-| `SANDBOX_UI_AUTH_API_PUBLIC_URL` | Optional: public origin of **auth-api** for OAuth metadata links (defaults to `http://127.0.0.1:9100` in generated env). |
+| `SANDBOX_UI_AUTH_API_PUBLIC_URL` | Optional: public origin of **auth-api** for OAuth metadata links (defaults to `http://localhost:9100` in generated env). |
+
+### WSL2 + Windows browser (“CORS request did not succeed”, status null)
+
+Firefox and Chrome often report a **failed connection** (nothing listening on the target from the browser’s OS) as **“CORS request did not succeed”** with **no HTTP status**. Typical causes:
+
+1. **`SANDBOX_UI_API_BASE_URL` uses `http://127.0.0.1:…`** — on Windows, that is **Windows loopback**, not your WSL VM. Use **`http://localhost:3000`** (or the port you expose) so WSL’s localhost relay is used.
+2. **`HOST=127.0.0.1` on aviate-api** — binds only loopback inside Linux; remove it or set **`HOST=0.0.0.0`** so port forwarding can reach the process (aviate-api defaults to `0.0.0.0` when `HOST` is unset).
+3. **API not running** — confirm `nx serve aviate-api` / `npm run dev:apis` is up, then `curl -sS -o /dev/null -w '%{http_code}' http://localhost:3001/` from the **same machine as the browser** (e.g. Windows PowerShell).
 
 ## local-edge parity (M2M plan)
 
@@ -29,6 +37,8 @@ Copies `SANDBOX_UI_*` from `.env` / `apps/sandbox-ui/.env` into `environment.aut
 ## CORS and browser Swagger
 
 Swagger UI runs in the **browser**. If the OpenAPI “Try it” target origin differs from where Swagger is hosted, the gateway must allow **CORS** for that browser origin, or use **server-side** curl/Postman, or a **Try-it proxy** (Phase 4 embedded explorer).
+
+**aviate-api** allows all origins (`Access-Control-Allow-Origin: *`) and answers `OPTIONS` with **204** for sandbox portal development. If the browser still reports a CORS error with **HTTP status `(null)`**, treat it as a **connectivity** problem first (wrong host such as `127.0.0.1` from Windows to WSL, API not listening on `0.0.0.0`, or service down) — see the WSL2 subsection in the env table above.
 
 ## OpenAPI merge
 

@@ -38,6 +38,58 @@ export const VIEWS_ROUTES: Routes = [
       import('./integrations/integrations.route').then((m) => m.INTEGRATIONS_ROUTES),
   },
   {
+    path: 'platform/production-access',
+    canActivate: [templateNavVisibilityGuard],
+    loadComponent: () =>
+      import('./platform/production-access-list-page').then((m) => m.ProductionAccessListPage),
+    data: { title: 'Production access' },
+  },
+  {
+    path: 'platform/production-access/:id',
+    canActivate: [templateNavVisibilityGuard],
+    loadComponent: () =>
+      import('./platform/production-access-detail-page').then((m) => m.ProductionAccessDetailPage),
+    data: { title: 'Production access detail' },
+  },
+  {
+    path: 'platform/sandbox-ai-models',
+    loadComponent: () =>
+      import('./platform/sandbox-ai-models-list-page').then((m) => m.SandboxAiModelsListPage),
+    data: { title: 'Sandbox AI models' },
+  },
+  {
+    path: 'platform/pricing-profiles',
+    loadComponent: () =>
+      import('./platform/pricing-profiles-list-page').then((m) => m.PricingProfilesListPage),
+    data: { title: 'Pricing profiles' },
+  },
+  {
+    path: 'platform/custom-endpoints',
+    loadComponent: () =>
+      import('./platform/custom-endpoints-approval-list-page').then((m) => m.CustomEndpointsApprovalListPage),
+    data: { title: 'Custom endpoint approvals' },
+  },
+  {
+    path: 'platform/custom-endpoints/:id',
+    loadComponent: () =>
+      import('./platform/custom-endpoints-approval-detail-page').then(
+        (m) => m.CustomEndpointsApprovalDetailPage,
+      ),
+    data: { title: 'Custom endpoint approval' },
+  },
+  {
+    path: 'platform/runtime-tenants',
+    loadComponent: () =>
+      import('./platform/runtime-tenants-list-page').then((m) => m.RuntimeTenantsListPage),
+    data: { title: 'Runtime tenants' },
+  },
+  {
+    path: 'platform/runtime-tenants/:id',
+    loadComponent: () =>
+      import('./platform/runtime-tenants-detail-page').then((m) => m.RuntimeTenantsDetailPage),
+    data: { title: 'Runtime tenant' },
+  },
+  {
     path: 'blank-page',
     canActivate: [templateNavVisibilityGuard],
     component: BlankPage,

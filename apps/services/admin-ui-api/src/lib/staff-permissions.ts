@@ -3,6 +3,10 @@ import type { RequestHandler } from 'express';
 /** GA audit RBAC — namespaced Auth0 API permissions (see M2M plan §RBAC). */
 export const STAFF_PERMISSION_INTEGRATIONS_READ = 'platform:integrations:read';
 export const STAFF_PERMISSION_INTEGRATIONS_EXPORT = 'platform:integrations:export';
+export const STAFF_PERMISSION_SANDBOX_AI_MODELS_MANAGE = 'platform:sandbox_ai_models:manage';
+export const STAFF_PERMISSION_PRICING_PROFILES_MANAGE = 'platform:pricing_profiles:manage';
+export const STAFF_PERMISSION_CUSTOM_ENDPOINTS_REVIEW = 'platform:custom_endpoints:review';
+export const STAFF_PERMISSION_CUSTOM_ENDPOINTS_PRICING_OVERRIDE = 'platform:custom_endpoints:pricing_override';
 
 /**
  * Auth0 RBAC typically emits `permissions: string[]` on access tokens.

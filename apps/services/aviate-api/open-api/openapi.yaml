@@ -221,6 +221,32 @@ paths:
       x-spectra-testing: |
         curl -s -H "Authorization: Bearer $ACCESS_TOKEN" http://127.0.0.1:3000/v1/platform/hello
 
+  /v1/platform/tenant-runtime/endpoints/{slug}/invoke:
+    x-spectra-audience: public
+    post:
+      tags: [Tenant runtime]
+      summary: Invoke staff-approved custom endpoint (M2M)
+      description: |
+        M2M access token with scope `custom_endpoints:invoke` and JWT claim `tenant_id`.
+        Production invoke enforces PAR (GAP-3), pinned revision (GAP-2), and pricing parity (GAP-5).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invocation result
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Insufficient scope or policy denial
+        '404':
+          description: Endpoint not found
+
   /v1/platform/uploads/init:
     x-spectra-audience: internal
     post:

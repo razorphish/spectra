@@ -157,3 +157,185 @@
   font-size: 0.9rem;
   color: #dbe4f0;
 }
+
+/* —— Documentation-style layout (side nav | main | in-page TOC) ——
+   Inspired by common .gov developer doc patterns (e.g. CMS Blue Button API docs). */
+.spectra-doc-layout {
+  display: grid;
+  /* Narrow side rails so the main column uses more of the page within --spectra-max-width */
+  grid-template-columns: minmax(8.75rem, 10rem) minmax(0, 1fr) minmax(7.25rem, 8.75rem);
+  gap: 1rem 1.25rem;
+  align-items: start;
+  margin-top: 1.5rem;
+}
+
+.spectra-doc-sidebar {
+  position: sticky;
+  top: calc(var(--spectra-header-height, 3.5rem) + 1rem);
+  padding-right: 0.25rem;
+}
+
+.spectra-doc-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 3px solid var(--spectra-color-border);
+  padding-left: 0.5rem;
+}
+
+.spectra-doc-nav-link {
+  display: block;
+  padding: 0.3rem 0.15rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--spectra-color-muted);
+  text-decoration: none;
+  border-radius: var(--spectra-radius-sm);
+  line-height: 1.35;
+}
+
+.spectra-doc-nav-link:hover,
+button.spectra-doc-nav-link:hover {
+  color: var(--spectra-color-link);
+  background: rgb(30 107 184 / 0.06);
+}
+
+button.spectra-doc-nav-link {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.spectra-doc-main {
+  min-width: 0;
+}
+
+.spectra-doc-main > .int-card {
+  margin-top: 0;
+}
+
+.spectra-doc-section {
+  scroll-margin-top: calc(var(--spectra-header-height, 3.5rem) + 0.75rem);
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--spectra-color-border);
+}
+
+.spectra-doc-section:last-of-type {
+  border-bottom: none;
+}
+
+.spectra-doc-section-heading {
+  margin: 0 0 1rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--spectra-color-navy);
+}
+
+.spectra-doc-subheading {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--spectra-color-navy);
+  scroll-margin-top: calc(var(--spectra-header-height, 3.5rem) + 0.75rem);
+}
+
+.spectra-doc-subheading:first-of-type {
+  margin-top: 0;
+}
+
+.spectra-doc-toc {
+  position: sticky;
+  top: calc(var(--spectra-header-height, 3.5rem) + 1rem);
+  padding-left: 0.35rem;
+  border-left: 1px solid var(--spectra-color-border);
+}
+
+.spectra-doc-toc-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--spectra-color-muted);
+}
+
+.spectra-doc-toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spectra-doc-toc-list > li {
+  margin: 0 0 0.5rem;
+}
+
+.spectra-doc-toc-list a {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--spectra-color-link);
+  text-decoration: none;
+  line-height: 1.35;
+}
+
+.spectra-doc-toc-list a:hover {
+  text-decoration: underline;
+  color: var(--spectra-color-link-hover);
+}
+
+.spectra-doc-toc-sub {
+  margin: 0.35rem 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.spectra-doc-toc-sub li {
+  margin: 0 0 0.35rem;
+}
+
+.spectra-doc-toc-sub a {
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--spectra-color-muted);
+}
+
+.spectra-doc-toc-sub a:hover {
+  color: var(--spectra-color-link);
+}
+
+@media (max-width: 960px) {
+  .spectra-doc-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .spectra-doc-sidebar {
+    position: static;
+    padding-right: 0;
+    border-bottom: 1px solid var(--spectra-color-border);
+    padding-bottom: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .spectra-doc-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    border-left: none;
+    padding-left: 0;
+  }
+
+  .spectra-doc-nav-link {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--spectra-color-border);
+    background: var(--spectra-color-surface);
+  }
+
+  .spectra-doc-toc {
+    display: none;
+  }
+}

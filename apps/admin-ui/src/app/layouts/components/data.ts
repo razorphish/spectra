@@ -98,7 +98,14 @@ export const menuItems: MenuItemType[] = [
     label: 'Platform',
     isCollapsed: true,
     icon: '/assets/icons/sprite.svg#cpu',
-    children: [{ label: 'Integrations', url: '/integrations' }],
+    children: [
+      { label: 'Integrations', url: '/integrations' },
+      { label: 'Production access', url: '/platform/production-access' },
+      { label: 'Sandbox AI models', url: '/platform/sandbox-ai-models' },
+      { label: 'Pricing profiles', url: '/platform/pricing-profiles' },
+      { label: 'Custom endpoint approvals', url: '/platform/custom-endpoints' },
+      { label: 'Runtime tenants', url: '/platform/runtime-tenants' },
+    ],
   },
   {
     isCollapsed: true,

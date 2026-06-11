@@ -33,12 +33,19 @@ export function mountServiceProxies(app: Express): void {
     { path: '/integration', target: aviate },
   ];
 
-  for (const { path, target } of routes) {
+  for (const { path: mountPath, target } of routes) {
     app.use(
-      path,
+      mountPath,
       createProxyMiddleware({
         target,
         changeOrigin: true,
+        // Express strips the mount path before the proxy sees `req.url`, so without a rewrite
+        // `/v1/platform/ready` would be forwarded as `/ready` while aviate-api serves `/v1/platform/ready`.
+        pathRewrite: (pathname) => {
+          const suffix =
+            pathname === '' || pathname === '/' ? '' : pathname;
+          return mountPath + suffix;
+        },
         on: {
           proxyReq(proxyReq, req) {
             const auth = req.headers.authorization;

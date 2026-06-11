@@ -1,5 +1,5 @@
 <div class="main-content">
-  <div class="container-xl py-4">
+  <div class="container-fluid py-4">
     <app-page-breadcrumb
       title="Integrations"
       subTitle1="Platform"
@@ -10,7 +10,7 @@
       <div class="alert alert-danger" role="alert">{{ err }}</div>
     }
 
-    <div class="card shadow-sm border mt-4">
+    <div class="card border shadow-sm mt-4 integrations-list-styled">
       <div class="card-body">
         <div class="row g-2 align-items-end mb-3">
           <div class="col-md-4">
@@ -47,15 +47,15 @@
           </div>
         } @else {
           <div class="table-responsive">
-            <table class="table table-hover table-sm align-middle">
-              <thead>
+            <table class="st-table table table-hover table-striped mb-0 align-middle">
+              <thead class="bg-light align-middle bg-opacity-25 thead-sm">
                 <tr>
-                  <th>Name</th>
-                  <th>Organization</th>
-                  <th>Client ID</th>
-                  <th>Status</th>
-                  <th>Updated</th>
-                  <th></th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Organization</th>
+                  <th scope="col">Client ID</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" class="text-nowrap">Updated</th>
+                  <th scope="col" class="text-end text-nowrap migration-actions-col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -66,8 +66,21 @@
                     <td><code class="small">{{ row.clientId ?? '—' }}</code></td>
                     <td>{{ row.statusName ?? row.statusId }}</td>
                     <td class="text-muted small">{{ row.updatedAt | date: 'medium' }}</td>
-                    <td>
-                      <a class="btn btn-sm btn-outline-primary" [routerLink]="['/integrations', row.id]">View</a>
+                    <td class="text-end">
+                      <div
+                        class="migration-tn-actions d-flex gap-1 align-items-center justify-content-end flex-nowrap"
+                        role="group"
+                        [attr.aria-label]="'Actions for integration ' + row.name"
+                      >
+                        <a
+                          class="btn btn-primary waves-effect btn-xs edit-btn d-inline-flex align-items-center justify-content-center"
+                          [routerLink]="['/integrations', row.id]"
+                          title="View integration"
+                          aria-label="View integration"
+                        >
+                          <i class="sa sa-doc" aria-hidden="true"></i>
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 } @empty {

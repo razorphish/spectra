@@ -16,12 +16,12 @@ Copy [apps/sandbox-ui/.env.example](../.env.example) to `apps/sandbox-ui/.env`:
 
 | Variable | Purpose |
 |----------|---------|
-| `SANDBOX_UI_API_BASE_URL` | Default `http://127.0.0.1:3000` (local-edge) |
+| `SANDBOX_UI_API_BASE_URL` | Default `http://localhost:3000` (local-edge). Use **`localhost` not `127.0.0.1`** when the browser runs on Windows and APIs run in WSL2 — otherwise the browser may hit the wrong loopback and you’ll see “CORS request did not succeed” with status `(null)`. |
 | `SANDBOX_UI_PUBLIC_API_DOCS_BASE_URL` | Optional. Origin for public Swagger (`/docs`) only; defaults to `SANDBOX_UI_API_BASE_URL`. Use when API calls hit a private host but the “API reference” link must open the **public limited** catalog on the edge/public gateway (never `/integration/docs`). |
 | `SANDBOX_UI_AUTH0_ENABLED` | `true` to enable Universal Login |
 | `SANDBOX_UI_AUTH0_DOMAIN` | Auth0 tenant host |
 | `SANDBOX_UI_AUTH0_CLIENT_ID` | SPA client ID |
-| `SANDBOX_UI_AUTH_API_PUBLIC_URL` | Optional. Public origin of **auth-api** for OAuth metadata links in the dashboard (defaults to `http://127.0.0.1:9100` in generated env when unset). |
+| `SANDBOX_UI_AUTH_API_PUBLIC_URL` | Optional. Public origin of **auth-api** for OAuth metadata links in the dashboard (defaults to `http://localhost:9100` in generated env when unset). |
 
 The header “Spectra” link uses `environment.spectraMarketingUrl` (`http://localhost:4200` in the development build for local `nx serve spectra-ui`; set in [environment.ts](../src/environments/environment.ts) for production when the marketing app is on another origin).
 
@@ -40,7 +40,7 @@ See [docs/api-polyglot.md](../../../docs/api-polyglot.md).
 
 ## M2M integrations (`client_credentials`)
 
-Create **Integrations** from the developer dashboard (server-to-server OAuth2 clients). Tokens are minted by **`auth-api`** (default `http://127.0.0.1:9100`) when **`M2M_MINT_ENABLED=true`**.
+Create **Integrations** from the developer dashboard (server-to-server OAuth2 clients). Tokens are minted by **`auth-api`** (default `http://localhost:9100`) when **`M2M_MINT_ENABLED=true`**.
 
 Example token request (Basic auth):
 

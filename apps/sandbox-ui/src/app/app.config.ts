@@ -3,7 +3,9 @@ import {
   ApplicationConfig,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
+import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
+import { provideToastr } from 'ngx-toastr';
 import { authHttpInterceptorFn, provideAuth0 } from '@auth0/auth0-angular';
 import { environment } from '../environments/environment';
 import { appRoutes } from './app.routes';
@@ -58,6 +60,8 @@ function auth0Providers(): ApplicationConfig['providers'] {
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
+    provideAnimations(),
+    provideToastr({ positionClass: 'toast-bottom-right' }),
     provideRouter(appRoutes),
     provideHttpClient(
       withFetch(),

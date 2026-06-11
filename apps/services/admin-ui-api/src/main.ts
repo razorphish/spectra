@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import express from 'express';
+import { createSpectraRequestContextMiddleware } from './lib/spectra-request-context';
 import { requestLoggingMiddleware } from './lib/request-logging';
 import { initServiceLogging, getServiceLog } from './lib/service-logger';
 import { createAdminRouter } from './routes/admin';
@@ -39,6 +40,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
+app.use(createSpectraRequestContextMiddleware());
 app.use(requestLoggingMiddleware);
 
 app.use('/v1/admin', createAdminRouter());

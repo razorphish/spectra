@@ -91,6 +91,19 @@ Staff endpoints under **`/v1/admin/integrations`** and **`/v1/admin/m2m/token-ac
 
 Enable **RBAC** on the Auth0 API, create these permissions, add them to a **Role**, assign the role to staff users (or via an Action). The access token must include a `permissions` array (Auth0 default for RBAC).
 
+### Sandbox AI & custom endpoints (RBAC — plan **GAP-10**)
+
+When **admin-ui-api** ships staff routes for sandbox AI models, pricing profiles, custom endpoint production approval, and per-endpoint pricing overrides, guard them with **`requireStaffPermission`** using the **same** Auth0 custom API and RBAC pattern as above. Normative permission strings (see internal plan *AI-assisted custom API endpoints* §11.1 **GAP-10** and [`docs/sandbox-ai-endpoints.md`](../../docs/sandbox-ai-endpoints.md) for related **GAP-11** client errors):
+
+| Permission | Purpose |
+| --- | --- |
+| `platform:sandbox_ai_models:manage` | CRUD staff catalog for **`ai_llm_models`** (provider / model metadata, secret refs). |
+| `platform:pricing_profiles:manage` | CRUD **`pricing_profiles`** and related catalog / default assignments. |
+| `platform:custom_endpoints:review` | **`ai_endpoint_production_requests`** queue: approve / reject / needs-information, **`approved_production_version_id`** transitions, **GAP-6** human-wait actions; **trust tier** and **`external_tenant_ref`** staff PATCH on **`runtime_tenants`** unless an ADR splits a finer permission. |
+| `platform:custom_endpoints:pricing_override` | Set or change **`pricing_profile_id`** (and equivalent per-endpoint commercial fields) from the **approval / ops** UI (**§6.6** in plan) without requiring **`platform:pricing_profiles:manage`**. |
+
+Register these in the **same** Auth0 API and attach them to staff roles when the corresponding **admin-ui-api** routes and **admin-ui** screens ship (same RBAC setup as the Integrations permissions above). **Client-facing API errors** for sandbox AI / tenant-runtime are cataloged separately in **[`docs/sandbox-ai-endpoints.md`](../../docs/sandbox-ai-endpoints.md)** (**GAP-11**).
+
 **Local dev without Auth0 RBAC:** with `AUTH0_VERIFY_DISABLED=true` on **admin-ui-api**, you may set `ADMIN_UI_API_DEV_GRANT_ALL_STAFF_PERMISSIONS=true` to bypass permission checks (never in shared environments).
 
 ## CI / staff deploy (`STAFF_API_URL`)

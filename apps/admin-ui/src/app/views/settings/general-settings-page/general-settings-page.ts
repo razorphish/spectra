@@ -49,6 +49,13 @@ export class GeneralSettingsPage implements OnInit {
   readonly platformSaveError = signal<string | null>(null);
   developerApplicationsUiDraft = signal(false);
 
+  readonly sandboxAiLoading = signal(false);
+  readonly sandboxAiSaveError = signal<string | null>(null);
+  sandboxAiEndpointsEnabled = signal(false);
+  sandboxAiPrecheckEnabled = signal(false);
+  sandboxAiAutomationEnabled = signal(false);
+  sandboxAiMachineAutoApprove = signal(false);
+
   readonly keys = TEMPLATE_NAV_MENU_KEYS;
   readonly labels = TEMPLATE_NAV_MENU_LABELS;
 
@@ -56,6 +63,7 @@ export class GeneralSettingsPage implements OnInit {
     void this.load();
     void this.loadAuthJwtSkew();
     void this.loadDeveloperPortalUi();
+    void this.loadSandboxAi();
   }
 
   isVisible(key: TemplateNavMenuKey): boolean {
@@ -170,6 +178,58 @@ export class GeneralSettingsPage implements OnInit {
       this.platformSaveError.set(msg);
     } finally {
       this.platformLoading.set(false);
+    }
+  }
+
+  async loadSandboxAi(): Promise<void> {
+    this.sandboxAiLoading.set(true);
+    this.sandboxAiSaveError.set(null);
+    try {
+      const r = await firstValueFrom(this.platformUiApi.getSandboxAi());
+      this.sandboxAiEndpointsEnabled.set(r.endpointsEnabled);
+      this.sandboxAiPrecheckEnabled.set(r.precheckEnabled);
+      this.sandboxAiAutomationEnabled.set(r.approvalAutomationEnabled);
+      this.sandboxAiMachineAutoApprove.set(r.machineAutoApproveEnabled);
+    } catch (e: unknown) {
+      let msg = 'Failed to load sandbox AI settings';
+      if (e instanceof HttpErrorResponse) {
+        const body = e.error as { message?: string } | null;
+        msg = body?.message ?? e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      this.sandboxAiSaveError.set(msg);
+    } finally {
+      this.sandboxAiLoading.set(false);
+    }
+  }
+
+  async saveSandboxAi(): Promise<void> {
+    this.sandboxAiLoading.set(true);
+    this.sandboxAiSaveError.set(null);
+    try {
+      await firstValueFrom(
+        this.platformUiApi.patchSandboxAi({
+          endpointsEnabled: this.sandboxAiEndpointsEnabled(),
+          precheckEnabled: this.sandboxAiPrecheckEnabled(),
+          approvalAutomationEnabled: this.sandboxAiAutomationEnabled(),
+          machineAutoApproveEnabled: this.sandboxAiMachineAutoApprove(),
+        }),
+      );
+      await this.loadSandboxAi();
+      this.toastr.success('Saved', 'Sandbox AI platform flags updated.');
+    } catch (e: unknown) {
+      let msg = 'Failed to save sandbox AI settings';
+      if (e instanceof HttpErrorResponse) {
+        const body = e.error as { message?: string } | null;
+        msg = body?.message ?? e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      this.sandboxAiSaveError.set(msg);
+      this.toastr.error('Save failed', msg);
+    } finally {
+      this.sandboxAiLoading.set(false);
     }
   }
 

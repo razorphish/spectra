@@ -22,6 +22,7 @@ Captured from product direction (2026). Use this to align engineering, docs, and
 - **Production API access** requires an **approval process**; approvals are **managed in admin-ui** (workflow TBD: request → review → grant scopes/keys/org linkage).
 - **Request history** is primarily for **customer self-serve debugging** (integrator sees their own traffic), with retention/RBAC designed for that audience—not only internal support tooling.
 - **Gap:** Design how self-serve request logs interact with **approval-gated** prod credentials (e.g. only show history for approved prod integrations, TTL, export limits).
+- **Engineering (v1 baseline, 2026-06):** Control-plane migration `0008_par_notifications_webhooks.sql` adds PAR catalog families (`production_access_request_states`, `user_principal`, `webhook_request_states`), `users.principal_kind_id`, `production_access_requests` extensions (submitter, integration vs application XOR, messages, notifications + `sandbox_outbound_webhook_requests` + optional `notification_outbox`), and `platform_settings` keys under `production_access.*`. **aviate-api:** `POST/GET …/integrations/:integrationId/production-access-request(s)` on sandbox-portal router (session + questionnaire validation); staff fan-out + deferred `audit_logs` wiring. **admin-ui-api:** `GET /v1/admin/production-access-requests` (+ `/:id`) gated by `production_access.staff_console_enabled`. **No public token status URL** — integrators use authenticated portal only.
 
 ## API status / incidents (v1 bar)
 

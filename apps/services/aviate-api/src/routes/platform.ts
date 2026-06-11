@@ -12,6 +12,7 @@ import {
 import { loadM2mClientStatusForEdge } from '../lib/m2m-client-status';
 import { createHelloHandler } from './hello';
 import { createSandboxPortalRouter } from './sandbox-portal';
+import { createTenantRuntimeRouter } from './tenant-runtime';
 
 const SEGMENT = 'platform';
 const requireAccessToken = createRequireSpectraAccessToken({
@@ -74,6 +75,17 @@ export function createPlatformRouter() {
   r.get('/info', info);
   r.get('/stats', stats);
   r.get('/hello', requireAccessToken, createHelloHandler('aviate-api', SEGMENT));
+  r.use('/tenant-runtime', requireAccessToken, createTenantRuntimeRouter());
+  r.get(
+    '/sandbox/production-access/status-by-token/:token',
+    (_req, res) => {
+      res.status(404).json({
+        error: 'not_found',
+        message:
+          'Production access status is only available in the authenticated developer portal (no public token URL in v1).',
+      });
+    },
+  );
   r.use('/sandbox', createSandboxPortalRouter());
   return r;
 }

@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import express, { type RequestHandler } from 'express';
 import swaggerUi from 'swagger-ui-express';
+import { createSpectraRequestContextMiddleware } from './lib/spectra-request-context';
 import { createPlatformRouter } from './routes/platform';
 import { createUploadsRouter } from './routes/uploads';
 
@@ -31,8 +32,13 @@ for (const [p, o] of [
   }
 }
 
-const host = process.env['HOST'] ?? 'localhost';
+/** Bind `0.0.0.0` by default so WSL2 / Docker port-forwarding and LAN dev clients can reach the process. */
+const host = process.env['HOST']?.trim() || '0.0.0.0';
 const port = process.env['PORT'] ? Number(process.env['PORT']) : 3001;
+
+/** Preflight-safe: include headers Auth0 / browsers may send on cross-origin API calls. */
+const CORS_ALLOW_HEADERS =
+  'Content-Type, Authorization, Auth0-Client, X-Requested-With, Accept, X-Request-Id, X-Correlation-Id';
 
 const app = express();
 app.use((req, res, next) => {
@@ -41,10 +47,7 @@ app.use((req, res, next) => {
     'Access-Control-Allow-Methods',
     'GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS'
   );
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'Content-Type, Authorization'
-  );
+  res.setHeader('Access-Control-Allow-Headers', CORS_ALLOW_HEADERS);
   if (req.method === 'OPTIONS') {
     res.sendStatus(204);
     return;
@@ -52,6 +55,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '64kb' }));
+app.use(createSpectraRequestContextMiddleware());
 
 app.use('/v1/platform', createPlatformRouter());
 app.use('/v1/platform/uploads', createUploadsRouter());
