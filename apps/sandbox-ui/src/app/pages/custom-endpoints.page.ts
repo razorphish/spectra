@@ -51,18 +51,20 @@ function apiErrorMessage(err: unknown): string {
   imports: [RouterLink, DatePipe],
   template: `
     <main class="spectra-page sandbox-custom-endpoints">
-      <header>
-        <h1>Custom API endpoints</h1>
-        <p class="lede">
-          Sandbox AI endpoints (staff approval → production M2M). Requires
-          <code>sandbox.ai.endpoints_enabled</code> in admin settings.
-        </p>
-        <p>
+      <header class="ce-head">
+        <div class="ce-head-text">
+          <h1>Custom API endpoints</h1>
+          <p class="lede">Sandbox AI endpoints (staff approval → production M2M).</p>
+        </div>
+        <div class="ce-head-actions">
           <a routerLink="/dashboard" class="btn btn-outline-secondary">← Dashboard</a>
           @if (mode() !== 'list') {
-            <a routerLink="/custom-endpoints" class="btn btn-outline-secondary ms-2">All endpoints</a>
+            <a routerLink="/custom-endpoints" class="btn btn-outline-secondary">All endpoints</a>
           }
-        </p>
+          @if (mode() === 'list') {
+            <a routerLink="/custom-endpoints/new" class="btn btn-primary">New draft</a>
+          }
+        </div>
       </header>
 
       @if (bootstrapError()) {
@@ -77,9 +79,15 @@ function apiErrorMessage(err: unknown): string {
         @if (mode() === 'list' && sandboxAiEndpointsEnabled()) {
           <section class="int-card mb-4" aria-labelledby="ce-openapi-heading">
             <h2 id="ce-openapi-heading" class="h5">Org preview OpenAPI</h2>
+            <p class="text-muted small mb-2">
+              Downloads a single OpenAPI 3.0.3 file that merges <strong>all</strong> of your org's custom endpoints
+              (each endpoint's <strong>latest</strong> revision) into one document — ready to import into Swagger UI,
+              Postman, or an SDK generator to explore and call them as one API.
+            </p>
             <p class="text-muted small">
-              Session-authenticated, org-private preview (may include draft paths). This is not the public integrator
-              catalog.
+              It does <strong>not</strong> publish anything: it is a session-authenticated, org-private preview that
+              may include <strong>draft</strong> paths and uses the latest revision (not necessarily the
+              production-approved version). This is not the public integrator catalog.
             </p>
             <button
               type="button"
@@ -134,9 +142,11 @@ function apiErrorMessage(err: unknown): string {
             @if (createError()) {
               <p class="form-error">{{ createError() }}</p>
             }
-            <button type="button" class="btn btn-primary" [disabled]="createSubmitting()" (click)="submitCreate()">
-              Create
-            </button>
+            <div class="ce-create-actions">
+              <button type="button" class="btn btn-primary" [disabled]="createSubmitting()" (click)="submitCreate()">
+                Create
+              </button>
+            </div>
           </section>
         }
 
@@ -267,8 +277,8 @@ function apiErrorMessage(err: unknown): string {
         }
 
         @if (mode() === 'list' && !listLoading()) {
-          <p class="text-muted small">Tenant <code>{{ tenantId() ?? '—' }}</code></p>
-          <div class="table-responsive">
+          <p class="ce-tenant text-muted small">Tenant <code>{{ tenantId() ?? '—' }}</code></p>
+          <div class="table-responsive ce-table-wrap">
             <table class="table">
               <thead>
                 <tr>
@@ -286,10 +296,10 @@ function apiErrorMessage(err: unknown): string {
                     </td>
                     <td>{{ endpointLifecycleLabel(e.statusId) }}</td>
                     <td>{{ e.createdAt | date: 'medium' }}</td>
-                    <td>
+                    <td class="ce-row-actions">
                       <button
                         type="button"
-                        class="btn btn-sm btn-outline-primary me-1"
+                        class="btn btn-sm btn-outline-primary"
                         [disabled]="isGenerating(e.id)"
                         (click)="generate(e.id)"
                       >
@@ -298,14 +308,14 @@ function apiErrorMessage(err: unknown): string {
                       @if (!e.approvedProductionVersionId) {
                         <button
                           type="button"
-                          class="btn btn-sm btn-primary me-1"
+                          class="btn btn-sm btn-primary"
                           [disabled]="submittingId() === e.id"
                           (click)="submitApproval(e.id)"
                         >
                           Submit for production
                         </button>
                       }
-                      <details class="d-inline-block ms-1">
+                      <details class="d-inline-block">
                         <summary class="small">Update instructions</summary>
                         <div class="py-2" style="min-width: 12rem;">
                           <textarea
@@ -332,11 +342,8 @@ function apiErrorMessage(err: unknown): string {
             </table>
           </div>
           @if (items().length === 0) {
-            <p class="text-muted">No endpoints yet.</p>
+            <p class="ce-empty text-muted">No endpoints yet. Use <strong>New draft</strong> to create one.</p>
           }
-          <p>
-            <a routerLink="/custom-endpoints/new" class="btn btn-primary">Create draft</a>
-          </p>
         } @else if (mode() === 'list' && listLoading()) {
           <p>Loading…</p>
         }
@@ -345,6 +352,63 @@ function apiErrorMessage(err: unknown): string {
   `,
   styles: [
     `
+      .sandbox-custom-endpoints {
+        max-width: var(--spectra-max-width);
+        padding-top: 1rem;
+      }
+      .sandbox-custom-endpoints .int-card {
+        padding: 1.25rem 1.5rem;
+      }
+      .sandbox-custom-endpoints .int-card > h2:first-child {
+        margin-top: 0;
+      }
+      .sandbox-custom-endpoints .form-group {
+        margin-bottom: 1.25rem;
+      }
+      .sandbox-custom-endpoints .form-group:last-of-type {
+        margin-bottom: 0;
+      }
+      .ce-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      .ce-head-text {
+        min-width: 16rem;
+      }
+      .ce-head-text h1 {
+        margin-bottom: 0.25rem;
+      }
+      .ce-head-text .lede {
+        margin-bottom: 0;
+      }
+      .ce-head-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .ce-tenant {
+        margin-bottom: 0.5rem;
+      }
+      .ce-table-wrap {
+        margin-bottom: 1rem;
+      }
+      .ce-row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        align-items: flex-start;
+      }
+      .ce-empty {
+        margin: 0.5rem 0 0;
+      }
+      .ce-create-actions {
+        margin-top: 1.25rem;
+      }
       .ce-spec-pre {
         max-height: 14rem;
         overflow: auto;

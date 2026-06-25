@@ -45,6 +45,13 @@ export const VIEWS_ROUTES: Routes = [
     data: { title: 'Production access' },
   },
   {
+    path: 'platform/production-access/:id/edit',
+    canActivate: [templateNavVisibilityGuard],
+    loadComponent: () =>
+      import('./platform/production-access-edit-page').then((m) => m.ProductionAccessEditPage),
+    data: { title: 'Edit production access' },
+  },
+  {
     path: 'platform/production-access/:id',
     canActivate: [templateNavVisibilityGuard],
     loadComponent: () =>

@@ -20,6 +20,30 @@ export type ProductionAccessRequestListItem = {
   createdAt: string;
 };
 
+export type ProductionAccessRequestDetail = ProductionAccessRequestListItem & {
+  orgId: string | null;
+  orgName: string | null;
+  customerStatusMessage: string | null;
+  staffInternalNotes: string | null;
+  documents: unknown;
+  publicReferenceToken: string | null;
+  approvedM2mOauthClientId: string | null;
+  approvedProductionOrgId: string | null;
+  updatedAt: string;
+  createdBy: unknown;
+  updatedBy: unknown;
+};
+
+export type ProductionAccessCustomApi = {
+  id: string;
+  slug: string;
+  statusId: string;
+  statusName: string | null;
+  approvedProductionVersionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 @Injectable({ providedIn: 'root' })
 export class AdminProductionAccessApiService {
   private readonly http = inject(HttpClient);
@@ -34,7 +58,41 @@ export class AdminProductionAccessApiService {
     );
   }
 
-  get(id: string): Observable<Record<string, unknown>> {
-    return this.http.get<Record<string, unknown>>(`${this.base()}/production-access-requests/${id}`);
+  get(id: string): Observable<ProductionAccessRequestDetail> {
+    return this.http.get<ProductionAccessRequestDetail>(
+      `${this.base()}/production-access-requests/${id}`,
+    );
+  }
+
+  listCustomApis(
+    id: string,
+  ): Observable<{ orgId: string | null; items: ProductionAccessCustomApi[] }> {
+    return this.http.get<{ orgId: string | null; items: ProductionAccessCustomApi[] }>(
+      `${this.base()}/production-access-requests/${id}/custom-apis`,
+    );
+  }
+
+  approve(id: string, note?: string): Observable<ProductionAccessRequestDetail> {
+    return this.http.patch<ProductionAccessRequestDetail>(
+      `${this.base()}/production-access-requests/${id}`,
+      { action: 'approve', ...(note?.trim() ? { note: note.trim() } : {}) },
+    );
+  }
+
+  revoke(id: string, note?: string): Observable<ProductionAccessRequestDetail> {
+    return this.http.patch<ProductionAccessRequestDetail>(
+      `${this.base()}/production-access-requests/${id}`,
+      { action: 'revoke', ...(note?.trim() ? { note: note.trim() } : {}) },
+    );
+  }
+
+  update(
+    id: string,
+    fields: { customerStatusMessage?: string | null; staffInternalNotes?: string | null },
+  ): Observable<ProductionAccessRequestDetail> {
+    return this.http.patch<ProductionAccessRequestDetail>(
+      `${this.base()}/production-access-requests/${id}`,
+      { action: 'update', ...fields },
+    );
   }
 }

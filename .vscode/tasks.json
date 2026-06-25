@@ -4,7 +4,7 @@
     {
       "label": "kill-local-dev-ports",
       "type": "shell",
-      "command": "node \"${workspaceFolder}/scripts/kill-local-dev-ports.cjs\"",
+      "command": "bash -c \"source ~/.nvm/nvm.sh && node ./scripts/kill-local-dev-ports.cjs\"",
       "options": {
         "cwd": "${workspaceFolder}"
       },
