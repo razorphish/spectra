@@ -17,11 +17,19 @@ const pexec = promisify(execFile);
  */
 export interface WorktreeGitOpsOptions {
   repoRoot?: string;
-  /** Branch/sha the worktree (and PR base) starts from. Default `HEAD`. */
+  /** Branch/sha the worktree starts from. Default `HEAD`. */
   baseRef?: string;
+  /** PR base branch (must exist on the remote). Default: `baseRef` with any `origin/` prefix removed. */
+  prBaseRef?: string;
   remote?: string;
   /** Skip `git push` + `gh pr create`; create branch+commit locally then remove them. */
   dryRun?: boolean;
+}
+
+/** Parse `owner/repo` from an https or ssh GitHub remote URL. */
+function parseGitHubSlug(remoteUrl: string): string | null {
+  const m = /github\.com[/:]([^/]+)\/(.+?)(?:\.git)?$/.exec(remoteUrl.trim());
+  return m ? `${m[1]}/${m[2]}` : null;
 }
 
 export function worktreeGitOps(opts: WorktreeGitOpsOptions = {}): GitOps {
@@ -49,13 +57,22 @@ export function worktreeGitOps(opts: WorktreeGitOpsOptions = {}): GitOps {
 
         let prUrl = '(dry-run: not pushed)';
         if (!opts.dryRun) {
+          const prBase = opts.prBaseRef ?? base.replace(/^origin\//, '');
           await git(['push', '-u', remote, args.branch], wt);
-          const pr = await pexec(
-            'gh',
-            ['pr', 'create', '--title', args.prTitle, '--body', args.prBody, '--head', args.branch],
-            { cwd: wt },
-          );
-          prUrl = pr.stdout.trim();
+          try {
+            const pr = await pexec(
+              'gh',
+              ['pr', 'create', '--base', prBase, '--head', args.branch, '--title', args.prTitle, '--body', args.prBody],
+              { cwd: wt },
+            );
+            prUrl = pr.stdout.trim();
+          } catch {
+            // gh missing/unauthed → hand back a prefilled compare URL (branch is already pushed).
+            const slug = parseGitHubSlug((await git(['remote', 'get-url', remote], wt)).stdout);
+            prUrl = slug
+              ? `https://github.com/${slug}/compare/${prBase}...${args.branch}?expand=1`
+              : `(pushed ${args.branch}; open a PR manually — gh unavailable)`;
+          }
         }
         return { branch: args.branch, commitSha, prUrl };
       } finally {
