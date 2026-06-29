@@ -64,6 +64,13 @@
       "when": 1780900000000,
       "tag": "0010_sandbox_mrp_fixtures",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781000000000,
+      "tag": "0011_meridian_action_log",
+      "breakpoints": true
     }
   ]
 }

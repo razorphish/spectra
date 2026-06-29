@@ -852,4 +852,67 @@ export const uploads = spectra.table(
   ]
 );
 
+/**
+ * Append-only audit of every Meridian (AI Driver) action — one row per action/run.
+ * Exempt from the standard audit/lifecycle columns: this is a frozen append-only log
+ * (never updated, never soft-deleted), so it carries no `updated_at`/`deleted_at`/
+ * `status_id`/`updated_by`. See docs/meridian/charter.md + docs/adr/meridian-002.
+ * Records executor + judge identities/verdicts so "executor is never its own judge"
+ * is auditable, plus token spend (budget) and git provenance (one run = one PR).
+ */
+export const meridianActionLog = spectra.table(
+  'meridian_action_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** ULID echoed in the `Meridian-Run` commit trailer — correlates row ↔ git. */
+    runId: text('run_id').notNull(),
+    /** Task class from the taxonomy (ADR meridian-003), e.g. `ui_scaffold`. */
+    taskClass: text('task_class').notNull(),
+    /** Activation phase the action ran under. */
+    phase: text('phase').notNull(),
+    /** Executor model id + tier (ADR meridian-001). */
+    executorModel: text('executor_model').notNull(),
+    executorTier: text('executor_tier').notNull(),
+    /** Tier escalations consumed (capped by MERIDIAN_MAX_ESCALATIONS). */
+    escalations: integer('escalations').notNull().default(0),
+    /** Executor + judge tokens (budget accounting, ADR meridian-001 OQ-2). */
+    tokensSpent: integer('tokens_spent').notNull().default(0),
+    /** Objective gate results (lint/test/build/db:verify/scope-map): pass/fail + detail. */
+    l0Results: jsonb('l0_results'),
+    /** Array of { model, family, verdict, reason } — the diverse refute panel (meridian-002). */
+    judgeVerdicts: jsonb('judge_verdicts'),
+    /** Final trust decision. */
+    decision: text('decision').notNull(),
+    /** Typed task input (spec/request). */
+    input: jsonb('input'),
+    /** Produced-artifact summary + pointers (files/branch), not necessarily the full diff. */
+    output: jsonb('output'),
+    branch: text('branch'),
+    prUrl: text('pr_url'),
+    commitSha: text('commit_sha'),
+    /** When applied to a branch; null in Shadow (logged, never applied). */
+    appliedAt: timestamp('applied_at', { withTimezone: true }),
+    createdBy: jsonb('created_by').notNull().default(systemActorJsonbDefault),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('meridian_action_log_run_id_uq').on(t.runId),
+    index('meridian_action_log_task_created_idx').on(t.taskClass, t.createdAt),
+    index('meridian_action_log_decision_idx').on(t.decision),
+    index('meridian_action_log_created_at_idx').on(t.createdAt),
+    check(
+      'meridian_action_log_phase_chk',
+      sql`${t.phase} in ('shadow','assisted','gated_auto','broad_auto')`
+    ),
+    check(
+      'meridian_action_log_tier_chk',
+      sql`${t.executorTier} in ('small','mid','frontier')`
+    ),
+    check(
+      'meridian_action_log_decision_chk',
+      sql`${t.decision} in ('accepted','rejected','aborted')`
+    ),
+  ]
+);
+
 export { CATALOG_IDS } from './catalog-seed-ids';

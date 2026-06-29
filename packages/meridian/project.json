@@ -1,0 +1,26 @@
+{
+  "name": "meridian",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/meridian/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/packages/meridian",
+        "main": "packages/meridian/src/index.ts",
+        "tsConfig": "packages/meridian/tsconfig.lib.json",
+        "assets": ["packages/meridian/*.md"]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "packages/meridian/jest.config.js"
+      }
+    }
+  }
+}
