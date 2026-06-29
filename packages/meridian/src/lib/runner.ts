@@ -44,16 +44,25 @@ export interface MeridianTask {
    * optional cleanup (Shadow applies nothing, so the temp artifact is always removed).
    */
   buildL0?: (result: ExecutorResult) => Promise<{ commands: string[]; cleanup?: () => Promise<void> | void }>;
+  /**
+   * Authoring classes only: the file(s) this task would write. Required by the Assisted phase
+   * (it commits these to a branch + opens a PR). Absent ⇒ not Assisted-eligible (e.g. a check).
+   */
+  artifactFor?: (result: ExecutorResult) => { path: string; content: string }[];
   /** Typed input, logged verbatim for audit. */
   input?: unknown;
 }
 
-export interface ShadowRunDeps {
+/** Shared deps for the run+verify core (executor + L0), used by Shadow and Assisted. */
+export interface RunCoreDeps {
   /** Defaults to the real executor (a live Claude call). Inject to mock. */
   executor?: (req: ExecutorRequest, deps?: ExecutorDeps) => Promise<ExecutorResult>;
   executorDeps?: ExecutorDeps;
   runGates?: (commands: string[], runner?: CommandRunner) => Promise<L0Result>;
   commandRunner?: CommandRunner;
+}
+
+export interface ShadowRunDeps extends RunCoreDeps {
   db?: SpectraDb;
   newRunId?: () => string;
 }
@@ -67,11 +76,15 @@ export interface ShadowRunResult {
   applied: false;
 }
 
-export async function runShadowTask(
+/**
+ * Run the executor once (no loop) and run L0 verification. Shared by Shadow and Assisted;
+ * applies nothing and writes nothing — the caller decides what to do with the verdict.
+ * L0 precedence: programmatic `verify` → `buildL0` (materialize temp + shell) → `l0Commands`.
+ */
+export async function executeAndVerify(
   task: MeridianTask,
-  deps: ShadowRunDeps = {},
-): Promise<ShadowRunResult> {
-  const runId = (deps.newRunId ?? randomUUID)();
+  deps: RunCoreDeps = {},
+): Promise<{ result: ExecutorResult; l0: L0Result; decision: MeridianDecision }> {
   const exec = deps.executor ?? invokeExecutor;
   const runGates = deps.runGates ?? runL0Gates;
 
@@ -87,8 +100,6 @@ export async function runShadowTask(
     deps.executorDeps,
   );
 
-  // L0 objective gates on the proposed output. Shadow never applies it. Order of precedence:
-  // programmatic `verify` → `buildL0` (materialize to temp + shell gate) → static `l0Commands`.
   let l0: L0Result;
   if (task.verify) {
     l0 = await task.verify(result);
@@ -106,7 +117,15 @@ export async function runShadowTask(
       if (cleanup) await cleanup();
     }
   }
-  const decision: MeridianDecision = l0.passed ? 'accepted' : 'rejected';
+  return { result, l0, decision: l0.passed ? 'accepted' : 'rejected' };
+}
+
+export async function runShadowTask(
+  task: MeridianTask,
+  deps: ShadowRunDeps = {},
+): Promise<ShadowRunResult> {
+  const runId = (deps.newRunId ?? randomUUID)();
+  const { result, l0, decision } = await executeAndVerify(task, deps);
 
   const db = deps.db ?? getDb();
   await db.insert(meridianActionLog).values({
@@ -179,6 +198,11 @@ export function testAuthorTask(args: {
         cleanup: () => rm(specPath, { force: true }),
       };
     };
+  }
+  if (args.specPath) {
+    const specPath = args.specPath;
+    // Assisted phase commits the generated spec here (a human reviews/finishes it).
+    task.artifactFor = (result) => [{ path: specPath, content: stripCodeFences(result.text) + '\n' }];
   }
   return task;
 }

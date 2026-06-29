@@ -11,8 +11,16 @@ This package holds Meridian's mechanics:
 - **`runL0Gates(commands, runner?)`** — the objective verifier (lint/typecheck/build/test):
   runs commands in order, short-circuits on first failure, no gates ⇒ not trusted.
 - **`runShadowTask(task, deps?)`** — the Shadow runner: executor → L0 → writes **one**
-  append-only `meridian_action_log` row, applying nothing (`applied_at` stays null). Ships a
-  `testAuthorTask(...)` factory as the first low-risk class. All deps are injectable for tests.
+  append-only `meridian_action_log` row, applying nothing (`applied_at` stays null). All deps
+  injectable for tests.
+- **`runAssistedTask(task, deps?)`** — the Assisted runner: executor → L0 → commits the artifact
+  to a branch (`meridian/<class>/<run>`) and opens a PR via an injectable `GitOps`, then logs an
+  `assisted` row with branch/PR/sha. Never commits to a default branch, never auto-merges; an
+  L0-failed draft still becomes a PR for a human to finish. The default `GitOps` **refuses to run**
+  — a real worktree+`gh` backend is deferred until opening real PRs is explicitly enabled.
+- **Classes:** `openapi_contract_check` (bounded/structured, autonomy-eligible) and
+  `testAuthorTask(...)` (large free-form → Assisted-only). `testAuthorTask` carries an
+  `artifactFor` so Assisted can commit the generated spec.
 - Shared contract constants `EXECUTOR_TIERS` / `MERIDIAN_PHASES` / `MERIDIAN_DECISIONS` mirror
   the `meridian_action_log` CHECK constraints.
 
