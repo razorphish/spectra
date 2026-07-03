@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { SpectraIconComponent } from '@spectra/shared-ui';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, debounceTime, distinctUntilChanged, filter, map, merge, of, Subject, switchMap, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -86,7 +87,7 @@ function apiErrorMessage(err: unknown): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
   selector: 'sandbox-custom-endpoints',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, SpectraIconComponent],
   template: `
     <main class="spectra-page sandbox-custom-endpoints">
       <header class="ce-head">
@@ -305,7 +306,7 @@ function apiErrorMessage(err: unknown): string {
                       <th>Created</th>
                       <th>Status</th>
                       <th>Instructions</th>
-                      <th>Spec</th>
+                      <th class="ce-actions-col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -324,7 +325,17 @@ function apiErrorMessage(err: unknown): string {
                           }
                         </td>
                         <td>
-                          <pre class="ce-spec-pre small">{{ formatJson(v['spec']) }}</pre>
+                          <div class="ce-actions">
+                            <button
+                              type="button"
+                              class="icon-btn"
+                              title="View spec (JSON)"
+                              aria-label="View spec JSON for revision {{ v['revision'] }}"
+                              (click)="openSpecModal(v)"
+                            >
+                              <spectra-icon name="code" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     }
@@ -399,76 +410,142 @@ function apiErrorMessage(err: unknown): string {
                 <pre class="ce-spec-pre small">{{ tryResultBodyText() }}</pre>
               }
             </section>
+
+            @if (specModalVersion(); as sv) {
+              <div class="modal-backdrop" role="presentation" (click)="closeSpecModal()"></div>
+              <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="ce-spec-modal-title">
+                <h2 id="ce-spec-modal-title">Spec — revision {{ sv['revision'] }}</h2>
+                <pre class="ce-spec-modal-pre small">{{ formatJson(sv['spec']) }}</pre>
+                <div class="modal-actions">
+                  <button type="button" class="btn btn-outline-secondary" (click)="closeSpecModal()">Close</button>
+                </div>
+              </div>
+            }
           }
         }
 
         @if (mode() === 'list' && !listLoading()) {
-          <p class="ce-tenant text-muted small">Tenant <code>{{ tenantId() ?? '—' }}</code></p>
+          <div class="ce-list-toolbar">
+            <p class="ce-tenant text-muted small mb-0">Tenant <code>{{ tenantId() ?? '—' }}</code></p>
+            <input
+              type="search"
+              class="form-control form-control-sm ce-search"
+              placeholder="Filter by slug or status…"
+              [value]="listSearch()"
+              (input)="onListSearchInput($event)"
+              aria-label="Filter endpoints"
+            />
+          </div>
+
           <div class="table-responsive ce-table-wrap">
-            <table class="table">
+            <table class="table table-hover align-middle ce-list-table">
               <thead>
                 <tr>
-                  <th>Slug</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Actions</th>
+                  <th class="ce-sortable" (click)="toggleSort('slug')" [attr.aria-sort]="ariaSort('slug')">
+                    Slug{{ sortIndicator('slug') }}
+                  </th>
+                  <th class="ce-sortable" (click)="toggleSort('status')" [attr.aria-sort]="ariaSort('status')">
+                    Status{{ sortIndicator('status') }}
+                  </th>
+                  <th class="ce-sortable" (click)="toggleSort('created')" [attr.aria-sort]="ariaSort('created')">
+                    Created{{ sortIndicator('created') }}
+                  </th>
+                  <th class="ce-actions-col text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                @for (e of items(); track e.id) {
+                @for (e of visibleEndpoints(); track e.id) {
                   <tr>
                     <td>
-                      <a [routerLink]="['/custom-endpoints', e.id]">{{ e.slug }}</a>
+                      <a [routerLink]="['/custom-endpoints', e.id]" class="fw-semibold">{{ e.slug }}</a>
                     </td>
-                    <td>{{ endpointLifecycleLabel(e.statusId) }}</td>
-                    <td>{{ e.createdAt | date: 'medium' }}</td>
-                    <td class="ce-row-actions">
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-primary"
-                        [disabled]="isGenerating(e.id)"
-                        (click)="generate(e.id)"
-                      >
-                        Generate
-                      </button>
-                      @if (!e.approvedProductionVersionId) {
+                    <td>
+                      <span class="badge {{ statusBadgeClass(e.statusId) }}">{{ endpointLifecycleLabel(e.statusId) }}</span>
+                      @if (e.approvedProductionVersionId) {
+                        <span class="badge text-bg-success ms-1" title="Has an approved production version">Prod</span>
+                      }
+                    </td>
+                    <td class="text-nowrap small text-muted">{{ e.createdAt | date: 'medium' }}</td>
+                    <td class="ce-actions-col">
+                      <div class="ce-actions justify-content-end">
                         <button
                           type="button"
-                          class="btn btn-sm btn-primary"
-                          [disabled]="submittingId() === e.id"
-                          (click)="submitApproval(e.id)"
+                          class="icon-btn"
+                          title="Generate latest revision"
+                          aria-label="Generate latest revision for {{ e.slug }}"
+                          [disabled]="isGenerating(e.id)"
+                          (click)="generate(e.id)"
                         >
-                          Submit for production
+                          <spectra-icon name="refresh" />
                         </button>
-                      }
-                      <details class="d-inline-block">
-                        <summary class="small">Update instructions</summary>
-                        <div class="py-2" style="min-width: 12rem;">
-                          <textarea
-                            class="form-control form-control-sm"
-                            rows="2"
-                            [value]="promptOverrideByEndpoint()[e.id] || ''"
-                            (input)="onPromptOverrideInput(e.id, $event)"
-                            placeholder="Optional prompt override"
-                          ></textarea>
+                        <button
+                          type="button"
+                          class="icon-btn"
+                          title="Generate with override"
+                          aria-label="Generate {{ e.slug }} with a prompt override"
+                          [disabled]="isGenerating(e.id)"
+                          (click)="openOverride(e.id)"
+                        >
+                          <spectra-icon name="pencil" />
+                        </button>
+                        @if (!e.approvedProductionVersionId) {
                           <button
                             type="button"
-                            class="btn btn-sm btn-outline-secondary mt-1"
-                            [disabled]="isGenerating(e.id)"
-                            (click)="generateWithOverride(e.id)"
+                            class="icon-btn"
+                            title="Submit for production"
+                            aria-label="Submit {{ e.slug }} for production"
+                            [disabled]="submittingId() === e.id"
+                            (click)="submitApproval(e.id)"
                           >
-                            Generate with override
+                            <spectra-icon name="document" />
                           </button>
-                        </div>
-                      </details>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+                @if (visibleEndpoints().length === 0) {
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-3">
+                      @if (items().length === 0) {
+                        No endpoints yet. Use <strong>New draft</strong> to create one.
+                      } @else {
+                        No endpoints match “{{ listSearch() }}”.
+                      }
                     </td>
                   </tr>
                 }
               </tbody>
             </table>
           </div>
-          @if (items().length === 0) {
-            <p class="ce-empty text-muted">No endpoints yet. Use <strong>New draft</strong> to create one.</p>
+          @if (items().length > 0) {
+            <p class="text-muted small ce-list-count">
+              Showing {{ visibleEndpoints().length }} of {{ items().length }} endpoint(s)
+            </p>
+          }
+
+          @if (overrideModalId(); as oid) {
+            <div class="modal-backdrop" role="presentation" (click)="closeOverride()"></div>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ce-override-title">
+              <h2 id="ce-override-title" class="h5">Generate with override</h2>
+              <p class="text-muted small">
+                Optional prompt override for <code>{{ overrideModalSlug() }}</code>. Leave blank to regenerate from the
+                existing instructions.
+              </p>
+              <textarea
+                class="form-control"
+                rows="4"
+                [value]="promptOverrideByEndpoint()[oid] || ''"
+                (input)="onPromptOverrideInput(oid, $event)"
+                placeholder="Optional prompt override"
+              ></textarea>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-outline-secondary" (click)="closeOverride()">Cancel</button>
+                <button type="button" class="btn btn-primary" [disabled]="isGenerating(oid)" (click)="confirmOverride()">
+                  {{ isGenerating(oid) ? 'Generating…' : 'Generate' }}
+                </button>
+              </div>
+            </div>
           }
         } @else if (mode() === 'list' && listLoading()) {
           <p>Loading…</p>
@@ -519,6 +596,26 @@ function apiErrorMessage(err: unknown): string {
       }
       .ce-tenant {
         margin-bottom: 0.5rem;
+      }
+      .ce-list-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .ce-search {
+        flex: 1 1 16rem;
+        max-width: 24rem;
+      }
+      .ce-list-table th.ce-sortable {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+      }
+      .ce-list-count {
+        margin-top: 0.5rem;
       }
       .ce-table-wrap {
         margin-bottom: 1rem;
@@ -595,6 +692,53 @@ function apiErrorMessage(err: unknown): string {
         white-space: pre-wrap;
         word-break: break-word;
       }
+      .ce-actions-col {
+        width: 1%;
+        white-space: nowrap;
+      }
+      .ce-actions {
+        display: flex;
+        gap: 0.4rem;
+        align-items: center;
+      }
+      .ce-spec-modal-pre {
+        max-height: 60vh;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0;
+        padding: 0.75rem 1rem;
+        border-radius: var(--spectra-radius-sm);
+        border: 1px solid var(--spectra-color-border);
+        background: var(--spectra-color-surface);
+      }
+      .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        padding: 0;
+        border-radius: var(--spectra-radius-sm);
+        border: none;
+        background: #e2e8f0;
+        color: #0f172a;
+        cursor: pointer;
+        flex-shrink: 0;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+      }
+      .icon-btn:hover {
+        background: #f8fafc;
+        color: #020617;
+      }
+      .icon-btn:active {
+        transform: translateY(1px);
+        box-shadow: 0 0 1px rgb(0 0 0 / 0.2);
+      }
+      .icon-btn:focus-visible {
+        outline: 2px solid var(--spectra-color-accent);
+        outline-offset: 2px;
+      }
     `,
   ],
 })
@@ -621,6 +765,29 @@ export class CustomEndpointsPageComponent {
   readonly listLoading = signal(false);
   readonly tenantId = signal<string | null>(null);
   readonly items = signal<EndpointListItem[]>([]);
+
+  // List-view datatable state: search filter, column sort, and override modal.
+  readonly listSearch = signal('');
+  readonly sortKey = signal<'slug' | 'status' | 'created'>('created');
+  readonly sortDir = signal<'asc' | 'desc'>('desc');
+  readonly overrideModalId = signal<string | null>(null);
+
+  /** Filtered + sorted rows shown in the list table. */
+  readonly visibleEndpoints = computed<EndpointListItem[]>(() => {
+    const q = this.listSearch().trim().toLowerCase();
+    const key = this.sortKey();
+    const dir = this.sortDir() === 'asc' ? 1 : -1;
+    const rows = this.items().filter((e) => {
+      if (!q) return true;
+      const status = this.endpointLifecycleLabel(e.statusId).toLowerCase();
+      return e.slug.toLowerCase().includes(q) || status.includes(q);
+    });
+    return [...rows].sort((a, b) => {
+      const av = this.sortValue(a, key);
+      const bv = this.sortValue(b, key);
+      return av < bv ? -dir : av > bv ? dir : 0;
+    });
+  });
 
   readonly sandboxAiEndpointsEnabled = signal(false);
 
@@ -686,6 +853,8 @@ export class CustomEndpointsPageComponent {
   readonly focusApprovedVersionId = signal<string | null>(null);
   readonly focusEndpointCreatedAt = signal<string | null>(null);
   readonly focusVersions = signal<Record<string, unknown>[]>([]);
+  /** Version whose spec is shown in the JSON modal, or null when closed. */
+  readonly specModalVersion = signal<Record<string, unknown> | null>(null);
 
   readonly approvalLoading = signal(false);
   readonly approvalError = signal<string | null>(null);
@@ -841,6 +1010,7 @@ export class CustomEndpointsPageComponent {
     this.focusApprovedVersionId.set(null);
     this.focusEndpointCreatedAt.set(null);
     this.focusVersions.set([]);
+    this.specModalVersion.set(null);
     this.approvalRequest.set(undefined);
     this.approvalError.set(null);
     this.tryResultStatus.set(null);
@@ -951,6 +1121,14 @@ export class CustomEndpointsPageComponent {
     }
   }
 
+  openSpecModal(v: Record<string, unknown>): void {
+    this.specModalVersion.set(v);
+  }
+
+  closeSpecModal(): void {
+    this.specModalVersion.set(null);
+  }
+
   approvalRequestStateLabel(): string {
     const req = this.approvalRequest();
     if (!req || typeof req !== 'object') return '';
@@ -977,6 +1155,70 @@ export class CustomEndpointsPageComponent {
   generateWithOverride(id: string): void {
     const raw = this.promptOverrideByEndpoint()[id]?.trim() ?? '';
     this.generate(id, raw || undefined);
+  }
+
+  // --- List datatable: search, sort, and override modal ---
+  onListSearchInput(ev: Event): void {
+    this.listSearch.set((ev.target as HTMLInputElement).value);
+  }
+
+  toggleSort(key: 'slug' | 'status' | 'created'): void {
+    if (this.sortKey() === key) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortKey.set(key);
+      this.sortDir.set('asc');
+    }
+  }
+
+  sortIndicator(key: 'slug' | 'status' | 'created'): string {
+    if (this.sortKey() !== key) return '';
+    return this.sortDir() === 'asc' ? ' ▲' : ' ▼';
+  }
+
+  ariaSort(key: 'slug' | 'status' | 'created'): 'ascending' | 'descending' | 'none' {
+    if (this.sortKey() !== key) return 'none';
+    return this.sortDir() === 'asc' ? 'ascending' : 'descending';
+  }
+
+  private sortValue(e: EndpointListItem, key: 'slug' | 'status' | 'created'): string {
+    if (key === 'slug') return e.slug.toLowerCase();
+    if (key === 'status') return this.endpointLifecycleLabel(e.statusId).toLowerCase();
+    return e.createdAt; // ISO string sorts chronologically
+  }
+
+  /** Bootstrap contextual class for a lifecycle-status badge. */
+  statusBadgeClass(statusId: string): string {
+    switch (this.endpointLifecycleLabel(statusId)) {
+      case 'Active':
+        return 'text-bg-success';
+      case 'Draft':
+        return 'text-bg-secondary';
+      case 'Archived':
+        return 'text-bg-dark';
+      default:
+        return 'text-bg-light';
+    }
+  }
+
+  openOverride(id: string): void {
+    this.overrideModalId.set(id);
+  }
+
+  closeOverride(): void {
+    this.overrideModalId.set(null);
+  }
+
+  overrideModalSlug(): string {
+    const id = this.overrideModalId();
+    return this.items().find((e) => e.id === id)?.slug ?? '';
+  }
+
+  confirmOverride(): void {
+    const id = this.overrideModalId();
+    if (!id) return;
+    this.generateWithOverride(id);
+    this.closeOverride();
   }
 
   generate(id: string, overridePrompt?: string): void {
