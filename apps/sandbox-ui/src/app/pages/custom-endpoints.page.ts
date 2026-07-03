@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   effect,
   inject,
@@ -12,13 +13,50 @@ import {
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { map, merge } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, filter, map, merge, of, Subject, switchMap, tap } from 'rxjs';
+import { environment } from '../../environments/environment';
 import {
   aiEndpointProductionRequestStateLabel,
   developerAiEndpointLifecycleLabel,
   genericRowStatusLabel,
 } from '../lib/custom-endpoint-catalog-labels';
 import { SandboxPortalService, SandboxSession } from '../services/sandbox-portal.service';
+
+/** A preview response from the dry-run endpoint. */
+type EndpointPreview = {
+  spec: Record<string, unknown>;
+  result: unknown;
+  httpStatus: number;
+  slugSuggestion: string;
+};
+
+/** Extracts `{ table, rows }` from a fixture-read preview result, if present. */
+function previewRows(result: unknown): { table: string | null; rows: Record<string, unknown>[] } | null {
+  if (!result || typeof result !== 'object') return null;
+  const r = result as Record<string, unknown>;
+  if (!Array.isArray(r['rows'])) return null;
+  return { table: typeof r['table'] === 'string' ? r['table'] : null, rows: r['rows'] as Record<string, unknown>[] };
+}
+
+/** Slugifies the first few words of a string into a slug base (no uniqueness suffix). */
+function slugifyBase(text: string): string {
+  const base = (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 5)
+    .join('-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+  return base.length >= 2 ? base : 'endpoint';
+}
+
+/** Short, URL-safe suffix keeping auto-generated slugs unique per draft. */
+function randomSlugSuffix(): string {
+  return Math.random().toString(36).slice(2, 6) || 'a1b2';
+}
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -62,6 +100,15 @@ function apiErrorMessage(err: unknown): string {
             <a routerLink="/custom-endpoints" class="btn btn-outline-secondary">All endpoints</a>
           }
           @if (mode() === 'list') {
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              [disabled]="reseeding()"
+              title="Delete and regenerate this org's MRP demo dataset"
+              (click)="resetDemoData()"
+            >
+              {{ reseeding() ? 'Resetting…' : 'Reset demo data' }}
+            </button>
             <a routerLink="/custom-endpoints/new" class="btn btn-primary">New draft</a>
           }
         </div>
@@ -106,8 +153,24 @@ function apiErrorMessage(err: unknown): string {
         @if (mode() === 'new') {
           <section class="int-card mb-4" aria-labelledby="ce-create-heading">
             <h2 id="ce-create-heading" class="h5">Create draft</h2>
+
             <div class="form-group">
-              <label for="ce-slug">Slug</label>
+              <label for="ce-prompt">Instructions</label>
+              <textarea
+                id="ce-prompt"
+                class="form-control"
+                rows="4"
+                placeholder="Describe what this endpoint should return, e.g. 'List purchased items with lead time over 5 days, showing sku, description and lead time'."
+                [value]="createUserPrompt()"
+                (input)="onCreateUserPromptInput($event)"
+              ></textarea>
+              <span class="text-muted small">
+                Plain-language instructions — the preview below updates as you type (about a second after you pause).
+              </span>
+            </div>
+
+            <div class="form-group">
+              <label for="ce-slug">Slug <span class="text-muted small">(optional — auto-generated if blank)</span></label>
               <input
                 id="ce-slug"
                 class="form-control"
@@ -116,35 +179,98 @@ function apiErrorMessage(err: unknown): string {
                 [value]="createSlug()"
                 (input)="onCreateSlugInput($event)"
               />
-              <span class="text-muted small">Lowercase letters, digits, hyphens; 2–64 characters.</span>
+              <p class="ce-url">
+                <span class="ce-url-label">Endpoint URL</span>
+                <code class="ce-url-value">{{ endpointUrl() }}</code>
+              </p>
             </div>
-            <div class="form-group">
-              <label for="ce-prompt">Instructions</label>
-              <textarea
-                id="ce-prompt"
-                class="form-control"
-                rows="4"
-                [value]="createUserPrompt()"
-                (input)="onCreateUserPromptInput($event)"
-              ></textarea>
+
+            <div class="ce-preview-head">
+              <h3 class="h6 mb-0">Sample data preview</h3>
+              <div class="ce-preview-actions">
+                @if (previewLoading()) {
+                  <span class="text-muted small">Generating…</span>
+                }
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-secondary"
+                  [disabled]="previewLoading() || createUserPrompt().trim().length < 10"
+                  (click)="runPreview()"
+                >
+                  Run preview
+                </button>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="ce-model">Model ID (optional)</label>
-              <input
-                id="ce-model"
-                class="form-control"
-                type="text"
-                autocomplete="off"
-                [value]="createModelId()"
-                (input)="onCreateModelIdInput($event)"
-              />
-            </div>
+            @if (previewError()) {
+              <p class="form-error">{{ previewError() }}</p>
+            }
+            @if (previewResult(); as pv) {
+              <div class="ce-tabs" role="tablist" aria-label="Preview format">
+                <button
+                  type="button"
+                  role="tab"
+                  class="ce-tab"
+                  [class.active]="previewTab() === 'list'"
+                  [attr.aria-selected]="previewTab() === 'list'"
+                  (click)="previewTab.set('list')"
+                >
+                  List
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  class="ce-tab"
+                  [class.active]="previewTab() === 'json'"
+                  [attr.aria-selected]="previewTab() === 'json'"
+                  (click)="previewTab.set('json')"
+                >
+                  JSON
+                </button>
+              </div>
+
+              @if (previewTab() === 'list') {
+                @if (previewTable(); as t) {
+                  @if (t.rows.length === 0) {
+                    <p class="text-muted small">No rows match — try adjusting the instructions.</p>
+                  } @else {
+                    <div class="table-responsive">
+                      <table class="table table-sm">
+                        <thead>
+                          <tr>
+                            @for (col of previewColumns(); track col) {
+                              <th>{{ col }}</th>
+                            }
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (row of t.rows; track $index) {
+                            <tr>
+                              @for (col of previewColumns(); track col) {
+                                <td>{{ formatCell(row[col]) }}</td>
+                              }
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                    <p class="text-muted small">{{ t.rows.length }} row(s){{ t.table ? ' from ' + t.table : '' }}.</p>
+                  }
+                } @else {
+                  <p class="text-muted small">This preview is not a row list — see the JSON tab.</p>
+                }
+              } @else {
+                <pre class="ce-spec-pre small">{{ formatJson({ spec: pv.spec, result: pv.result }) }}</pre>
+              }
+            } @else if (!previewLoading()) {
+              <p class="text-muted small">Start typing instructions to see a live sample.</p>
+            }
+
             @if (createError()) {
               <p class="form-error">{{ createError() }}</p>
             }
             <div class="ce-create-actions">
               <button type="button" class="btn btn-primary" [disabled]="createSubmitting()" (click)="submitCreate()">
-                Create
+                {{ createSubmitting() ? 'Creating…' : 'Create' }}
               </button>
             </div>
           </section>
@@ -409,6 +535,60 @@ function apiErrorMessage(err: unknown): string {
       .ce-create-actions {
         margin-top: 1.25rem;
       }
+      .ce-url {
+        margin: 0.5rem 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        align-items: baseline;
+      }
+      .ce-url-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--spectra-color-navy);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .ce-url-value {
+        font-size: 0.82rem;
+        word-break: break-all;
+        color: var(--spectra-color-text);
+      }
+      .ce-preview-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin: 1.25rem 0 0.5rem;
+      }
+      .ce-preview-actions {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .ce-tabs {
+        display: flex;
+        gap: 0.25rem;
+        border-bottom: 1px solid var(--spectra-color-border);
+        margin-bottom: 0.75rem;
+      }
+      .ce-tab {
+        border: none;
+        background: transparent;
+        padding: 0.4rem 0.8rem;
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--spectra-color-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+      }
+      .ce-tab.active {
+        color: var(--spectra-color-navy);
+        border-bottom-color: var(--spectra-color-accent);
+      }
       .ce-spec-pre {
         max-height: 14rem;
         overflow: auto;
@@ -446,9 +626,49 @@ export class CustomEndpointsPageComponent {
 
   readonly createSlug = signal('');
   readonly createUserPrompt = signal('');
-  readonly createModelId = signal('');
   readonly createError = signal<string | null>(null);
   readonly createSubmitting = signal(false);
+
+  /** Live preview state for the new-draft page. */
+  readonly previewLoading = signal(false);
+  readonly previewError = signal<string | null>(null);
+  readonly previewResult = signal<EndpointPreview | null>(null);
+  readonly previewTab = signal<'list' | 'json'>('list');
+  /** Random suffix that keeps an auto-generated slug stable for this draft (bumped on conflict). */
+  private readonly slugSuffix = signal(randomSlugSuffix());
+  private readonly promptInput$ = new Subject<string>();
+  private readonly manualPreview$ = new Subject<string>();
+
+  /** Slug used when the user leaves the field blank: prompt/suggestion base + a uniqueness suffix. */
+  readonly autoSlug = computed(() => {
+    const base = slugifyBase(this.previewResult()?.slugSuggestion || this.createUserPrompt());
+    return `${base}-${this.slugSuffix()}`.slice(0, 63).replace(/-+$/g, '');
+  });
+  /** The slug that will actually be used: explicit value if valid-ish, else the auto slug. */
+  readonly effectiveSlug = computed(() => this.createSlug().trim() || this.autoSlug());
+  /** Hosted invoke URL preview for the effective slug. */
+  readonly endpointUrl = computed(() => {
+    const base = (environment.apiBaseUrl ?? '').replace(/\/$/, '');
+    return `${base}/v1/platform/tenant-runtime/endpoints/${this.effectiveSlug()}/invoke`;
+  });
+  /** Parsed `{ table, rows }` of the current preview, if it is a row list. */
+  readonly previewTable = computed(() => previewRows(this.previewResult()?.result));
+  /** Union of column keys across preview rows (stable order from the first row, then extras). */
+  readonly previewColumns = computed<string[]>(() => {
+    const t = this.previewTable();
+    if (!t || t.rows.length === 0) return [];
+    const seen = new Set<string>();
+    const cols: string[] = [];
+    for (const row of t.rows) {
+      for (const k of Object.keys(row)) {
+        if (!seen.has(k)) {
+          seen.add(k);
+          cols.push(k);
+        }
+      }
+    }
+    return cols;
+  });
 
   readonly generatingById = signal<Record<string, boolean>>({});
   readonly promptOverrideByEndpoint = signal<Record<string, string>>({});
@@ -456,6 +676,7 @@ export class CustomEndpointsPageComponent {
 
   readonly openapiDownloading = signal(false);
   readonly openapiError = signal<string | null>(null);
+  readonly reseeding = signal(false);
 
   readonly focusLoading = signal(false);
   readonly focusNotFound = signal(false);
@@ -509,6 +730,36 @@ export class CustomEndpointsPageComponent {
         this.refreshListFromRoute();
       });
 
+    // Live preview pipeline: debounce keystrokes, dedupe, or fire immediately on manual Run.
+    // switchMap cancels any in-flight request when a newer one starts.
+    merge(
+      this.promptInput$.pipe(debounceTime(1000), map((p) => p.trim()), distinctUntilChanged()),
+      this.manualPreview$.pipe(map((p) => p.trim())),
+    )
+      .pipe(
+        filter((p) => p.length >= 10),
+        tap(() => {
+          this.previewLoading.set(true);
+          this.previewError.set(null);
+        }),
+        switchMap((userPrompt) =>
+          this.api.previewCustomAiEndpoint({ userPrompt }).pipe(
+            map((res) => ({ ok: true as const, res })),
+            catchError((err: unknown) => of({ ok: false as const, err })),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((out) => {
+        this.previewLoading.set(false);
+        if (out.ok) {
+          this.previewResult.set(out.res);
+          this.previewError.set(null);
+        } else {
+          this.previewError.set(apiErrorMessage(out.err));
+        }
+      });
+
     effect(() => {
       const m = this.mode();
       const id = this.focusEndpointId();
@@ -539,11 +790,38 @@ export class CustomEndpointsPageComponent {
   }
 
   onCreateUserPromptInput(ev: Event): void {
-    this.createUserPrompt.set((ev.target as HTMLTextAreaElement).value ?? '');
+    const value = (ev.target as HTMLTextAreaElement).value ?? '';
+    this.createUserPrompt.set(value);
+    this.promptInput$.next(value);
   }
 
-  onCreateModelIdInput(ev: Event): void {
-    this.createModelId.set((ev.target as HTMLInputElement).value ?? '');
+  /** Manual preview trigger (bypasses the debounce). */
+  runPreview(): void {
+    this.manualPreview$.next(this.createUserPrompt());
+  }
+
+  /** Regenerates the org's MRP demo fixtures, then reloads the list. */
+  resetDemoData(): void {
+    if (this.reseeding()) return;
+    this.reseeding.set(true);
+    this.api.reseedSandboxFixtures().subscribe({
+      next: (r) => {
+        this.reseeding.set(false);
+        this.toastr.success(`Demo dataset regenerated (${r.itemCount} items).`, 'Reset demo data');
+        if (this.mode() === 'list') this.reloadList();
+      },
+      error: (e: unknown) => {
+        this.reseeding.set(false);
+        this.toastr.error(apiErrorMessage(e), 'Reset failed');
+      },
+    });
+  }
+
+  /** Renders a cell value for the List tab. */
+  formatCell(v: unknown): string {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') return JSON.stringify(v);
+    return String(v);
   }
 
   onTryBodyInput(ev: Event): void {
@@ -747,42 +1025,42 @@ export class CustomEndpointsPageComponent {
     });
   }
 
-  submitCreate(): void {
-    const slug = this.createSlug().trim();
+  submitCreate(retried = false): void {
     const userPrompt = this.createUserPrompt().trim();
-    const modelRaw = this.createModelId().trim();
+    const slug = this.effectiveSlug();
     this.createError.set(null);
-    if (!SLUG_RE.test(slug)) {
-      this.createError.set('Slug must be lowercase letters, digits, hyphens (2–64 chars).');
-      return;
-    }
     if (!userPrompt) {
       this.createError.set('Instructions are required.');
       return;
     }
-    let modelId: string | undefined;
-    if (modelRaw) {
-      if (!UUID_RE.test(modelRaw)) {
-        this.createError.set('Model ID must be a UUID when provided.');
-        return;
-      }
-      modelId = modelRaw;
+    if (!SLUG_RE.test(slug)) {
+      this.createError.set('Slug must be lowercase letters, digits, hyphens (2–64 chars).');
+      return;
     }
     this.createSubmitting.set(true);
-    this.api
-      .createCustomAiEndpoint(modelId ? { slug, userPrompt, modelId } : { slug, userPrompt })
-      .subscribe({
-        next: (res) => {
-          this.createSubmitting.set(false);
-          const newId = (res.endpoint as { id?: string })?.id;
-          if (newId) void this.router.navigate(['/custom-endpoints', newId]);
-          else void this.router.navigate(['/custom-endpoints']);
-        },
-        error: (e: unknown) => {
-          this.createSubmitting.set(false);
-          this.createError.set(apiErrorMessage(e));
-        },
-      });
+    this.api.createCustomAiEndpoint({ slug, userPrompt }).subscribe({
+      next: (res) => {
+        this.createSubmitting.set(false);
+        const newId = (res.endpoint as { id?: string })?.id;
+        if (newId) void this.router.navigate(['/custom-endpoints', newId]);
+        else void this.router.navigate(['/custom-endpoints']);
+      },
+      error: (e: unknown) => {
+        this.createSubmitting.set(false);
+        // Auto-generated slug collided — bump the suffix and retry once.
+        if (
+          !retried &&
+          !this.createSlug().trim() &&
+          e instanceof HttpErrorResponse &&
+          e.status === 409
+        ) {
+          this.slugSuffix.set(randomSlugSuffix());
+          this.submitCreate(true);
+          return;
+        }
+        this.createError.set(apiErrorMessage(e));
+      },
+    });
   }
 
   downloadOpenApi(): void {

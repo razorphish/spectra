@@ -13,6 +13,7 @@ import {
   parseParDocumentsEnvelope,
   productionAccessRequests,
   resolveSpectraDatabaseUrl,
+  type ParDocumentsEnvelope,
 } from '@spectra/database';
 
 export type EnsureSessionFn = (
@@ -87,7 +88,7 @@ export function createSandboxPortalProductionAccessRouter(ensureSession: EnsureS
       res.status(400).json({ error: 'validation_error', message: 'documents envelope is required.' });
       return;
     }
-    let documents: import('@spectra/database').ParDocumentsEnvelope;
+    let documents: ParDocumentsEnvelope;
     try {
       documents = parseParDocumentsEnvelope((req.body as { documents?: unknown }).documents);
     } catch (e) {

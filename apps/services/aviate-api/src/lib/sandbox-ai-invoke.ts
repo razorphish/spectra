@@ -1,4 +1,5 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, like, lt, lte, ne, type SQL } from 'drizzle-orm';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 
 import type { SpectraDb } from '@spectra/database';
 import {
@@ -11,7 +12,13 @@ import {
   sandboxMrpRoutingOperations,
   sandboxMrpSuppliers,
   sandboxMrpWorkOrders,
+  SANDBOX_MRP_FIXTURE_COLUMNS,
+  SANDBOX_MRP_FIXTURE_LIMIT_CAP,
   SANDBOX_MRP_FIXTURE_TABLE_NAMES,
+  type SandboxAiFilterClause,
+  type SandboxAiFilterOperator,
+  type SandboxAiSortClause,
+  type SandboxMrpFixtureTableName,
 } from '@spectra/database';
 
 export type HostedCustomEndpointInvokeContext = {
@@ -19,11 +26,55 @@ export type HostedCustomEndpointInvokeContext = {
   tenantId: string;
 };
 
-const FIXTURE_ROW_CAP = 500;
+const FIXTURE_ROW_CAP = SANDBOX_MRP_FIXTURE_LIMIT_CAP;
+
+/** Allowlisted table objects, keyed by physical table name (matches SANDBOX_MRP_FIXTURE_TABLE_NAMES). */
+const FIXTURE_TABLES: Record<SandboxMrpFixtureTableName, PgTable> = {
+  sandbox_mrp_items: sandboxMrpItems,
+  sandbox_mrp_bom_lines: sandboxMrpBomLines,
+  sandbox_mrp_inventory_balances: sandboxMrpInventoryBalances,
+  sandbox_mrp_work_orders: sandboxMrpWorkOrders,
+  sandbox_mrp_suppliers: sandboxMrpSuppliers,
+  sandbox_mrp_purchase_orders: sandboxMrpPurchaseOrders,
+  sandbox_mrp_routing_operations: sandboxMrpRoutingOperations,
+  sandbox_mrp_inventory_transactions: sandboxMrpInventoryTransactions,
+  sandbox_mrp_demand_forecasts: sandboxMrpDemandForecasts,
+};
+
+function columnFor(table: SandboxMrpFixtureTableName, prop: string): PgColumn | null {
+  if (!SANDBOX_MRP_FIXTURE_COLUMNS[table].includes(prop)) return null;
+  const col = (FIXTURE_TABLES[table] as unknown as Record<string, PgColumn>)[prop];
+  return col ?? null;
+}
+
+function buildFilter(col: PgColumn, op: SandboxAiFilterOperator, val: unknown): SQL | null {
+  switch (op) {
+    case 'eq':
+      return eq(col, val);
+    case 'ne':
+      return ne(col, val);
+    case 'gt':
+      return gt(col, val);
+    case 'gte':
+      return gte(col, val);
+    case 'lt':
+      return lt(col, val);
+    case 'lte':
+      return lte(col, val);
+    case 'like':
+      return like(col, String(val));
+    case 'in':
+      return Array.isArray(val) ? inArray(col, val) : null;
+    default:
+      return null;
+  }
+}
 
 /**
  * Executes persisted `developer_ai_endpoint_versions.spec` (GAP-1 kinds + G10 fixture reads).
- * `sandbox_mrp_fixture_read` never executes client SQL; only allowlisted tables with injected `tenant_id`.
+ * `sandbox_mrp_fixture_read` never executes client SQL; it only queries allowlisted tables and
+ * columns with an injected `tenant_id` filter and `deleted_at IS NULL`. Optional `where` / `sort`
+ * / `select` / `limit` are mapped from the validated spec to Drizzle operators via the allowlist.
  */
 export async function executeHostedCustomEndpointSpec(
   ctx: HostedCustomEndpointInvokeContext,
@@ -51,99 +102,60 @@ export async function executeHostedCustomEndpointSpec(
         json: { error: 'policy_violation', message: 'Invalid fixture table for execution_kind.' },
       };
     }
+    const tableName = table as SandboxMrpFixtureTableName;
+    const tableObj = FIXTURE_TABLES[tableName];
+    const cols = tableObj as unknown as Record<string, PgColumn>;
 
-    switch (table) {
-      case 'sandbox_mrp_items': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpItems)
-          .where(and(eq(sandboxMrpItems.tenantId, ctx.tenantId), isNull(sandboxMrpItems.deletedAt)))
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
+    // Tenant scope + soft-delete are always injected — never client-controlled.
+    const conditions: SQL[] = [eq(cols['tenantId'], ctx.tenantId), isNull(cols['deletedAt'])];
+
+    const where = Array.isArray(spec['where']) ? (spec['where'] as SandboxAiFilterClause[]) : [];
+    for (const clause of where) {
+      const col = columnFor(tableName, clause.col);
+      if (!col) {
+        return { httpStatus: 400, json: { error: 'policy_violation', message: `Invalid filter column: ${clause.col}` } };
       }
-      case 'sandbox_mrp_bom_lines': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpBomLines)
-          .where(and(eq(sandboxMrpBomLines.tenantId, ctx.tenantId), isNull(sandboxMrpBomLines.deletedAt)))
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
+      const cond = buildFilter(col, clause.op, clause.val);
+      if (!cond) {
+        return { httpStatus: 400, json: { error: 'policy_violation', message: `Invalid filter operator: ${clause.op}` } };
       }
-      case 'sandbox_mrp_inventory_balances': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpInventoryBalances)
-          .where(
-            and(eq(sandboxMrpInventoryBalances.tenantId, ctx.tenantId), isNull(sandboxMrpInventoryBalances.deletedAt)),
-          )
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
-      }
-      case 'sandbox_mrp_work_orders': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpWorkOrders)
-          .where(and(eq(sandboxMrpWorkOrders.tenantId, ctx.tenantId), isNull(sandboxMrpWorkOrders.deletedAt)))
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
-      }
-      case 'sandbox_mrp_suppliers': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpSuppliers)
-          .where(and(eq(sandboxMrpSuppliers.tenantId, ctx.tenantId), isNull(sandboxMrpSuppliers.deletedAt)))
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
-      }
-      case 'sandbox_mrp_purchase_orders': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpPurchaseOrders)
-          .where(
-            and(eq(sandboxMrpPurchaseOrders.tenantId, ctx.tenantId), isNull(sandboxMrpPurchaseOrders.deletedAt)),
-          )
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
-      }
-      case 'sandbox_mrp_routing_operations': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpRoutingOperations)
-          .where(
-            and(eq(sandboxMrpRoutingOperations.tenantId, ctx.tenantId), isNull(sandboxMrpRoutingOperations.deletedAt)),
-          )
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
-      }
-      case 'sandbox_mrp_inventory_transactions': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpInventoryTransactions)
-          .where(
-            and(
-              eq(sandboxMrpInventoryTransactions.tenantId, ctx.tenantId),
-              isNull(sandboxMrpInventoryTransactions.deletedAt),
-            ),
-          )
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
-      }
-      case 'sandbox_mrp_demand_forecasts': {
-        const rows = await ctx.db
-          .select()
-          .from(sandboxMrpDemandForecasts)
-          .where(
-            and(eq(sandboxMrpDemandForecasts.tenantId, ctx.tenantId), isNull(sandboxMrpDemandForecasts.deletedAt)),
-          )
-          .limit(FIXTURE_ROW_CAP);
-        return { httpStatus: 200, json: { table, rows } };
-      }
-      default:
-        return {
-          httpStatus: 400,
-          json: { error: 'policy_violation', message: 'Unsupported fixture table.' },
-        };
+      conditions.push(cond);
     }
+
+    const select = Array.isArray(spec['select']) ? (spec['select'] as string[]) : [];
+    const projection: Record<string, PgColumn> = {};
+    for (const prop of select) {
+      const col = columnFor(tableName, prop);
+      if (!col) {
+        return { httpStatus: 400, json: { error: 'policy_violation', message: `Invalid select column: ${prop}` } };
+      }
+      projection[prop] = col;
+    }
+
+    const sort = Array.isArray(spec['sort']) ? (spec['sort'] as SandboxAiSortClause[]) : [];
+    const orderBy: SQL[] = [];
+    for (const s of sort) {
+      const col = columnFor(tableName, s.col);
+      if (!col) {
+        return { httpStatus: 400, json: { error: 'policy_violation', message: `Invalid sort column: ${s.col}` } };
+      }
+      orderBy.push(s.dir === 'desc' ? desc(col) : asc(col));
+    }
+
+    const rawLimit = typeof spec['limit'] === 'number' ? spec['limit'] : FIXTURE_ROW_CAP;
+    const limit = Math.min(Math.max(1, Math.trunc(rawLimit)), FIXTURE_ROW_CAP);
+
+    // Cast to a permissive builder for conditional chaining; safety is enforced by the allowlist above.
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    let query: any = (Object.keys(projection).length ? ctx.db.select(projection) : ctx.db.select())
+      .from(tableObj)
+      .where(and(...conditions));
+    if (orderBy.length) {
+      query = query.orderBy(...orderBy);
+    }
+    const rows = (await query.limit(limit)) as Record<string, unknown>[];
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    return { httpStatus: 200, json: { table, rows } };
   }
   return { httpStatus: 500, json: { error: 'unsupported_execution_kind' } };
 }

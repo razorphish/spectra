@@ -1,26 +1,28 @@
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { Router, type RequestHandler } from 'express';
 
 import {
   aiEndpointProductionRequests,
-  aiLlmModels,
   buildActorJson,
   CATALOG_IDS,
   developerAiEndpointVersions,
   developerAiEndpoints,
   fetchSandboxAiPlatformSettings,
   getDb,
+  getDefaultAiLlmModel,
   getEndpointPricingProfileId,
   resolveEffectivePricingPolicy,
+  reseedSandboxMrpFixturesForTenant,
   resolveSpectraDatabaseUrl,
   runtimeTenants,
+  sandboxMrpItems,
   seedSandboxMrpFixturesForTenant,
   sha256HexJson,
-  usageEvents,
   validateDeveloperAiEndpointSpec,
 } from '@spectra/database';
 
 import { executeHostedCustomEndpointSpec } from '../lib/sandbox-ai-invoke';
+import { AiModelNotConfiguredError, generateEndpointSpecFromPrompt } from '../lib/sandbox-ai-llm';
 
 import type { EnsureSessionFn } from './sandbox-portal-par';
 
@@ -34,12 +36,59 @@ function noDatabase(res: Parameters<RequestHandler>[1]): void {
   });
 }
 
-function buildStubLlmSpec(slug: string): Record<string, unknown> {
-  return {
-    execution_kind: 'sandbox_mrp_fixture_read',
-    table: 'sandbox_mrp_items',
-    note: `stub for ${slug}`,
-  };
+/** Derives a slug candidate from prompt words (frontend adds a uniqueness suffix). */
+function suggestSlugFromPrompt(prompt: string): string {
+  const base = prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 5)
+    .join('-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+  return base.length >= 2 ? base : 'endpoint';
+}
+
+type GeneratedEndpointSpec = {
+  spec: Record<string, unknown>;
+  llmRawResponse: string;
+  modelId: string;
+};
+
+/** Resolves the model, calls the LLM, and validates the produced spec. Throws on config/validation failure. */
+async function generateValidatedSpec(
+  db: ReturnType<typeof getDb>,
+  userPrompt: string,
+  pinnedModelId?: string | null,
+): Promise<GeneratedEndpointSpec> {
+  const model = await getDefaultAiLlmModel(db, pinnedModelId ?? undefined);
+  const { spec, llmRawResponse } = await generateEndpointSpecFromPrompt({ userPrompt, model });
+  const validated = validateDeveloperAiEndpointSpec(spec);
+  if (validated.ok === false) {
+    const err = new Error(validated.error);
+    err.name = 'SpecValidationError';
+    throw err;
+  }
+  return { spec, llmRawResponse, modelId: model.id };
+}
+
+/** Maps spec-generation errors to an HTTP response. Returns true if it handled (responded). */
+function handleGenerationError(res: Parameters<RequestHandler>[1], e: unknown): boolean {
+  if (e instanceof AiModelNotConfiguredError) {
+    res.status(503).json({ error: 'ai_model_not_configured', message: e.message });
+    return true;
+  }
+  if (e instanceof Error && e.name === 'SpecValidationError') {
+    res.status(422).json({ error: 'spec_validation_error', message: `Generated spec was invalid: ${e.message}` });
+    return true;
+  }
+  res.status(502).json({
+    error: 'ai_generation_failed',
+    message: e instanceof Error ? e.message : 'Failed to generate endpoint spec.',
+  });
+  return true;
 }
 
 export function createSandboxPortalAiRouter(ensureSession: EnsureSessionFn): Router {
@@ -133,6 +182,39 @@ export function createSandboxPortalAiRouter(ensureSession: EnsureSessionFn): Rou
     });
   };
 
+  /** Deletes and regenerates this org's MRP demo fixtures (so an existing tenant picks up richer data). */
+  const postReseedFixtures: RequestHandler = async (req, res) => {
+    const sub = req.auth?.sub;
+    if (!sub) {
+      res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+      return;
+    }
+    const session = await ensureSession(sub, req.auth?.claims ?? {});
+    if (!session) {
+      res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+      return;
+    }
+    const db = getDb();
+    const [rt] = await db
+      .select({ id: runtimeTenants.id })
+      .from(runtimeTenants)
+      .where(and(eq(runtimeTenants.orgId, session.orgId), isNull(runtimeTenants.deletedAt)))
+      .limit(1);
+    if (!rt) {
+      res.status(400).json({
+        error: 'tenant_not_bootstrapped',
+        message: 'POST /v1/platform/sandbox/runtime-tenants first.',
+      });
+      return;
+    }
+    await reseedSandboxMrpFixturesForTenant(db, rt.id);
+    const [cnt] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(sandboxMrpItems)
+      .where(and(eq(sandboxMrpItems.tenantId, rt.id), isNull(sandboxMrpItems.deletedAt)));
+    res.status(200).json({ tenantId: rt.id, itemCount: cnt?.n ?? 0 });
+  };
+
   const listAiEndpoints: RequestHandler = async (req, res) => {
     const sub = req.auth?.sub;
     if (!sub) {
@@ -209,7 +291,17 @@ export function createSandboxPortalAiRouter(ensureSession: EnsureSessionFn): Rou
     }
 
     const actor = buildActorJson({ name: session.email, userId: session.userId });
-    const modelId = typeof body.modelId === 'string' ? body.modelId : null;
+    const pinnedModelId = typeof body.modelId === 'string' ? body.modelId : null;
+
+    // Generate the spec from the prompt before persisting anything, so a config/LLM
+    // failure doesn't leave an orphaned endpoint with no version.
+    let generated: GeneratedEndpointSpec;
+    try {
+      generated = await generateValidatedSpec(db, userPrompt, pinnedModelId);
+    } catch (e: unknown) {
+      handleGenerationError(res, e);
+      return;
+    }
 
     const [ep] = await db
       .insert(developerAiEndpoints)
@@ -228,22 +320,17 @@ export function createSandboxPortalAiRouter(ensureSession: EnsureSessionFn): Rou
       return;
     }
 
-    const spec = buildStubLlmSpec(slug);
-    const validated = validateDeveloperAiEndpointSpec(spec);
-    if (validated.ok === false) {
-      res.status(500).json({ error: 'internal', message: validated.error });
-      return;
-    }
-    const specSha = sha256HexJson(spec);
+    const specSha = sha256HexJson(generated.spec);
     const [ver] = await db
       .insert(developerAiEndpointVersions)
       .values({
         endpointId: ep.id,
         revision: 1,
         userPrompt,
-        modelId,
-        spec: spec as never,
+        modelId: generated.modelId,
+        spec: generated.spec as never,
         specSha256: specSha,
+        llmRawResponse: generated.llmRawResponse as never,
         statusId: CATALOG_IDS.status.active,
         createdBy: actor,
         updatedBy: actor,
@@ -339,7 +426,6 @@ export function createSandboxPortalAiRouter(ensureSession: EnsureSessionFn): Rou
       res.status(404).json({ error: 'endpoint_not_found', message: 'Endpoint not found.' });
       return;
     }
-    const ep = epJoin.ep;
     const [latest] = await db
       .select()
       .from(developerAiEndpointVersions)
@@ -348,24 +434,31 @@ export function createSandboxPortalAiRouter(ensureSession: EnsureSessionFn): Rou
       .limit(1);
     const nextRev = (latest?.revision ?? 0) + 1;
     const prompt = userPrompt || latest?.userPrompt || '';
-    const actor = buildActorJson({ name: session.email, userId: session.userId });
-    const spec = buildStubLlmSpec(ep.slug);
-    const validated = validateDeveloperAiEndpointSpec(spec);
-    if (validated.ok === false) {
-      res.status(400).json({ error: 'validation_error', message: validated.error });
+    if (!prompt) {
+      res.status(400).json({ error: 'validation_error', message: 'userPrompt is required to generate.' });
       return;
     }
-    const specSha = sha256HexJson(spec);
+    const actor = buildActorJson({ name: session.email, userId: session.userId });
+
+    let generated: GeneratedEndpointSpec;
+    try {
+      generated = await generateValidatedSpec(db, prompt, latest?.modelId ?? null);
+    } catch (e: unknown) {
+      handleGenerationError(res, e);
+      return;
+    }
+
+    const specSha = sha256HexJson(generated.spec);
     const [ver] = await db
       .insert(developerAiEndpointVersions)
       .values({
         endpointId: id,
         revision: nextRev,
         userPrompt: prompt,
-        modelId: latest?.modelId ?? null,
-        spec: spec as never,
+        modelId: generated.modelId,
+        spec: generated.spec as never,
         specSha256: specSha,
-        llmRawResponse: '{"stub":true}' as never,
+        llmRawResponse: generated.llmRawResponse as never,
         statusId: CATALOG_IDS.status.active,
         createdBy: actor,
         updatedBy: actor,
@@ -703,9 +796,58 @@ export function createSandboxPortalAiRouter(ensureSession: EnsureSessionFn): Rou
     });
   };
 
+  const postPreview: RequestHandler = async (req, res) => {
+    const sub = req.auth?.sub;
+    if (!sub) {
+      res.status(401).json({ error: 'unauthorized', message: 'Missing principal.' });
+      return;
+    }
+    const session = await ensureSession(sub, req.auth?.claims ?? {});
+    if (!session) {
+      res.status(500).json({ error: 'bootstrap_failed', message: 'Could not resolve developer org.' });
+      return;
+    }
+    const body = (req.body ?? {}) as { userPrompt?: unknown; modelId?: unknown };
+    const userPrompt = typeof body.userPrompt === 'string' ? body.userPrompt.trim() : '';
+    if (!userPrompt) {
+      res.status(400).json({ error: 'validation_error', message: 'userPrompt is required.' });
+      return;
+    }
+    const db = getDb();
+    const [rt] = await db
+      .select({ id: runtimeTenants.id })
+      .from(runtimeTenants)
+      .where(and(eq(runtimeTenants.orgId, session.orgId), isNull(runtimeTenants.deletedAt)))
+      .limit(1);
+    if (!rt) {
+      res.status(400).json({
+        error: 'tenant_not_bootstrapped',
+        message: 'POST /v1/platform/sandbox/runtime-tenants first.',
+      });
+      return;
+    }
+    // Dry run: generate a spec from the prompt and execute it read-only — persists nothing.
+    let generated: GeneratedEndpointSpec;
+    try {
+      generated = await generateValidatedSpec(db, userPrompt, typeof body.modelId === 'string' ? body.modelId : null);
+    } catch (e: unknown) {
+      handleGenerationError(res, e);
+      return;
+    }
+    const out = await executeHostedCustomEndpointSpec({ db, tenantId: rt.id }, generated.spec, {});
+    res.status(200).json({
+      spec: generated.spec,
+      result: out.json,
+      httpStatus: out.httpStatus,
+      slugSuggestion: suggestSlugFromPrompt(userPrompt),
+    });
+  };
+
   r.post('/runtime-tenants', postRuntimeTenants);
+  r.post('/reseed-fixtures', postReseedFixtures);
   r.get('/ai-endpoints', listAiEndpoints);
   r.post('/ai-endpoints', postAiEndpoints);
+  r.post('/ai-endpoints/preview', postPreview);
   r.get('/ai-endpoints/openapi', getOpenApiMerge);
   r.get('/ai-endpoints/:id', getAiEndpoint);
   r.post('/ai-endpoints/:id/generate', postGenerate);

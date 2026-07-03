@@ -224,6 +224,14 @@ export class SandboxPortalService {
     }>(`${this.apiRoot()}/v1/platform/sandbox/runtime-tenants`, body ?? {});
   }
 
+  /** Dev/sandbox: delete and regenerate this org's MRP demo fixtures. */
+  reseedSandboxFixtures() {
+    return this.http.post<{ tenantId: string; itemCount: number }>(
+      `${this.apiRoot()}/v1/platform/sandbox/reseed-fixtures`,
+      {},
+    );
+  }
+
   listCustomAiEndpoints() {
     return this.http.get<{
       items: { id: string; slug: string; statusId: string; approvedProductionVersionId: string | null; createdAt: string }[];
@@ -265,6 +273,16 @@ export class SandboxPortalService {
       `${this.apiRoot()}/v1/platform/sandbox/ai-endpoints/${id}/generate`,
       body ?? {},
     );
+  }
+
+  /** Dry-run: turn instructions into a spec and execute it read-only. Persists nothing. */
+  previewCustomAiEndpoint(body: { userPrompt: string; modelId?: string }) {
+    return this.http.post<{
+      spec: Record<string, unknown>;
+      result: unknown;
+      httpStatus: number;
+      slugSuggestion: string;
+    }>(`${this.apiRoot()}/v1/platform/sandbox/ai-endpoints/preview`, body);
   }
 
   invokeCustomAiEndpointPreview(id: string, body: object, revision?: number) {
