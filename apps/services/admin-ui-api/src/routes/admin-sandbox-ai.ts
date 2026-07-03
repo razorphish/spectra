@@ -54,7 +54,12 @@ export function registerAdminSandboxAiRoutes(r: Router): void {
           displayName: aiLlmModels.displayName,
           provider: aiLlmModels.provider,
           modelName: aiLlmModels.modelName,
+          apiBaseUrl: aiLlmModels.apiBaseUrl,
+          maxTokens: aiLlmModels.maxTokens,
+          // secret_ref is a pointer (e.g. "env:ANTHROPIC_API_KEY"), not the secret value.
+          secretRef: aiLlmModels.secretRef,
           statusId: aiLlmModels.statusId,
+          updatedAt: aiLlmModels.updatedAt,
         })
         .from(aiLlmModels)
         .where(isNull(aiLlmModels.deletedAt))

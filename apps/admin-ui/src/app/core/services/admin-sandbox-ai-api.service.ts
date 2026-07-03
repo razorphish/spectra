@@ -3,6 +3,27 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '@/environments/environment';
 
+export interface AiLlmModel {
+  id: string;
+  displayName: string;
+  provider: string;
+  modelName: string;
+  apiBaseUrl: string | null;
+  maxTokens: number | null;
+  secretRef: string | null;
+  statusId: string | null;
+  updatedAt: string | null;
+}
+
+export interface AiLlmModelInput {
+  displayName: string;
+  provider: string;
+  modelName: string;
+  apiBaseUrl?: string | null;
+  maxTokens?: number | null;
+  secretRef?: string | null;
+}
+
 export interface PricingProfile {
   id: string;
   displayName: string;
@@ -20,8 +41,16 @@ export class AdminSandboxAiApiService {
     return `${environment.apiBaseUrl.replace(/\/$/, '')}/v1/admin`;
   }
 
-  listModels(): Observable<{ items: unknown[] }> {
-    return this.http.get<{ items: unknown[] }>(`${this.base()}/ai-llm-models`);
+  listModels(): Observable<{ items: AiLlmModel[] }> {
+    return this.http.get<{ items: AiLlmModel[] }>(`${this.base()}/ai-llm-models`);
+  }
+
+  createModel(body: AiLlmModelInput): Observable<AiLlmModel> {
+    return this.http.post<AiLlmModel>(`${this.base()}/ai-llm-models`, body);
+  }
+
+  patchModel(id: string, body: Partial<AiLlmModelInput>): Observable<AiLlmModel> {
+    return this.http.patch<AiLlmModel>(`${this.base()}/ai-llm-models/${id}`, body);
   }
 
   listPricingProfiles(): Observable<{ items: PricingProfile[] }> {
