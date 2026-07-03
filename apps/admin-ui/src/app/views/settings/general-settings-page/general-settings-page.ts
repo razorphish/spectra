@@ -5,6 +5,7 @@ import { NgbNavModule, NgbNavOutlet } from '@ng-bootstrap/ng-bootstrap';
 import { PageBreadcrumb } from '@app/components/page-breadcrumb';
 import { AdminAuthPlatformApiService } from '@core/services/admin-auth-platform-api.service';
 import { AdminNavVisibilityApiService } from '@core/services/admin-nav-visibility-api.service';
+import { AdminPlatformHealthApiService, type PlatformHealthDto } from '@core/services/admin-platform-health-api.service';
 import { AdminPlatformUiApiService } from '@core/services/admin-platform-ui-api.service';
 import { SidebarNavVisibilityService } from '@core/services/sidebar-nav-visibility.service';
 import {
@@ -31,6 +32,7 @@ export class GeneralSettingsPage implements OnInit {
   private readonly api = inject(AdminNavVisibilityApiService);
   private readonly authPlatform = inject(AdminAuthPlatformApiService);
   private readonly platformUiApi = inject(AdminPlatformUiApiService);
+  private readonly healthApi = inject(AdminPlatformHealthApiService);
   private readonly toastr = inject(ToastrService);
   private readonly navVisibility = inject(SidebarNavVisibilityService);
 
@@ -56,6 +58,10 @@ export class GeneralSettingsPage implements OnInit {
   sandboxAiAutomationEnabled = signal(false);
   sandboxAiMachineAutoApprove = signal(false);
 
+  readonly healthLoading = signal(false);
+  readonly healthError = signal<string | null>(null);
+  readonly health = signal<PlatformHealthDto | null>(null);
+
   readonly keys = TEMPLATE_NAV_MENU_KEYS;
   readonly labels = TEMPLATE_NAV_MENU_LABELS;
 
@@ -64,6 +70,27 @@ export class GeneralSettingsPage implements OnInit {
     void this.loadAuthJwtSkew();
     void this.loadDeveloperPortalUi();
     void this.loadSandboxAi();
+    void this.loadHealth();
+  }
+
+  async loadHealth(): Promise<void> {
+    this.healthLoading.set(true);
+    this.healthError.set(null);
+    try {
+      this.health.set(await firstValueFrom(this.healthApi.get()));
+    } catch (e: unknown) {
+      let msg = 'Failed to load API health';
+      if (e instanceof HttpErrorResponse) {
+        const body = e.error as { message?: string } | null;
+        msg = body?.message ?? e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      this.healthError.set(msg);
+      this.health.set(null);
+    } finally {
+      this.healthLoading.set(false);
+    }
   }
 
   isVisible(key: TemplateNavMenuKey): boolean {

@@ -16,6 +16,7 @@ import { createAdminMeSyncHandler } from './admin-me-sync';
 import { registerAdminLoggingRoutes } from './admin-logging';
 import { registerAdminMigrationsRoutes } from './admin-migrations';
 import { registerAdminNavVisibilityRoutes } from './admin-nav-visibility';
+import { registerAdminPlatformHealthRoutes } from './admin-platform-health';
 import { registerAdminPlatformUiRoutes } from './admin-platform-ui';
 import { registerAdminProductionAccessRoutes } from './admin-production-access';
 import { registerAdminSandboxAiRoutes } from './admin-sandbox-ai';
@@ -83,6 +84,7 @@ export function createAdminRouter() {
   registerAdminLoggingRoutes(r);
   registerAdminMigrationsRoutes(r);
   registerAdminNavVisibilityRoutes(r);
+  registerAdminPlatformHealthRoutes(r);
   registerAdminPlatformUiRoutes(r);
   registerAdminProductionAccessRoutes(r);
   registerAdminSandboxAiRoutes(r);

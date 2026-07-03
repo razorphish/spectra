@@ -230,6 +230,23 @@ app.get('/', (_req, res) => {
   res.send({ message: 'Spectra aviate-api', prefix: '/v1/platform' });
 });
 
+/** True when an Anthropic API key is available for sandbox custom-AI generation. */
+function sandboxAiKeyConfigured(): boolean {
+  return Boolean(process.env['ANTHROPIC_API_KEY']?.trim());
+}
+
+/** Lightweight readiness probe — never leaks secret values, only booleans. */
+app.get('/healthz', (_req, res) => {
+  res.json({
+    ok: true,
+    database: Boolean(process.env['DATABASE_URL']?.trim()),
+    sandboxAi: sandboxAiKeyConfigured(),
+  });
+});
+
 app.listen(port, host, () => {
   console.log(`[ ready ] http://${host}:${port}`);
+  console.log(
+    `[ sandbox-ai ] ANTHROPIC_API_KEY ${sandboxAiKeyConfigured() ? 'detected — custom AI endpoints enabled' : 'NOT set — /custom-endpoints preview/generate will return 503'}`,
+  );
 });
