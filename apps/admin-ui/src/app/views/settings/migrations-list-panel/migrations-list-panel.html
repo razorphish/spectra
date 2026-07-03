@@ -26,6 +26,20 @@
       }
       Run All
     </button>
+    <button
+      type="button"
+      class="btn btn-success btn-sm waves-effect d-inline-flex align-items-center gap-2"
+      (click)="state.runSeeds()"
+      [disabled]="state.runSeedsBusy()"
+      title="Run idempotent environment seed scripts (default AI model row + MRP demo fixtures)"
+    >
+      @if (state.runSeedsBusy()) {
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+      } @else {
+        <i class="sa sa-check" aria-hidden="true"></i>
+      }
+      Run seeds
+    </button>
     <button type="button" class="btn btn-secondary btn-sm waves-effect d-inline-flex align-items-center gap-2" (click)="state.check()">
       <i class="sa sa-check" aria-hidden="true"></i>
       Check

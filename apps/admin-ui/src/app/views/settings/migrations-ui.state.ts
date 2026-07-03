@@ -60,6 +60,7 @@ export class MigrationsUiState {
 
   runPendingBusy = signal(false);
   runAllBusy = signal(false);
+  runSeedsBusy = signal(false);
   reconcileBusy = signal(false);
   refreshing = signal(false);
   loadError = signal<string | null>(null);
@@ -292,6 +293,28 @@ export class MigrationsUiState {
       this.toastr.error(this.errMessage(e), 'Run All');
     } finally {
       this.runAllBusy.set(false);
+    }
+  }
+
+  /** Runs idempotent environment seed scripts (default model row + MRP fixture backfill). */
+  async runSeeds(): Promise<void> {
+    if (this.runSeedsBusy()) return;
+    this.runSeedsBusy.set(true);
+    try {
+      const { seeds } = await firstValueFrom(this.api.runSeeds());
+      const failed = seeds.filter((s) => s.status === 'error');
+      if (failed.length > 0) {
+        this.toastr.warning(
+          `Seeds completed with ${failed.length} failure(s): ${failed.map((f) => `${f.name} (${f.error ?? 'error'})`).join('; ')}.`,
+          'Run seeds',
+        );
+      } else {
+        this.toastr.success(`Ran ${seeds.length} seed(s): ${seeds.map((s) => s.name).join(', ')}.`, 'Run seeds');
+      }
+    } catch (e) {
+      this.toastr.error(this.errMessage(e), 'Run seeds');
+    } finally {
+      this.runSeedsBusy.set(false);
     }
   }
 

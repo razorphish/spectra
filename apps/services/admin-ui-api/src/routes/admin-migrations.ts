@@ -17,6 +17,7 @@ import {
   resolveMigrationHashForTag,
   resolveSpectraDatabaseUrl,
   runDrizzleMigrationsWithRunnerMode,
+  runEnvironmentSeeds,
   setAdminMigrationsUseSharedHttpClient,
 } from '@spectra/database';
 
@@ -118,9 +119,10 @@ const postRun: RequestHandler = async (req, res) => {
     return;
   }
 
-  const body = req.body as { scope?: unknown; tag?: unknown };
+  const body = req.body as { scope?: unknown; tag?: unknown; runSeeds?: unknown };
   const scope = typeof body.scope === 'string' ? body.scope : '';
   const tag = typeof body.tag === 'string' && body.tag.length > 0 ? body.tag : undefined;
+  const runSeeds = body.runSeeds === true;
 
   if (scope !== 'pending' && scope !== 'all' && scope !== 'single') {
     res.status(400).json({
@@ -169,8 +171,9 @@ const postRun: RequestHandler = async (req, res) => {
   try {
     const useShared = await getAdminMigrationsUseSharedHttpClient(db);
     const hashRepairedTags = await runDrizzleMigrationsWithRunnerMode(db, root, useShared);
+    const seeds = runSeeds ? await runEnvironmentSeeds(db) : undefined;
     const inventory = await getMigrationInventory(db, root);
-    res.status(200).json({ ok: true, inventory, hashRepairedTags });
+    res.status(200).json({ ok: true, inventory, hashRepairedTags, ...(seeds ? { seeds } : {}) });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     let cause: string | undefined;
@@ -182,6 +185,25 @@ const postRun: RequestHandler = async (req, res) => {
       message,
       ...(cause ? { cause } : {}),
     });
+  }
+};
+
+const postSeed: RequestHandler = async (_req, res) => {
+  const dbUrl = resolveSpectraDatabaseUrl();
+  if (!dbUrl) {
+    res.status(503).json({
+      error: 'database_not_configured',
+      message: 'DATABASE_URL / NEON_DATABASE_URL is not set.',
+    });
+    return;
+  }
+  try {
+    const seeds = await runEnvironmentSeeds(getDb());
+    const failed = seeds.filter((s) => s.status === 'error');
+    res.status(failed.length ? 207 : 200).json({ ok: failed.length === 0, seeds });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error';
+    res.status(500).json({ error: 'seed_failed', message });
   }
 };
 
@@ -361,6 +383,7 @@ export function registerAdminMigrationsRoutes(r: Router): void {
   r.put('/migrations/runner-config', requireAuth0AccessToken, putRunnerConfig);
   r.delete('/migrations/runner-config', requireAuth0AccessToken, deleteRunnerConfig);
   r.post('/migrations/run', requireAuth0AccessToken, postRun);
+  r.post('/migrations/seed', requireAuth0AccessToken, postSeed);
   r.post('/migrations/reconcile', requireAuth0AccessToken, postReconcile);
   r.delete('/migrations/record', requireAuth0AccessToken, deleteRecord);
 }
