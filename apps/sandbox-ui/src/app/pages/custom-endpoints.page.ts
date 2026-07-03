@@ -39,6 +39,17 @@ function previewRows(result: unknown): { table: string | null; rows: Record<stri
   return { table: typeof r['table'] === 'string' ? r['table'] : null, rows: r['rows'] as Record<string, unknown>[] };
 }
 
+/** Returns the userPrompt of the highest-revision version, or '' if none. */
+function latestUserPrompt(versions: Record<string, unknown>[]): string {
+  let best: { rev: number; prompt: string } | null = null;
+  for (const v of versions) {
+    const rev = typeof v['revision'] === 'number' ? v['revision'] : -1;
+    const prompt = typeof v['userPrompt'] === 'string' ? v['userPrompt'] : '';
+    if (!best || rev > best.rev) best = { rev, prompt };
+  }
+  return best?.prompt ?? '';
+}
+
 /** Slugifies the first few words of a string into a slug base (no uniqueness suffix). */
 function slugifyBase(text: string): string {
   const base = (text || '')
@@ -70,6 +81,8 @@ type EndpointListItem = {
   statusId: string;
   approvedProductionVersionId: string | null;
   createdAt: string;
+  /** True when an open production request exists (pending review / needs info / awaiting user). */
+  pendingProductionRequest: boolean;
 };
 
 function apiErrorMessage(err: unknown): string {
@@ -471,20 +484,10 @@ function apiErrorMessage(err: unknown): string {
                         <button
                           type="button"
                           class="icon-btn"
-                          title="Generate latest revision"
-                          aria-label="Generate latest revision for {{ e.slug }}"
+                          title="Regenerate (edit instructions or re-run as-is)"
+                          aria-label="Regenerate {{ e.slug }}"
                           [disabled]="isGenerating(e.id)"
-                          (click)="generate(e.id)"
-                        >
-                          <spectra-icon name="refresh" />
-                        </button>
-                        <button
-                          type="button"
-                          class="icon-btn"
-                          title="Generate with override"
-                          aria-label="Generate {{ e.slug }} with a prompt override"
-                          [disabled]="isGenerating(e.id)"
-                          (click)="openOverride(e.id)"
+                          (click)="openRegenerate(e.id)"
                         >
                           <spectra-icon name="pencil" />
                         </button>
@@ -492,10 +495,14 @@ function apiErrorMessage(err: unknown): string {
                           <button
                             type="button"
                             class="icon-btn"
-                            title="Submit for production"
-                            aria-label="Submit {{ e.slug }} for production"
-                            [disabled]="submittingId() === e.id"
-                            (click)="submitApproval(e.id)"
+                            [class.icon-btn--pending]="e.pendingProductionRequest"
+                            [title]="!hasAnyIntegration() ? 'Create an integration before submitting for production' : e.pendingProductionRequest ? 'Submission in progress — resubmit latest revision' : 'Submit for production'"
+                            [attr.aria-label]="
+                              !hasAnyIntegration() ? 'No integration — create one before submitting ' + e.slug + ' for production' :
+                              (e.pendingProductionRequest ? 'Submission in progress for ' : 'Submit ') + e.slug + ' for production'
+                            "
+                            [disabled]="submittingId() === e.id || !hasAnyIntegration()"
+                            (click)="openSubmit(e.id)"
                           >
                             <spectra-icon name="document" />
                           </button>
@@ -524,25 +531,71 @@ function apiErrorMessage(err: unknown): string {
             </p>
           }
 
-          @if (overrideModalId(); as oid) {
-            <div class="modal-backdrop" role="presentation" (click)="closeOverride()"></div>
-            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ce-override-title">
-              <h2 id="ce-override-title" class="h5">Generate with override</h2>
+          @if (regenModalId(); as rid) {
+            <div class="modal-backdrop" role="presentation" (click)="closeRegenerate()"></div>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ce-regen-title">
+              <h2 id="ce-regen-title" class="h5">Regenerate endpoint</h2>
               <p class="text-muted small">
-                Optional prompt override for <code>{{ overrideModalSlug() }}</code>. Leave blank to regenerate from the
-                existing instructions.
+                Edit the instructions for <code>{{ regenModalSlug() }}</code> and regenerate, or leave them as-is to
+                re-run the AI. Either way this creates a <strong>new revision</strong>.
               </p>
-              <textarea
-                class="form-control"
-                rows="4"
-                [value]="promptOverrideByEndpoint()[oid] || ''"
-                (input)="onPromptOverrideInput(oid, $event)"
-                placeholder="Optional prompt override"
-              ></textarea>
+              @if (regenLoading()) {
+                <p class="text-muted small mb-0">Loading current instructions…</p>
+              } @else {
+                <textarea
+                  class="form-control"
+                  rows="5"
+                  [value]="promptOverrideByEndpoint()[rid] || ''"
+                  (input)="onPromptOverrideInput(rid, $event)"
+                  placeholder="Describe what this endpoint should return…"
+                ></textarea>
+              }
               <div class="modal-actions">
-                <button type="button" class="btn btn-outline-secondary" (click)="closeOverride()">Cancel</button>
-                <button type="button" class="btn btn-primary" [disabled]="isGenerating(oid)" (click)="confirmOverride()">
-                  {{ isGenerating(oid) ? 'Generating…' : 'Generate' }}
+                <button type="button" class="btn btn-outline-secondary" (click)="closeRegenerate()">Cancel</button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="regenLoading() || isGenerating(rid)"
+                  (click)="confirmRegenerate()"
+                >
+                  {{ isGenerating(rid) ? 'Regenerating…' : 'Regenerate' }}
+                </button>
+              </div>
+            </div>
+          }
+
+          @if (submitModalId(); as sid) {
+            <div class="modal-backdrop" role="presentation" (click)="closeSubmit()"></div>
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ce-submit-title">
+              <h2 id="ce-submit-title" class="h5">Submit for production</h2>
+              @if (submitModalPending()) {
+                <div class="alert alert-warning py-2 small mb-3">
+                  A submission for <code>{{ submitModalSlug() }}</code> is already in progress. Submitting again replaces it
+                  with your current latest revision and restarts staff review.
+                </div>
+              }
+              <p class="small mb-2">
+                This sends the <strong>latest revision</strong> of <code>{{ submitModalSlug() }}</code> to Spectra staff
+                for production approval. Once approved it becomes callable via production M2M.
+              </p>
+              <p class="small text-muted mb-0">
+                The request is pinned to the revision as it is now. If you generate <strong>any new revisions</strong> after
+                submitting, they are <strong>not</strong> part of this request — the pending submission is superseded and
+                you must resubmit to include them.
+              </p>
+              <div class="alert alert-info py-2 small mt-3 mb-0">
+                Your integration must also have an approved production access request before this endpoint is callable via M2M.
+                Go to <strong>Integrations → Production access</strong> if you haven't submitted one yet.
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="btn btn-outline-secondary" (click)="closeSubmit()">Cancel</button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="submittingId() === sid"
+                  (click)="confirmSubmit()"
+                >
+                  {{ submittingId() === sid ? 'Submitting…' : submitModalPending() ? 'Resubmit' : 'Submit for production' }}
                 </button>
               </div>
             </div>
@@ -613,6 +666,11 @@ function apiErrorMessage(err: unknown): string {
         cursor: pointer;
         user-select: none;
         white-space: nowrap;
+      }
+      /* Amber submit icon when a production submission is in progress. */
+      .icon-btn.icon-btn--pending {
+        background: #fde68a;
+        color: #92400e;
       }
       .ce-list-count {
         margin-top: 0.5rem;
@@ -770,7 +828,9 @@ export class CustomEndpointsPageComponent {
   readonly listSearch = signal('');
   readonly sortKey = signal<'slug' | 'status' | 'created'>('created');
   readonly sortDir = signal<'asc' | 'desc'>('desc');
-  readonly overrideModalId = signal<string | null>(null);
+  readonly regenModalId = signal<string | null>(null);
+  readonly regenLoading = signal(false);
+  readonly submitModalId = signal<string | null>(null);
 
   /** Filtered + sorted rows shown in the list table. */
   readonly visibleEndpoints = computed<EndpointListItem[]>(() => {
@@ -840,6 +900,8 @@ export class CustomEndpointsPageComponent {
   readonly generatingById = signal<Record<string, boolean>>({});
   readonly promptOverrideByEndpoint = signal<Record<string, string>>({});
   readonly submittingId = signal<string | null>(null);
+
+  readonly hasAnyIntegration = signal(false);
 
   readonly openapiDownloading = signal(false);
   readonly openapiError = signal<string | null>(null);
@@ -1039,6 +1101,10 @@ export class CustomEndpointsPageComponent {
         this.pageError.set(apiErrorMessage(e));
       },
     });
+    this.api.listIntegrations().subscribe({
+      next: (r) => this.hasAnyIntegration.set(r.integrations.length > 0),
+      error: () => {},
+    });
   }
 
   private loadFocus(id: string): void {
@@ -1201,24 +1267,70 @@ export class CustomEndpointsPageComponent {
     }
   }
 
-  openOverride(id: string): void {
-    this.overrideModalId.set(id);
+  openRegenerate(id: string): void {
+    this.regenModalId.set(id);
+    // Pre-fill the textarea with the endpoint's latest instructions (fetch-on-open),
+    // unless the user already has unsaved text for this endpoint.
+    if (this.promptOverrideByEndpoint()[id] != null) return;
+    this.regenLoading.set(true);
+    this.api.getCustomAiEndpoint(id).subscribe({
+      next: (r) => {
+        this.promptOverrideByEndpoint.set({
+          ...this.promptOverrideByEndpoint(),
+          [id]: latestUserPrompt(r.versions),
+        });
+        this.regenLoading.set(false);
+      },
+      error: () => {
+        // Leave the textarea blank; a blank prompt regenerates from the stored instructions.
+        this.promptOverrideByEndpoint.set({ ...this.promptOverrideByEndpoint(), [id]: '' });
+        this.regenLoading.set(false);
+      },
+    });
   }
 
-  closeOverride(): void {
-    this.overrideModalId.set(null);
+  closeRegenerate(): void {
+    this.regenModalId.set(null);
   }
 
-  overrideModalSlug(): string {
-    const id = this.overrideModalId();
+  regenModalSlug(): string {
+    const id = this.regenModalId();
     return this.items().find((e) => e.id === id)?.slug ?? '';
   }
 
-  confirmOverride(): void {
-    const id = this.overrideModalId();
+  confirmRegenerate(): void {
+    const id = this.regenModalId();
     if (!id) return;
     this.generateWithOverride(id);
-    this.closeOverride();
+    this.closeRegenerate();
+  }
+
+  openSubmit(id: string): void {
+    this.submitModalId.set(id);
+  }
+
+  closeSubmit(): void {
+    this.submitModalId.set(null);
+  }
+
+  private submitModalItem(): EndpointListItem | undefined {
+    const id = this.submitModalId();
+    return this.items().find((e) => e.id === id);
+  }
+
+  submitModalSlug(): string {
+    return this.submitModalItem()?.slug ?? '';
+  }
+
+  submitModalPending(): boolean {
+    return this.submitModalItem()?.pendingProductionRequest ?? false;
+  }
+
+  confirmSubmit(): void {
+    const id = this.submitModalId();
+    if (!id) return;
+    this.submitApproval(id);
+    this.closeSubmit();
   }
 
   generate(id: string, overridePrompt?: string): void {
