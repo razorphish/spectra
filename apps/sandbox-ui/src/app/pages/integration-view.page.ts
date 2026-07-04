@@ -486,7 +486,16 @@ export class IntegrationViewPageComponent {
 
   constructor() {
     const st = this.router.currentNavigation()?.extras?.state as { clientSecret?: string } | undefined;
-    if (st?.clientSecret) this.clientSecretPlain.set(st.clientSecret);
+    if (st?.clientSecret) {
+      this.clientSecretPlain.set(st.clientSecret);
+      // Scrub the secret from window.history.state so it isn't readable later via
+      // history.state after the one-shot handoff from create/rotate.
+      if (typeof history !== 'undefined') {
+        const rest = { ...((history.state ?? {}) as Record<string, unknown>) };
+        delete rest['clientSecret'];
+        history.replaceState(rest, '');
+      }
+    }
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) {
       this.loadErr.set('Missing id');

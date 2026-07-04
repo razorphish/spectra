@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { catchError, forkJoin, map, of } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
+import { catchError, from, map, mergeMap, of, toArray } from 'rxjs';
 import { environment } from '../../environments/environment';
 import {
   SandboxApplicationSummary,
@@ -145,48 +146,23 @@ type ParApprovalRow = {
                             <input
                               readonly
                               class="form-control form-control-compact font-monospace"
-                              [type]="showSecrets() ? 'text' : 'password'"
+                              type="text"
                               [value]="row.clientId"
                               (click)="copy(row.clientId)"
+                              title="Click to copy client ID"
                             />
                           </td>
                           <td>
                             <input
                               readonly
                               class="form-control form-control-compact font-monospace"
-                              [type]="showSecrets() ? 'text' : 'password'"
+                              type="text"
                               value="••••••••••••••••"
                               title="Secret is only shown once when the app is created"
                               (click)="copyHint()"
                             />
                           </td>
                           <td class="actions actions-icon-row">
-                            <button
-                              type="button"
-                              class="icon-btn"
-                              [attr.title]="showSecrets() ? 'Mask client ID values' : 'Reveal client IDs as plain text'"
-                              [attr.aria-label]="showSecrets() ? 'Mask client ID values' : 'Reveal client IDs as plain text'"
-                              (click)="toggleSecrets()"
-                            >
-                              @if (showSecrets()) {
-                                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                                  <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
-                                  />
-                                </svg>
-                              } @else {
-                                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                                  <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-                                  />
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                              }
-                            </button>
                             <button
                               type="button"
                               class="icon-btn"
@@ -234,6 +210,9 @@ type ParApprovalRow = {
                 Integrations with a submitted <strong>production access</strong> request. Open an integration to see
                 status, staff messages, and questionnaire details on the <strong>Production access</strong> tab.
               </p>
+              @if (parListError(); as ple) {
+                <p class="spectra-auth-error">{{ ple }}</p>
+              }
               @if (parListLoading()) {
                 <p>Loading…</p>
               } @else if (parApprovalRows().length === 0) {
@@ -806,6 +785,7 @@ type ParApprovalRow = {
 export class DashboardPageComponent {
   private readonly api = inject(SandboxPortalService);
   private readonly router = inject(Router);
+  private readonly toastr = inject(ToastrService);
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -815,7 +795,7 @@ export class DashboardPageComponent {
   protected readonly intLoading = signal(true);
   protected readonly intErr = signal<string | null>(null);
   protected readonly integrations = signal<SandboxIntegrationSummary[]>([]);
-  protected readonly showSecrets = signal(false);
+  protected readonly parListError = signal<string | null>(null);
   protected readonly pendingRotate = signal<SandboxIntegrationSummary | null>(null);
   protected readonly pendingRevoke = signal<SandboxIntegrationSummary | null>(null);
   protected readonly intActionErr = signal<string | null>(null);
@@ -845,6 +825,9 @@ export class DashboardPageComponent {
     return environment.production ? 'Production' : 'Local';
   });
 
+  // Security: the URLs below feed `[href]` bindings. They MUST stay derived from build-time
+  // `environment.*` config only. Never populate them from server/session/user data — a
+  // `javascript:`/`data:` URL would then execute on click. Sanitize if that ever changes.
   protected readonly oauthDiscoveryUrl = computed(() => {
     const b = environment.authApiPublicBaseUrl?.trim();
     if (!b) return null;
@@ -1078,8 +1061,11 @@ export class DashboardPageComponent {
   }
 
   private setIntActionHttpError(e: unknown, fallback: string): void {
-    const err = e as { error?: { message?: string } };
-    this.intActionErr.set(err?.error?.message ?? (e instanceof Error ? e.message : fallback));
+    // Only surface the backend message for client-side (4xx) validation errors; for 5xx/unknown
+    // show a generic fallback so internal details aren't leaked to the UI.
+    const err = e as { status?: number; error?: { message?: string } };
+    const isClientError = typeof err?.status === 'number' && err.status >= 400 && err.status < 500;
+    this.intActionErr.set(isClientError && err?.error?.message ? err.error.message : fallback);
   }
 
   private loadIntegrations(): void {
@@ -1113,27 +1099,41 @@ export class DashboardPageComponent {
       return;
     }
     this.parListLoading.set(true);
-    const requests = ints.map((int) =>
-      this.api.getProductionAccessRequest(int.id).pipe(
-        map((par) => ({
-          integrationId: int.id,
-          integrationName: int.name,
-          requestId: par.id,
-          statusId: par.statusId,
-        })),
-        catchError(() => of(null)),
-      ),
-    );
-    forkJoin(requests).subscribe({
-      next: (rows) => {
-        this.parApprovalRows.set(rows.filter((x): x is ParApprovalRow => x !== null));
-        this.parListLoading.set(false);
-      },
-      error: () => {
-        this.parApprovalRows.set([]);
-        this.parListLoading.set(false);
-      },
-    });
+    this.parListError.set(null);
+    const CONCURRENCY = 5;
+    from(ints)
+      .pipe(
+        mergeMap(
+          (int) =>
+            this.api.getProductionAccessRequest(int.id).pipe(
+              map((par) => ({
+                integrationId: int.id,
+                integrationName: int.name,
+                requestId: par.id,
+                statusId: par.statusId,
+              })),
+              catchError((e: unknown) => {
+                // 404 = this integration simply has no PAR yet (expected). Surface anything else
+                // instead of silently masking it.
+                const status = (e as { status?: number })?.status;
+                if (status !== 404) this.parListError.set('Some approval statuses could not be loaded.');
+                return of(null);
+              }),
+            ),
+          CONCURRENCY,
+        ),
+        toArray(),
+      )
+      .subscribe({
+        next: (rows) => {
+          this.parApprovalRows.set(rows.filter((x): x is ParApprovalRow => x !== null));
+          this.parListLoading.set(false);
+        },
+        error: () => {
+          this.parApprovalRows.set([]);
+          this.parListLoading.set(false);
+        },
+      });
   }
 
   private async load(): Promise<void> {
@@ -1151,18 +1151,15 @@ export class DashboardPageComponent {
     });
   }
 
-  protected toggleSecrets(): void {
-    this.showSecrets.update((v) => !v);
-  }
-
   protected copy(text: string): void {
-    void navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(text).then(
+      () => this.toastr.success('Copied to clipboard'),
+      () => this.toastr.error('Could not copy — copy manually'),
+    );
   }
 
   protected copyHint(): void {
-    void navigator.clipboard.writeText(
-      'Client secret is only shown once when you create the application. Rotate flow not implemented.',
-    );
+    this.toastr.info('Client secret is only shown once, when you create the application.');
   }
 
   /** Maps `production_access_requests.status_id` catalog UUIDs to short labels (see `catalog-seed-ids.ts`). */

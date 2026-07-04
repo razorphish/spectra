@@ -1079,7 +1079,27 @@ function resolveAuthApiBaseUrl(): string | null {
   return raw.replace(/\/$/, '');
 }
 
+// ponytail: in-memory mint throttle, per API instance. Move to a shared store (Redis)
+// if aviate-api runs multi-instance and you need a global limit.
+const MINT_ATTEMPTS = new Map<string, { count: number; resetAt: number }>();
+const MINT_MAX_FAILURES = 5;
+const MINT_WINDOW_MS = 5 * 60_000;
+
+function mintThrottleState(key: string): { blocked: boolean; retryAfterSec: number } {
+  const now = Date.now();
+  const e = MINT_ATTEMPTS.get(key);
+  if (!e || now >= e.resetAt) return { blocked: false, retryAfterSec: 0 };
+  return { blocked: e.count >= MINT_MAX_FAILURES, retryAfterSec: Math.ceil((e.resetAt - now) / 1000) };
+}
+function mintRecordFailure(key: string): void {
+  const now = Date.now();
+  const e = MINT_ATTEMPTS.get(key);
+  if (!e || now >= e.resetAt) MINT_ATTEMPTS.set(key, { count: 1, resetAt: now + MINT_WINDOW_MS });
+  else e.count += 1;
+}
+
 const mintIntegrationAccessToken: RequestHandler = async (req, res) => {
+  // Security: `req.body.clientSecret` is a live credential — never log this request body.
   if (!resolveSpectraDatabaseUrl()) {
     noDatabase(res);
     return;
@@ -1127,6 +1147,16 @@ const mintIntegrationAccessToken: RequestHandler = async (req, res) => {
   const row = rows[0];
   if (!row) {
     res.status(404).json({ error: 'not_found', message: 'Integration not found.' });
+    return;
+  }
+  const throttleKey = `${sessionRow.orgId}:${id}`;
+  const throttle = mintThrottleState(throttleKey);
+  if (throttle.blocked) {
+    res.setHeader('Retry-After', String(throttle.retryAfterSec));
+    res.status(429).json({
+      error: 'too_many_attempts',
+      error_description: 'Too many failed token mints for this integration. Try again later.',
+    });
     return;
   }
   const body = req.body as Record<string, unknown>;
@@ -1189,25 +1219,27 @@ const mintIntegrationAccessToken: RequestHandler = async (req, res) => {
     });
     return;
   }
-  const text = await authRes.text();
-  const ct = authRes.headers.get('content-type') ?? '';
-  let payload: unknown;
-  if (ct.includes('application/json')) {
-    try {
-      payload = JSON.parse(text) as unknown;
-    } catch {
-      payload = {
-        error: 'invalid_response',
-        error_description: text.slice(0, 400),
-      };
-    }
-  } else {
-    payload = {
-      error: 'invalid_response',
-      error_description: text ? text.slice(0, 400) : `HTTP ${authRes.status} from auth-api`,
-    };
+  // On failure, do NOT echo auth-api's raw response — that turns this proxy into a
+  // credential-validity oracle. Return a single generic message and count the attempt.
+  if (!authRes.ok) {
+    mintRecordFailure(throttleKey);
+    const status = authRes.status === 401 ? 401 : 400;
+    res.status(status).json({
+      error: 'mint_failed',
+      error_description: 'Invalid client credentials or scope for this integration.',
+    });
+    return;
   }
-  res.status(authRes.status).json(payload);
+  MINT_ATTEMPTS.delete(throttleKey);
+  const text = await authRes.text();
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text) as unknown;
+  } catch {
+    res.status(502).json({ error: 'invalid_response', error_description: 'Malformed token response.' });
+    return;
+  }
+  res.status(200).json(payload);
 };
 
 const revokeIntegration: RequestHandler = async (req, res) => {
