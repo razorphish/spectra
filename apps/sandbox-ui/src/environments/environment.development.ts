@@ -7,6 +7,8 @@ import {
 
 export const environment = {
   production: false,
+  /** When true, use the BFF (cookie session) instead of the in-browser Auth0 SPA. */
+  bffAuth: false,
   apiBaseUrl: apiBaseUrlFromDotEnv,
   publicApiDocsBaseUrl: publicApiDocsBaseUrlFromDotEnv,
   /** OAuth metadata / JWKS host for links in dashboard (see SANDBOX_UI_AUTH_API_PUBLIC_URL). */

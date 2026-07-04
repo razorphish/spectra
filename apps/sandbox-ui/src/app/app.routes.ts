@@ -1,5 +1,5 @@
 import { Route } from '@angular/router';
-import { AuthGuard } from '@auth0/auth0-angular';
+import { authGuard as AuthGuard } from './guards/auth.guard';
 import { AccountPageComponent } from './pages/account.page';
 import { ApplicationFormPageComponent } from './pages/application-form.page';
 import { ApplicationViewPageComponent } from './pages/application-view.page';

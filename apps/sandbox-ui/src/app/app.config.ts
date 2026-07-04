@@ -9,6 +9,7 @@ import { provideToastr } from 'ngx-toastr';
 import { authHttpInterceptorFn, provideAuth0 } from '@auth0/auth0-angular';
 import { environment } from '../environments/environment';
 import { appRoutes } from './app.routes';
+import { bffHttpInterceptor } from './core/bff-http.interceptor';
 
 function isAuth0Configured(): boolean {
   const { domain, clientId, enabled } = environment.auth0;
@@ -30,7 +31,10 @@ function auth0Providers(): ApplicationConfig['providers'] {
       domain: a.domain,
       clientId: a.clientId,
       useRefreshTokens: true,
-      cacheLocation: 'localstorage',
+      // In-memory cache (not localStorage): an XSS can't read persisted access/refresh
+      // tokens. Trade-off: a full page reload does a silent re-auth instead of reading
+      // tokens from storage. Revert to 'localstorage' only if that UX is unacceptable.
+      cacheLocation: 'memory',
       authorizationParams: {
         audience: a.audience || undefined,
         redirect_uri:
@@ -65,8 +69,11 @@ export const appConfig: ApplicationConfig = {
     provideRouter(appRoutes),
     provideHttpClient(
       withFetch(),
-      ...(isAuth0Configured() ? [withInterceptors([authHttpInterceptorFn])] : [])
+      ...(environment.bffAuth ? [withInterceptors([bffHttpInterceptor])]
+      : isAuth0Configured() ? [withInterceptors([authHttpInterceptorFn])]
+      : []),
     ),
-    ...auth0Providers(),
+    // Auth0 SPA providers only in non-BFF mode; BFF mode uses cookie sessions via the edge.
+    ...(environment.bffAuth ? [] : auth0Providers()),
   ],
 };

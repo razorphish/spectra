@@ -1,5 +1,7 @@
 export const environment = {
   production: true,
+  /** When true, use the BFF (cookie session) instead of the in-browser Auth0 SPA. */
+  bffAuth: false,
   apiBaseUrl: '',
   /**
    * Origin for public limited Swagger (`/docs`). Empty = use `apiBaseUrl`.

@@ -1,3 +1,4 @@
+import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from '@auth0/auth0-angular';
@@ -10,6 +11,8 @@ describe('sandbox-ui landing', () => {
       imports: [LandingPageComponent],
       providers: [
         provideRouter([]),
+        // BffAuthService (injected by LandingPage) needs HttpClient even in Auth0 mode.
+        provideHttpClient(),
         {
           provide: AuthService,
           useValue: {
