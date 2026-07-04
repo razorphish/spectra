@@ -234,7 +234,14 @@ export class SandboxPortalService {
 
   listCustomAiEndpoints() {
     return this.http.get<{
-      items: { id: string; slug: string; statusId: string; approvedProductionVersionId: string | null; createdAt: string }[];
+      items: {
+        id: string;
+        slug: string;
+        statusId: string;
+        approvedProductionVersionId: string | null;
+        createdAt: string;
+        pendingProductionRequest: boolean;
+      }[];
       tenantId: string | null;
     }>(`${this.apiRoot()}/v1/platform/sandbox/ai-endpoints`);
   }

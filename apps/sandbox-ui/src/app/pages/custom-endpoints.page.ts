@@ -1103,7 +1103,9 @@ export class CustomEndpointsPageComponent {
     });
     this.api.listIntegrations().subscribe({
       next: (r) => this.hasAnyIntegration.set(r.integrations.length > 0),
-      error: () => {},
+      error: () => {
+        /* best-effort: integration presence is optional context */
+      },
     });
   }
 

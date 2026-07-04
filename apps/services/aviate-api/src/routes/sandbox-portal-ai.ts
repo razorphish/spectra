@@ -21,7 +21,7 @@ import {
   validateDeveloperAiEndpointSpec,
 } from '@spectra/database';
 
-import { executeHostedCustomEndpointSpec } from '../lib/sandbox-ai-invoke';
+import { executeHostedCustomEndpointSpec } from '@spectra/database';
 import { AiModelNotConfiguredError, generateEndpointSpecFromPrompt } from '../lib/sandbox-ai-llm';
 
 import type { EnsureSessionFn } from './sandbox-portal-par';
@@ -247,7 +247,29 @@ export function createSandboxPortalAiRouter(ensureSession: EnsureSessionFn): Rou
       .from(developerAiEndpoints)
       .where(and(eq(developerAiEndpoints.tenantId, rt.id), isNull(developerAiEndpoints.deletedAt)))
       .orderBy(desc(developerAiEndpoints.createdAt));
-    res.json({ items: rows, tenantId: rt.id });
+
+    // Flag endpoints with an open production request (pending review / needs info / awaiting user).
+    const endpointIds = rows.map((r) => r.id);
+    const openReqs =
+      endpointIds.length > 0 ?
+        await db
+          .select({ endpointId: aiEndpointProductionRequests.endpointId })
+          .from(aiEndpointProductionRequests)
+          .where(
+            and(
+              inArray(aiEndpointProductionRequests.endpointId, endpointIds),
+              isNull(aiEndpointProductionRequests.deletedAt),
+              inArray(aiEndpointProductionRequests.statusId, [
+                CATALOG_IDS.aiEndpointProductionRequestStates.pendingReview,
+                CATALOG_IDS.aiEndpointProductionRequestStates.needsInformation,
+                CATALOG_IDS.aiEndpointProductionRequestStates.awaitingUser,
+              ]),
+            ),
+          )
+      : [];
+    const pendingSet = new Set(openReqs.map((r) => r.endpointId));
+    const items = rows.map((r) => ({ ...r, pendingProductionRequest: pendingSet.has(r.id) }));
+    res.json({ items, tenantId: rt.id });
   };
 
   const postAiEndpoints: RequestHandler = async (req, res) => {
