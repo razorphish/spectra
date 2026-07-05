@@ -22,3 +22,4 @@ export * from './par-questionnaire';
 export * from './par-notification-writer';
 export * from './stats';
 export * from './uploads';
+export * from './sandbox-ai-invoke';

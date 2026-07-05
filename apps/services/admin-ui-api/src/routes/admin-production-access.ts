@@ -8,6 +8,8 @@ import {
   catalog,
   CATALOG_IDS,
   developerAiEndpoints,
+  developerAiEndpointVersions,
+  executeHostedCustomEndpointSpec,
   fetchProductionAccessPortalFlags,
   getDb,
   integrations,
@@ -16,6 +18,7 @@ import {
   resolveSpectraDatabaseUrl,
   runtimeTenants,
   users,
+  validateDeveloperAiEndpointSpec,
 } from '@spectra/database';
 
 import { requireAuth0AccessToken } from '../lib/auth';
@@ -163,6 +166,7 @@ export function registerAdminProductionAccessRoutes(r: Router): void {
       return;
     }
     const statusCat = alias(catalog, 'endpoint_status_cat');
+    const approvedVer = alias(developerAiEndpointVersions, 'approved_ver');
     const items = await db
       .select({
         id: developerAiEndpoints.id,
@@ -170,12 +174,14 @@ export function registerAdminProductionAccessRoutes(r: Router): void {
         statusId: developerAiEndpoints.statusId,
         statusName: statusCat.name,
         approvedProductionVersionId: developerAiEndpoints.approvedProductionVersionId,
+        spec: approvedVer.spec,
         createdAt: developerAiEndpoints.createdAt,
         updatedAt: developerAiEndpoints.updatedAt,
       })
       .from(developerAiEndpoints)
       .innerJoin(runtimeTenants, eq(developerAiEndpoints.tenantId, runtimeTenants.id))
       .leftJoin(statusCat, eq(developerAiEndpoints.statusId, statusCat.id))
+      .leftJoin(approvedVer, eq(approvedVer.id, developerAiEndpoints.approvedProductionVersionId))
       .where(and(eq(runtimeTenants.orgId, orgId), isNull(developerAiEndpoints.deletedAt)))
       .orderBy(desc(developerAiEndpoints.createdAt))
       .limit(200);
@@ -253,6 +259,70 @@ export function registerAdminProductionAccessRoutes(r: Router): void {
     }
 
     res.status(400).json({ error: 'validation_error', message: 'Unknown action.' });
+  });
+
+  // Staff test-invoke: execute the approved spec for a custom API endpoint.
+  g.post('/production-access-requests/:id/custom-apis/:endpointId/invoke', async (req, res) => {
+    const { id, endpointId } = req.params as Record<string, string>;
+    if (!UUID_RE.test(id) || !UUID_RE.test(endpointId)) {
+      res.status(400).json({ error: 'bad_request' });
+      return;
+    }
+    const db = getDb();
+    // Verify the PAR exists and look up its org.
+    const [par] = await db
+      .select({ integrationOrgId: integrations.orgId, applicationOrgId: applications.orgId })
+      .from(productionAccessRequests)
+      .leftJoin(integrations, eq(productionAccessRequests.integrationId, integrations.id))
+      .leftJoin(applications, eq(productionAccessRequests.applicationId, applications.id))
+      .where(and(eq(productionAccessRequests.id, id), isNull(productionAccessRequests.deletedAt)))
+      .limit(1);
+    if (!par) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const orgId = par.integrationOrgId ?? par.applicationOrgId;
+    // Verify the endpoint belongs to this org and get its approved spec + tenant.
+    const [ep] = await db
+      .select({
+        tenantId: developerAiEndpoints.tenantId,
+        approvedVersionId: developerAiEndpoints.approvedProductionVersionId,
+      })
+      .from(developerAiEndpoints)
+      .innerJoin(runtimeTenants, eq(developerAiEndpoints.tenantId, runtimeTenants.id))
+      .where(
+        and(
+          eq(developerAiEndpoints.id, endpointId),
+          orgId ? eq(runtimeTenants.orgId, orgId) : undefined,
+          isNull(developerAiEndpoints.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!ep) {
+      res.status(404).json({ error: 'not_found', message: 'Endpoint not found for this request.' });
+      return;
+    }
+    if (!ep.approvedVersionId) {
+      res.status(422).json({ error: 'no_approved_version', message: 'No approved version to invoke.' });
+      return;
+    }
+    const [ver] = await db
+      .select({ spec: developerAiEndpointVersions.spec })
+      .from(developerAiEndpointVersions)
+      .where(eq(developerAiEndpointVersions.id, ep.approvedVersionId))
+      .limit(1);
+    if (!ver) {
+      res.status(404).json({ error: 'version_not_found' });
+      return;
+    }
+    const spec = ver.spec as Record<string, unknown>;
+    const validation = validateDeveloperAiEndpointSpec(spec);
+    if (validation.ok === false) {
+      res.status(422).json({ error: 'invalid_spec', message: validation.error });
+      return;
+    }
+    const out = await executeHostedCustomEndpointSpec({ db, tenantId: ep.tenantId }, spec, req.body);
+    res.status(out.httpStatus).json(out.json);
   });
 
   r.use(g);

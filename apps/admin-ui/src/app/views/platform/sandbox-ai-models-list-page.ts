@@ -48,7 +48,7 @@ const PROVIDER_HINTS = ['anthropic', 'openai', 'google', 'azure-openai', 'bedroc
           </p>
         </div>
         <button type="button" class="btn btn-primary btn-sm" (click)="openCreate()">
-          <i class="bi bi-plus-lg me-1"></i>Create
+          <i class="sa sa-plus me-1"></i>Create
         </button>
       </div>
 
@@ -100,17 +100,19 @@ const PROVIDER_HINTS = ['anthropic', 'openai', 'google', 'azure-openai', 'bedroc
                         <div class="text-danger small mt-1">{{ editError() }}</div>
                       }
                     </td>
-                    <td class="text-end text-nowrap">
-                      <button type="button" class="btn btn-primary btn-sm me-1" [disabled]="saving()" (click)="saveEdit()" title="Save" aria-label="Save">
-                        @if (saving()) {
-                          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        } @else {
-                          <i class="bi bi-check-lg"></i>
-                        }
-                      </button>
-                      <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="saving()" (click)="cancelEdit()" title="Cancel" aria-label="Cancel">
-                        <i class="bi bi-x-lg"></i>
-                      </button>
+                    <td class="text-end">
+                      <div class="d-flex gap-1 align-items-center justify-content-end flex-nowrap" role="group" aria-label="Edit actions">
+                        <button type="button" class="btn btn-success waves-effect btn-xs d-inline-flex align-items-center justify-content-center" [disabled]="saving()" (click)="saveEdit()" title="Save" aria-label="Save">
+                          @if (saving()) {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          } @else {
+                            <i class="sa sa-check" aria-hidden="true"></i>
+                          }
+                        </button>
+                        <button type="button" class="btn btn-danger waves-effect btn-xs d-inline-flex align-items-center justify-content-center" [disabled]="saving()" (click)="cancelEdit()" title="Cancel" aria-label="Cancel">
+                          <i class="sa sa-close" aria-hidden="true"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 } @else {
@@ -129,9 +131,11 @@ const PROVIDER_HINTS = ['anthropic', 'openai', 'google', 'azure-openai', 'bedroc
                     </td>
                     <td class="text-nowrap small text-muted">{{ row.updatedAt | date: 'short' }}</td>
                     <td class="text-end">
-                      <button type="button" class="btn btn-outline-secondary btn-sm" (click)="startEdit(row)" title="Edit" aria-label="Edit">
-                        <i class="bi bi-pencil"></i>
-                      </button>
+                      <div class="d-flex gap-1 align-items-center justify-content-end flex-nowrap" role="group" [attr.aria-label]="'Actions for ' + row.displayName">
+                        <button type="button" class="btn btn-primary waves-effect btn-xs d-inline-flex align-items-center justify-content-center" (click)="startEdit(row)" title="Edit" aria-label="Edit">
+                          <i class="sa sa-pencil" aria-hidden="true"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 }

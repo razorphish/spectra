@@ -1,8 +1,8 @@
-import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { DatePipe, JsonPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, inject, signal, TemplateRef, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { NgbNavModule, NgbNavOutlet } from '@ng-bootstrap/ng-bootstrap';
+import { NgbModal, NgbModalModule, NgbNavModule, NgbNavOutlet } from '@ng-bootstrap/ng-bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import { finalize } from 'rxjs';
 
@@ -17,7 +17,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
   selector: 'app-production-access-edit-page',
-  imports: [DatePipe, FormsModule, RouterLink, PageBreadcrumb, NgbNavModule, NgbNavOutlet],
+  imports: [DatePipe, JsonPipe, FormsModule, RouterLink, PageBreadcrumb, NgbNavModule, NgbNavOutlet, NgbModalModule],
   template: `
     <div class="main-content">
       <div class="container-fluid py-4">
@@ -119,6 +119,7 @@ import {
                             <th>Status</th>
                             <th>Approved version</th>
                             <th>Created</th>
+                            <th class="text-end">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -134,10 +135,34 @@ import {
                                 }
                               </td>
                               <td class="text-nowrap small">{{ api.createdAt | date: 'medium' }}</td>
+                              <td class="text-end">
+                                <div class="d-flex gap-1 align-items-center justify-content-end flex-nowrap" role="group" [attr.aria-label]="'Actions for ' + api.slug">
+                                  <button
+                                    type="button"
+                                    class="btn btn-secondary waves-effect btn-xs d-inline-flex align-items-center justify-content-center"
+                                    title="View spec"
+                                    aria-label="View spec"
+                                    [disabled]="!api.spec"
+                                    (click)="openSpecModal(api)"
+                                  >
+                                    <i class="sa sa-doc" aria-hidden="true"></i>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="btn btn-warning waves-effect btn-xs d-inline-flex align-items-center justify-content-center"
+                                    title="Test call"
+                                    aria-label="Test call"
+                                    [disabled]="!api.approvedProductionVersionId"
+                                    (click)="openInvokeModal(api)"
+                                  >
+                                    <i class="sa sa-control-play" aria-hidden="true"></i>
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           } @empty {
                             <tr>
-                              <td colspan="4" class="text-muted">No custom APIs for this org.</td>
+                              <td colspan="5" class="text-muted">No custom APIs for this org.</td>
                             </tr>
                           }
                         </tbody>
@@ -152,12 +177,49 @@ import {
         }
       </div>
     </div>
+
+    <!-- Spec viewer modal -->
+    <ng-template #specTpl let-modal>
+      <div class="modal-header">
+        <h5 class="modal-title">Spec — <code>{{ specApi()?.slug }}</code></h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+      </div>
+      <div class="modal-body">
+        <pre class="small bg-light p-3 rounded" style="max-height:60vh;overflow:auto">{{ specApi()?.spec | json }}</pre>
+      </div>
+    </ng-template>
+
+    <!-- Test invoke modal -->
+    <ng-template #invokeTpl let-modal>
+      <div class="modal-header">
+        <h5 class="modal-title">Test call — <code>{{ invokeApi()?.slug }}</code></h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label small">Request body (JSON)</label>
+        <textarea class="form-control form-control-sm font-monospace" rows="5" [(ngModel)]="invokeBody" [disabled]="invoking()"></textarea>
+        @if (invokeError()) {
+          <div class="alert alert-danger py-2 mt-2 small">{{ invokeError() }}</div>
+        }
+        @if (invokeResult() !== null) {
+          <label class="form-label small mt-3">Response</label>
+          <pre class="small bg-light p-3 rounded" style="max-height:40vh;overflow:auto">{{ invokeResult() | json }}</pre>
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="modal.dismiss()">Close</button>
+        <button type="button" class="btn btn-warning btn-sm" [disabled]="invoking()" (click)="runInvoke()">
+          {{ invoking() ? 'Running…' : 'Run' }}
+        </button>
+      </div>
+    </ng-template>
   `,
 })
 export class ProductionAccessEditPage {
   private readonly api = inject(AdminProductionAccessApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
+  private readonly modal = inject(NgbModal);
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
@@ -169,6 +231,19 @@ export class ProductionAccessEditPage {
   customerStatusMessage = '';
   staffInternalNotes = '';
   activeId = 'info';
+
+  // Spec viewer
+  readonly specApi = signal<ProductionAccessCustomApi | null>(null);
+
+  // Invoke
+  readonly invokeApi = signal<ProductionAccessCustomApi | null>(null);
+  readonly invoking = signal(false);
+  readonly invokeError = signal<string | null>(null);
+  readonly invokeResult = signal<unknown>(null);
+  invokeBody = '{}';
+
+  private readonly specTpl = viewChild<TemplateRef<unknown>>('specTpl');
+  private readonly invokeTpl = viewChild<TemplateRef<unknown>>('invokeTpl');
 
   private readonly id = this.route.snapshot.paramMap.get('id') ?? '';
 
@@ -192,6 +267,48 @@ export class ProductionAccessEditPage {
 
   submitterDisplay(d: ProductionAccessRequestDetail): string {
     return d.submittedByEmail?.trim() || d.submittedByUserId;
+  }
+
+  openSpecModal(api: ProductionAccessCustomApi): void {
+    const tpl = this.specTpl();
+    if (!tpl) return;
+    this.specApi.set(api);
+    this.modal.open(tpl, { size: 'lg', scrollable: true });
+  }
+
+  openInvokeModal(api: ProductionAccessCustomApi): void {
+    const tpl = this.invokeTpl();
+    if (!tpl) return;
+    this.invokeApi.set(api);
+    this.invokeBody = '{}';
+    this.invokeError.set(null);
+    this.invokeResult.set(null);
+    this.modal.open(tpl, { size: 'lg', scrollable: true });
+  }
+
+  runInvoke(): void {
+    const api = this.invokeApi();
+    if (!api) return;
+    let body: unknown;
+    try {
+      body = JSON.parse(this.invokeBody || '{}');
+    } catch {
+      this.invokeError.set('Invalid JSON in request body.');
+      return;
+    }
+    this.invoking.set(true);
+    this.invokeError.set(null);
+    this.invokeResult.set(null);
+    this.api.invokeCustomApi(this.id, api.id, body).subscribe({
+      next: (result) => {
+        this.invokeResult.set(result);
+        this.invoking.set(false);
+      },
+      error: (e: unknown) => {
+        this.invoking.set(false);
+        this.invokeError.set(e instanceof Error ? e.message : 'Invoke failed.');
+      },
+    });
   }
 
   save(): void {

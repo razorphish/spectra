@@ -40,6 +40,7 @@ export type ProductionAccessCustomApi = {
   statusId: string;
   statusName: string | null;
   approvedProductionVersionId: string | null;
+  spec: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -83,6 +84,13 @@ export class AdminProductionAccessApiService {
     return this.http.patch<ProductionAccessRequestDetail>(
       `${this.base()}/production-access-requests/${id}`,
       { action: 'revoke', ...(note?.trim() ? { note: note.trim() } : {}) },
+    );
+  }
+
+  invokeCustomApi(parId: string, endpointId: string, body: unknown): Observable<unknown> {
+    return this.http.post<unknown>(
+      `${this.base()}/production-access-requests/${parId}/custom-apis/${endpointId}/invoke`,
+      body,
     );
   }
 

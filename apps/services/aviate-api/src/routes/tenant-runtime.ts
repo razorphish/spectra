@@ -15,7 +15,7 @@ import {
   validateDeveloperAiEndpointSpec,
 } from '@spectra/database';
 
-import { executeHostedCustomEndpointSpec } from '../lib/sandbox-ai-invoke';
+import { executeHostedCustomEndpointSpec } from '@spectra/database';
 
 function noDatabase(res: Parameters<RequestHandler>[1]): void {
   res.status(503).json({
