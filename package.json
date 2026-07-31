@@ -135,7 +135,7 @@
     "jsonc-eslint-parser": "^2.1.0",
     "metro-config": "~0.83.0",
     "metro-resolver": "~0.83.0",
-    "nx": "22.7.1",
+    "nx": "22.7.2",
     "pg": "^8.20.0",
     "prettier": "3.8.3",
     "ts-jest": "^29.4.0",
