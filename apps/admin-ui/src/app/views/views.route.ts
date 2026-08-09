@@ -85,6 +85,12 @@ export const VIEWS_ROUTES: Routes = [
     data: { title: 'Custom endpoint approval' },
   },
   {
+    path: 'platform/api-catalog',
+    loadComponent: () =>
+      import('./platform/platform-api-catalog-page').then((m) => m.PlatformApiCatalogPage),
+    data: { title: 'API Catalog' },
+  },
+  {
     path: 'platform/runtime-tenants',
     loadComponent: () =>
       import('./platform/runtime-tenants-list-page').then((m) => m.RuntimeTenantsListPage),

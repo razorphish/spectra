@@ -49,6 +49,8 @@ export async function mintM2mAccessJwt(params: {
   clientId: string;
   integrationId: string;
   orgId: string;
+  /** Runtime tenant ID — included as `tenant_id` claim when present. */
+  tenantId?: string | null;
   clientName: string;
   ttlSeconds: number;
 }): Promise<{ token: string; jti: string; exp: number; iat: number }> {
@@ -56,13 +58,15 @@ export async function mintM2mAccessJwt(params: {
   const jti = randomUUID();
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + params.ttlSeconds;
-  const jwt = await new SignJWT({
+  const claims: Record<string, unknown> = {
     scope: params.scope,
     client_id: params.clientId,
     integration_id: params.integrationId,
     org_id: params.orgId,
     client_name: params.clientName,
-  })
+  };
+  if (params.tenantId) claims['tenant_id'] = params.tenantId;
+  const jwt = await new SignJWT(claims)
     .setProtectedHeader({ alg: 'ES256', kid })
     .setIssuer(params.issuer)
     .setAudience(params.audience)

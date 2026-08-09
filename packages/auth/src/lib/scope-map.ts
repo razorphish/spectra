@@ -3,7 +3,7 @@
  * @see docs/plans/m2m-client-credentials-edge-auth.md — Scope management (M2M)
  */
 
-export const SCOPE_MAP_VERSION = 2 as const;
+export const SCOPE_MAP_VERSION = 3 as const;
 
 /** Ordered: first match wins (prefer longer prefixes first in array order). */
 export const scopePathRules: readonly {
@@ -11,16 +11,50 @@ export const scopePathRules: readonly {
   readonly pathPrefix: string;
   readonly requiredScope: string;
 }[] = [
+  // ── platform:read ─────────────────────────────────────────────────────────
   { method: 'GET', pathPrefix: '/v1/platform/hello', requiredScope: 'platform:read' },
-  {
-    method: 'POST',
-    pathPrefix: '/v1/platform/tenant-runtime/endpoints',
-    requiredScope: 'custom_endpoints:invoke',
-  },
+  { method: 'GET', pathPrefix: '/v1/platform/tenant', requiredScope: 'platform:read' },
+  { method: 'GET', pathPrefix: '/v1/platform/ai', requiredScope: 'platform:read' },
+  { method: 'GET', pathPrefix: '/v1/platform/config', requiredScope: 'platform:read' },
+  { method: 'GET', pathPrefix: '/v1/platform/notifications', requiredScope: 'platform:read' },
+  { method: 'PATCH', pathPrefix: '/v1/platform/notifications', requiredScope: 'platform:read' },
+  { method: 'DELETE', pathPrefix: '/v1/platform/notifications', requiredScope: 'platform:read' },
+  { method: 'GET', pathPrefix: '/v1/platform/search', requiredScope: 'platform:read' },
+  // ── custom_endpoints:invoke ────────────────────────────────────────────────
+  { method: 'POST', pathPrefix: '/v1/platform/tenant-runtime/endpoints', requiredScope: 'custom_endpoints:invoke' },
+  { method: 'POST', pathPrefix: '/v1/platform/ai/endpoints', requiredScope: 'custom_endpoints:invoke' },
+  { method: 'POST', pathPrefix: '/v1/platform/ai/batch-invoke', requiredScope: 'custom_endpoints:invoke' },
+  // ── analytics:read ─────────────────────────────────────────────────────────
+  { method: 'GET', pathPrefix: '/v1/platform/analytics', requiredScope: 'analytics:read' },
+  // ── integrations:read ──────────────────────────────────────────────────────
+  { method: 'GET', pathPrefix: '/v1/platform/integrations', requiredScope: 'integrations:read' },
+  // ── billing:read ───────────────────────────────────────────────────────────
+  { method: 'GET', pathPrefix: '/v1/platform/billing', requiredScope: 'billing:read' },
+  // ── webhooks:manage ────────────────────────────────────────────────────────
+  { method: 'GET', pathPrefix: '/v1/platform/webhooks', requiredScope: 'webhooks:manage' },
+  { method: 'POST', pathPrefix: '/v1/platform/webhooks', requiredScope: 'webhooks:manage' },
+  { method: 'PATCH', pathPrefix: '/v1/platform/webhooks', requiredScope: 'webhooks:manage' },
+  { method: 'DELETE', pathPrefix: '/v1/platform/webhooks', requiredScope: 'webhooks:manage' },
+  // ── apikeys:manage ─────────────────────────────────────────────────────────
+  { method: 'GET', pathPrefix: '/v1/platform/api-keys', requiredScope: 'apikeys:manage' },
+  { method: 'POST', pathPrefix: '/v1/platform/api-keys', requiredScope: 'apikeys:manage' },
+  { method: 'PATCH', pathPrefix: '/v1/platform/api-keys', requiredScope: 'apikeys:manage' },
+  { method: 'DELETE', pathPrefix: '/v1/platform/api-keys', requiredScope: 'apikeys:manage' },
+  // ── team:read ──────────────────────────────────────────────────────────────
+  { method: 'GET', pathPrefix: '/v1/platform/team', requiredScope: 'team:read' },
 ];
 
 /** Scopes that may appear on Integration / token ceiling (subset validated at mint). */
-export const KNOWN_M2M_SCOPES = ['platform:read', 'custom_endpoints:invoke'] as const;
+export const KNOWN_M2M_SCOPES = [
+  'platform:read',
+  'custom_endpoints:invoke',
+  'analytics:read',
+  'integrations:read',
+  'billing:read',
+  'webhooks:manage',
+  'apikeys:manage',
+  'team:read',
+] as const;
 
 export type KnownM2mScope = (typeof KNOWN_M2M_SCOPES)[number];
 

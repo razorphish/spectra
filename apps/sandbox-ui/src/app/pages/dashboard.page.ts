@@ -640,9 +640,13 @@ type ParApprovalRow = {
       }
       .context-swagger {
         margin: 0.35rem 0;
-        word-break: break-all;
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.5rem;
       }
       .context-swagger a {
+        word-break: break-all;
         color: var(--spectra-color-link);
         font-weight: 600;
       }

@@ -412,15 +412,65 @@ function apiErrorMessage(err: unknown): string {
               }
               <button
                 type="button"
-                class="btn btn-primary"
+                class="btn btn-primary mt-3"
                 [disabled]="trySending()"
                 (click)="sendTryIt()"
               >
                 Send
               </button>
               @if (tryResultStatus() !== null) {
-                <p class="mt-2 small"><strong>HTTP {{ tryResultStatus() }}</strong></p>
-                <pre class="ce-spec-pre small">{{ tryResultBodyText() }}</pre>
+                <p class="mt-3 small"><strong>HTTP {{ tryResultStatus() }}</strong></p>
+                <div class="ce-tabs" role="tablist" aria-label="Result format">
+                  <button
+                    type="button"
+                    role="tab"
+                    class="ce-tab"
+                    [class.active]="tryResultTab() === 'list'"
+                    [attr.aria-selected]="tryResultTab() === 'list'"
+                    (click)="tryResultTab.set('list')"
+                  >Data list</button>
+                  <button
+                    type="button"
+                    role="tab"
+                    class="ce-tab"
+                    [class.active]="tryResultTab() === 'json'"
+                    [attr.aria-selected]="tryResultTab() === 'json'"
+                    (click)="tryResultTab.set('json')"
+                  >JSON</button>
+                </div>
+                @if (tryResultTab() === 'list') {
+                  @if (tryResultTable(); as t) {
+                    @if (t.rows.length === 0) {
+                      <p class="text-muted small">No rows returned.</p>
+                    } @else {
+                      <div class="table-responsive">
+                        <table class="table table-sm">
+                          <thead>
+                            <tr>
+                              @for (col of tryResultColumns(); track col) {
+                                <th>{{ col }}</th>
+                              }
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (row of t.rows; track $index) {
+                              <tr>
+                                @for (col of tryResultColumns(); track col) {
+                                  <td>{{ formatCell(row[col]) }}</td>
+                                }
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                      <p class="text-muted small">{{ t.rows.length }} row(s){{ t.table ? ' from ' + t.table : '' }}.</p>
+                    }
+                  } @else {
+                    <p class="text-muted small">This result is not a row list — see the JSON tab.</p>
+                  }
+                } @else {
+                  <pre class="ce-spec-pre small">{{ tryResultBodyText() }}</pre>
+                }
               }
             </section>
 
@@ -929,6 +979,26 @@ export class CustomEndpointsPageComponent {
   readonly trySending = signal(false);
   readonly tryResultStatus = signal<number | null>(null);
   readonly tryResultBodyText = signal('');
+  readonly tryResultTab = signal<'list' | 'json'>('list');
+
+  readonly tryResultTable = computed(() => {
+    const text = this.tryResultBodyText();
+    if (!text) return null;
+    try { return previewRows(JSON.parse(text) as unknown); } catch { return null; }
+  });
+
+  readonly tryResultColumns = computed<string[]>(() => {
+    const t = this.tryResultTable();
+    if (!t || t.rows.length === 0) return [];
+    const seen = new Set<string>();
+    const cols: string[] = [];
+    for (const row of t.rows) {
+      for (const k of Object.keys(row)) {
+        if (!seen.has(k)) { seen.add(k); cols.push(k); }
+      }
+    }
+    return cols;
+  });
 
   constructor() {
     this.api.session().subscribe({

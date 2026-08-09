@@ -18,6 +18,7 @@ import { registerAdminMigrationsRoutes } from './admin-migrations';
 import { registerAdminNavVisibilityRoutes } from './admin-nav-visibility';
 import { registerAdminPlatformHealthRoutes } from './admin-platform-health';
 import { registerAdminPlatformUiRoutes } from './admin-platform-ui';
+import { registerAdminPlatformApiCatalogRoutes } from './admin-platform-api-catalog';
 import { registerAdminProductionAccessRoutes } from './admin-production-access';
 import { registerAdminSandboxAiRoutes } from './admin-sandbox-ai';
 
@@ -86,6 +87,7 @@ export function createAdminRouter() {
   registerAdminNavVisibilityRoutes(r);
   registerAdminPlatformHealthRoutes(r);
   registerAdminPlatformUiRoutes(r);
+  registerAdminPlatformApiCatalogRoutes(r);
   registerAdminProductionAccessRoutes(r);
   registerAdminSandboxAiRoutes(r);
   return r;

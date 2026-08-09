@@ -11,15 +11,11 @@ import {
 
 import { loadM2mClientStatusForEdge } from '../lib/m2m-client-status';
 import { createHelloHandler } from './hello';
+import { createPlatformTenantRouter } from './platform-tenant';
 import { createSandboxPortalRouter } from './sandbox-portal';
 import { createTenantRuntimeRouter } from './tenant-runtime';
 
 const SEGMENT = 'platform';
-const requireAccessToken = createRequireSpectraAccessToken({
-  logLabel: 'aviate-api',
-  m2mVerifyEnvSegment: 'AVIATE_API',
-  loadM2mClientStatus: loadM2mClientStatusForEdge,
-});
 
 const health: RequestHandler = (_req, res) => {
   res.status(200).json({ status: 'ok' });
@@ -69,12 +65,18 @@ const stats: RequestHandler = async (_req, res) => {
 };
 
 export function createPlatformRouter() {
+  const requireAccessToken = createRequireSpectraAccessToken({
+    logLabel: 'aviate-api',
+    m2mVerifyEnvSegment: 'AVIATE_API',
+    loadM2mClientStatus: loadM2mClientStatusForEdge,
+  });
   const r = Router();
   r.get('/health', health);
   r.get('/ready', ready);
   r.get('/info', info);
   r.get('/stats', stats);
   r.get('/hello', requireAccessToken, createHelloHandler('aviate-api', SEGMENT));
+  r.use('/tenant', requireAccessToken, createPlatformTenantRouter());
   r.use('/tenant-runtime', requireAccessToken, createTenantRuntimeRouter());
   r.get(
     '/sandbox/production-access/status-by-token/:token',

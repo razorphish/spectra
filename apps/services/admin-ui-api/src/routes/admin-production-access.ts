@@ -3,6 +3,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { Router, type RequestHandler } from 'express';
 
 import {
+  aiEndpointProductionRequests,
   applications,
   buildActorJson,
   catalog,
@@ -186,6 +187,54 @@ export function registerAdminProductionAccessRoutes(r: Router): void {
       .orderBy(desc(developerAiEndpoints.createdAt))
       .limit(200);
     res.json({ orgId, items });
+  });
+
+  // AI endpoint production requests scoped to this PAR's org.
+  g.get('/production-access-requests/:id/endpoint-approvals', async (req, res) => {
+    const id = req.params['id'];
+    if (!id || !UUID_RE.test(id)) {
+      res.status(400).json({ error: 'bad_request' });
+      return;
+    }
+    const db = getDb();
+    const [par] = await db
+      .select({ integrationOrgId: integrations.orgId, applicationOrgId: applications.orgId })
+      .from(productionAccessRequests)
+      .leftJoin(integrations, eq(productionAccessRequests.integrationId, integrations.id))
+      .leftJoin(applications, eq(productionAccessRequests.applicationId, applications.id))
+      .where(and(eq(productionAccessRequests.id, id), isNull(productionAccessRequests.deletedAt)))
+      .limit(1);
+    if (!par) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+    const orgId = par.integrationOrgId ?? par.applicationOrgId;
+    if (!orgId) {
+      res.json({ items: [] });
+      return;
+    }
+    const rows = await db
+      .select({
+        id: aiEndpointProductionRequests.id,
+        endpointId: aiEndpointProductionRequests.endpointId,
+        endpointVersionId: aiEndpointProductionRequests.endpointVersionId,
+        statusId: aiEndpointProductionRequests.statusId,
+        createdAt: aiEndpointProductionRequests.createdAt,
+        updatedAt: aiEndpointProductionRequests.updatedAt,
+        endpointSlug: developerAiEndpoints.slug,
+      })
+      .from(aiEndpointProductionRequests)
+      .innerJoin(developerAiEndpoints, eq(aiEndpointProductionRequests.endpointId, developerAiEndpoints.id))
+      .innerJoin(runtimeTenants, eq(developerAiEndpoints.tenantId, runtimeTenants.id))
+      .where(
+        and(
+          eq(runtimeTenants.orgId, orgId),
+          isNull(aiEndpointProductionRequests.deletedAt),
+        ),
+      )
+      .orderBy(desc(aiEndpointProductionRequests.updatedAt))
+      .limit(200);
+    res.json({ items: rows });
   });
 
   // Approve / revoke / update a production access request.

@@ -34,6 +34,16 @@ export type ProductionAccessRequestDetail = ProductionAccessRequestListItem & {
   updatedBy: unknown;
 };
 
+export type EndpointApprovalItem = {
+  id: string;
+  endpointId: string;
+  endpointVersionId: string;
+  statusId: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  endpointSlug: string | null;
+};
+
 export type ProductionAccessCustomApi = {
   id: string;
   slug: string;
@@ -70,6 +80,12 @@ export class AdminProductionAccessApiService {
   ): Observable<{ orgId: string | null; items: ProductionAccessCustomApi[] }> {
     return this.http.get<{ orgId: string | null; items: ProductionAccessCustomApi[] }>(
       `${this.base()}/production-access-requests/${id}/custom-apis`,
+    );
+  }
+
+  listEndpointApprovals(id: string): Observable<{ items: EndpointApprovalItem[] }> {
+    return this.http.get<{ items: EndpointApprovalItem[] }>(
+      `${this.base()}/production-access-requests/${id}/endpoint-approvals`,
     );
   }
 

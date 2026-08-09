@@ -7,6 +7,7 @@ export const STAFF_PERMISSION_SANDBOX_AI_MODELS_MANAGE = 'platform:sandbox_ai_mo
 export const STAFF_PERMISSION_PRICING_PROFILES_MANAGE = 'platform:pricing_profiles:manage';
 export const STAFF_PERMISSION_CUSTOM_ENDPOINTS_REVIEW = 'platform:custom_endpoints:review';
 export const STAFF_PERMISSION_CUSTOM_ENDPOINTS_PRICING_OVERRIDE = 'platform:custom_endpoints:pricing_override';
+export const STAFF_PERMISSION_API_CATALOG_MANAGE = 'platform:api_catalog:manage';
 
 /**
  * Auth0 RBAC typically emits `permissions: string[]` on access tokens.

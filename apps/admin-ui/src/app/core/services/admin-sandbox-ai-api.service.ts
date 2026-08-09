@@ -33,6 +33,29 @@ export interface PricingProfile {
   updatedAt: string | null;
 }
 
+export interface ProductionRequest {
+  id: string;
+  endpointId: string;
+  endpointVersionId: string;
+  statusId: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  endpointSlug: string | null;
+}
+
+export interface ProductionRequestDetail {
+  request: ProductionRequest & {
+    staffVisibleRejectionReason: string | null;
+    staffReasonCode: string | null;
+    internalStaffNotes: string | null;
+    precheckSummary: unknown;
+    userFollowUp: unknown;
+  };
+  endpoint: { id: string; slug: string; tenantId: string; orgId: string | null; statusId: string } | null;
+  version: { id: string; revision: number; userPrompt: string; spec: unknown } | null;
+  effectivePricing: { profileId: string | null; policy: Record<string, unknown> };
+}
+
 @Injectable({ providedIn: 'root' })
 export class AdminSandboxAiApiService {
   private readonly http = inject(HttpClient);
@@ -71,12 +94,12 @@ export class AdminSandboxAiApiService {
     return this.http.patch<PricingProfile>(`${this.base()}/pricing-profiles/${id}`, body);
   }
 
-  listProductionRequests(): Observable<{ items: unknown[] }> {
-    return this.http.get<{ items: unknown[] }>(`${this.base()}/ai-endpoint-production-requests`);
+  listProductionRequests(): Observable<{ items: ProductionRequest[] }> {
+    return this.http.get<{ items: ProductionRequest[] }>(`${this.base()}/ai-endpoint-production-requests`);
   }
 
-  getProductionRequest(id: string): Observable<unknown> {
-    return this.http.get<unknown>(`${this.base()}/ai-endpoint-production-requests/${id}`);
+  getProductionRequest(id: string): Observable<ProductionRequestDetail> {
+    return this.http.get<ProductionRequestDetail>(`${this.base()}/ai-endpoint-production-requests/${id}`);
   }
 
   patchProductionRequest(id: string, body: Record<string, unknown>): Observable<unknown> {

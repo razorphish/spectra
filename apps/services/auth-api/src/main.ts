@@ -13,6 +13,7 @@ import {
   m2mOauthClients,
   m2mTokenIssuanceLog,
   resolveSpectraDatabaseUrl,
+  runtimeTenants,
 } from '@spectra/database';
 
 import { isKnownM2mScope } from '@spectra/auth';
@@ -185,6 +186,13 @@ async function handleToken(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  // Look up the runtime tenant for this org (if one exists) to include tenant_id in the JWT.
+  const [rtRow] = await db
+    .select({ id: runtimeTenants.id })
+    .from(runtimeTenants)
+    .where(and(eq(runtimeTenants.orgId, row.orgId), isNull(runtimeTenants.deletedAt)))
+    .limit(1);
+
   const issuer = resolvedIssuer();
   const audience = resolvedAudience();
   const ttl = 600;
@@ -195,6 +203,7 @@ async function handleToken(req: Request, res: Response): Promise<void> {
     clientId,
     integrationId: row.integrationId,
     orgId: row.orgId,
+    tenantId: rtRow?.id ?? null,
     clientName: row.integrationName,
     ttlSeconds: ttl,
   });

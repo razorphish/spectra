@@ -310,8 +310,17 @@ export function registerAdminSandboxAiRoutes(r: Router): void {
       }
       const db = getDb();
       const rows = await db
-        .select()
+        .select({
+          id: aiEndpointProductionRequests.id,
+          endpointId: aiEndpointProductionRequests.endpointId,
+          endpointVersionId: aiEndpointProductionRequests.endpointVersionId,
+          statusId: aiEndpointProductionRequests.statusId,
+          createdAt: aiEndpointProductionRequests.createdAt,
+          updatedAt: aiEndpointProductionRequests.updatedAt,
+          endpointSlug: developerAiEndpoints.slug,
+        })
         .from(aiEndpointProductionRequests)
+        .leftJoin(developerAiEndpoints, eq(aiEndpointProductionRequests.endpointId, developerAiEndpoints.id))
         .where(isNull(aiEndpointProductionRequests.deletedAt))
         .orderBy(desc(aiEndpointProductionRequests.updatedAt))
         .limit(200);
@@ -348,6 +357,16 @@ export function registerAdminSandboxAiRoutes(r: Router): void {
         .from(developerAiEndpoints)
         .where(eq(developerAiEndpoints.id, row.endpointId))
         .limit(1);
+      const [version] = await db
+        .select({
+          id: developerAiEndpointVersions.id,
+          revision: developerAiEndpointVersions.revision,
+          userPrompt: developerAiEndpointVersions.userPrompt,
+          spec: developerAiEndpointVersions.spec,
+        })
+        .from(developerAiEndpointVersions)
+        .where(eq(developerAiEndpointVersions.id, row.endpointVersionId))
+        .limit(1);
       const effective =
         ep ?
           await resolveEffectivePricingPolicy(
@@ -357,7 +376,12 @@ export function registerAdminSandboxAiRoutes(r: Router): void {
             ep.pricingProfileId ?? null,
           )
         : { profileId: null, policy: {} };
-      res.json({ request: row, effectivePricing: effective });
+      res.json({
+        request: row,
+        endpoint: ep ? { id: ep.id, slug: ep.slug, tenantId: ep.tenantId, orgId: ep.orgId, statusId: ep.statusId } : null,
+        version: version ?? null,
+        effectivePricing: effective,
+      });
     },
   );
 

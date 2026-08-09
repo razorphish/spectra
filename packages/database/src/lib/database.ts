@@ -23,3 +23,4 @@ export * from './par-notification-writer';
 export * from './stats';
 export * from './uploads';
 export * from './sandbox-ai-invoke';
+export * from './platform-api-catalog';

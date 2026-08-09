@@ -9,6 +9,7 @@ import { finalize } from 'rxjs';
 import { PageBreadcrumb } from '@/app/components/page-breadcrumb';
 import {
   AdminProductionAccessApiService,
+  type EndpointApprovalItem,
   type ProductionAccessCustomApi,
   type ProductionAccessRequestDetail,
 } from '@/app/core/services/admin-production-access-api.service';
@@ -97,6 +98,62 @@ import {
                       </div>
                     </div>
                   </div>
+                </div>
+              </ng-template>
+            </li>
+
+            <li ngbNavItem="endpoint-approvals">
+              <a ngbNavLink>Endpoint approvals</a>
+              <ng-template ngbNavContent>
+                <div class="pt-3">
+                  <p class="text-muted small">
+                    AI endpoint production approval requests for this org's custom endpoints.
+                  </p>
+                  @if (endpointApprovalsLoading()) {
+                    <p>Loading…</p>
+                  } @else {
+                    <div class="table-responsive">
+                      <table class="table table-sm table-hover">
+                        <thead>
+                          <tr>
+                            <th>Status</th>
+                            <th>Endpoint</th>
+                            <th>Request ID</th>
+                            <th>Submitted</th>
+                            <th>Updated</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (row of endpointApprovals(); track row.id) {
+                            <tr>
+                              <td>
+                                <span class="badge {{ approvalStatusCls(row.statusId) }}">{{ approvalStatusLabel(row.statusId) }}</span>
+                              </td>
+                              <td class="font-monospace small">{{ row.endpointSlug ?? '—' }}</td>
+                              <td class="font-monospace small text-muted">{{ row.id.slice(0, 8) }}…</td>
+                              <td class="small text-nowrap text-muted">{{ row.createdAt | date: 'short' }}</td>
+                              <td class="small text-nowrap text-muted">{{ row.updatedAt | date: 'short' }}</td>
+                              <td class="text-end">
+                                <a
+                                  [routerLink]="['/platform/custom-endpoints', row.id]"
+                                  class="btn btn-outline-secondary waves-effect btn-xs d-inline-flex align-items-center justify-content-center"
+                                  title="Review"
+                                  aria-label="Review"
+                                >
+                                  <i class="sa sa-pencil" aria-hidden="true"></i>
+                                </a>
+                              </td>
+                            </tr>
+                          } @empty {
+                            <tr>
+                              <td colspan="6" class="text-muted">No endpoint approval requests for this org.</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
                 </div>
               </ng-template>
             </li>
@@ -227,6 +284,8 @@ export class ProductionAccessEditPage {
   readonly saving = signal(false);
   readonly customApis = signal<ProductionAccessCustomApi[]>([]);
   readonly customApisLoading = signal(true);
+  readonly endpointApprovals = signal<EndpointApprovalItem[]>([]);
+  readonly endpointApprovalsLoading = signal(true);
 
   customerStatusMessage = '';
   staffInternalNotes = '';
@@ -357,5 +416,30 @@ export class ProductionAccessEditPage {
         this.customApisLoading.set(false);
       },
     });
+    this.api.listEndpointApprovals(this.id).subscribe({
+      next: (res) => {
+        this.endpointApprovals.set(res.items);
+        this.endpointApprovalsLoading.set(false);
+      },
+      error: () => {
+        this.endpointApprovalsLoading.set(false);
+      },
+    });
+  }
+
+  private static readonly APPROVAL_STATUS: Record<string, { label: string; cls: string }> = {
+    'a0000080-0000-4000-8000-000000000001': { label: 'Pending review', cls: 'text-bg-warning' },
+    'a0000080-0000-4000-8000-000000000002': { label: 'Needs info', cls: 'text-bg-info' },
+    'a0000080-0000-4000-8000-000000000003': { label: 'Awaiting user', cls: 'text-bg-secondary' },
+    'a0000080-0000-4000-8000-000000000004': { label: 'Approved', cls: 'text-bg-success' },
+    'a0000080-0000-4000-8000-000000000005': { label: 'Rejected', cls: 'text-bg-danger' },
+  };
+
+  approvalStatusLabel(id: string): string {
+    return ProductionAccessEditPage.APPROVAL_STATUS[id]?.label ?? id.slice(0, 8);
+  }
+
+  approvalStatusCls(id: string): string {
+    return ProductionAccessEditPage.APPROVAL_STATUS[id]?.cls ?? 'text-bg-secondary';
   }
 }

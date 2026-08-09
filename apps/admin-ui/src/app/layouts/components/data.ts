@@ -103,8 +103,8 @@ export const menuItems: MenuItemType[] = [
       { label: 'Production access', url: '/platform/production-access' },
       { label: 'Sandbox AI models', url: '/platform/sandbox-ai-models' },
       { label: 'Pricing profiles', url: '/platform/pricing-profiles' },
-      { label: 'Custom endpoint approvals', url: '/platform/custom-endpoints' },
       { label: 'Runtime tenants', url: '/platform/runtime-tenants' },
+      { label: 'API Catalog & Scopes', url: '/platform/api-catalog' },
     ],
   },
   {
