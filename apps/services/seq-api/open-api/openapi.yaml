@@ -32,6 +32,7 @@ components:
         message: { type: string }
 paths:
   /v1/seq/health:
+    x-spectra-audience: internal
     get:
       tags: [System]
       summary: Liveness
@@ -39,6 +40,7 @@ paths:
         '200':
           description: OK
   /v1/seq/ready:
+    x-spectra-audience: public
     get:
       tags: [System]
       summary: Readiness
@@ -46,6 +48,7 @@ paths:
         '200':
           description: OK
   /v1/seq/hello:
+    x-spectra-audience: public
     get:
       tags: [Sandbox]
       summary: Authenticated sandbox hello (seq segment)

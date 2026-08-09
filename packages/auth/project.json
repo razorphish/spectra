@@ -19,7 +19,15 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "packages/auth/jest.config.cts"
+        "jestConfig": "packages/auth/jest.config.js"
+      }
+    },
+    "emit-scope-map": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node scripts/emit-scope-map-json.cjs",
+        "cwd": "{workspaceRoot}"
       }
     }
   }

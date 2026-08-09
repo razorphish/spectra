@@ -70,6 +70,10 @@ Thumbs.db
 .claude/worktrees
 .claude/settings.local.json
 
+# .NET build output
+**/bin/
+**/obj/
+
 # Terraform
 **/.terraform/
 **/.terraform.lock.hcl
@@ -83,3 +87,5 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+.nx/polygraph

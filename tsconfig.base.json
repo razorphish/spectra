@@ -17,6 +17,7 @@
       "@spectra/auth": ["./packages/auth/src/index.ts"],
       "@spectra/database": ["./packages/database/src/index.ts"],
       "@spectra/logger": ["./packages/logger/src/index.ts"],
+      "@spectra/meridian": ["./packages/meridian/src/index.ts"],
       "@spectra/logger-express": ["./packages/logger-express/src/index.ts"],
       "@spectra/openapi": ["./packages/openapi/src/index.ts"],
       "@spectra/upload": ["./packages/upload/src/index.ts"],

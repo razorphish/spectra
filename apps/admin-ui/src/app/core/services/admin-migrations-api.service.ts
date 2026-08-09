@@ -9,6 +9,13 @@ export interface MigrationPathsDto {
   snapshotFolder: string;
 }
 
+export interface SeedResultDto {
+  name: string;
+  status: 'ok' | 'error';
+  detail?: Record<string, unknown>;
+  error?: string;
+}
+
 export interface MigrationStatusDto {
   totalApplied: number;
   totalAvailable: number;
@@ -115,6 +122,27 @@ export class AdminMigrationsApiService {
       inventory: MigrationsInventoryDto;
       hashRepairedTags?: string[];
     }>(`${this.adminBaseUrl()}/migrations/run`, { scope, ...(tag ? { tag } : {}) });
+  }
+
+  runSeeds(): Observable<{ ok: boolean; seeds: SeedResultDto[] }> {
+    return this.http.post<{ ok: boolean; seeds: SeedResultDto[] }>(
+      `${this.adminBaseUrl()}/migrations/seed`,
+      {},
+    );
+  }
+
+  postReconcile(): Observable<{
+    ok: boolean;
+    inventory: MigrationsInventoryDto;
+    deletedOrphanHashes: string[];
+    hashRepairedTags: string[];
+  }> {
+    return this.http.post<{
+      ok: boolean;
+      inventory: MigrationsInventoryDto;
+      deletedOrphanHashes: string[];
+      hashRepairedTags: string[];
+    }>(`${this.adminBaseUrl()}/migrations/reconcile`, {});
   }
 
   deleteMigrationRecord(tag: string): Observable<{ ok: boolean; inventory: MigrationsInventoryDto }> {

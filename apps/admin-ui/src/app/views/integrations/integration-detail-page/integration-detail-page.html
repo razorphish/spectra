@@ -1,0 +1,172 @@
+<div class="main-content">
+  <div class="container-fluid py-4">
+    <app-page-breadcrumb
+      title="Integration detail"
+      subTitle1="Platform"
+      subText="Overview and token issuance audit (read-only)."
+    />
+
+    <p class="mt-2">
+      <a routerLink="/integrations" class="text-decoration-none">← Back to Integrations</a>
+    </p>
+
+    @if (loading()) {
+      <div class="text-muted py-4">
+        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+        Loading…
+      </div>
+    } @else if (detail(); as d) {
+      <h5 class="mt-3 mb-0">{{ d.integration.name }}</h5>
+      <p class="text-muted small mb-3">
+        <code>{{ integrationId() }}</code>
+        @if (d.isDeleted) {
+          <span class="badge bg-secondary ms-2">Deleted</span>
+        }
+      </p>
+
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="export('json')">
+          Export JSON
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" (click)="export('csv')">
+          Export issuance CSV
+        </button>
+      </div>
+
+      <ul
+        [(activeId)]="activeId"
+        ngbNav
+        #nav="ngbNav"
+        class="nav nav-tabs-clean mt-2"
+      >
+        <li ngbNavItem="overview">
+          <a ngbNavLink>Overview</a>
+          <ng-template ngbNavContent>
+            <div class="pt-3 row g-3">
+              <div class="col-md-6">
+                <div class="card border shadow-sm">
+                  <div class="card-header fw-semibold">Integration</div>
+                  <div class="card-body small">
+                    <p><strong>Org:</strong> {{ d.organization.name }}</p>
+                    <p><strong>Description:</strong> {{ d.integration.description || '—' }}</p>
+                    <p><strong>Status:</strong> {{ d.integration.statusName ?? d.integration.statusId }}</p>
+                    <p><strong>Created:</strong> {{ d.integration.createdAt | date: 'medium' }}</p>
+                    <p><strong>Updated:</strong> {{ d.integration.updatedAt | date: 'medium' }}</p>
+                    <p class="mb-0"><strong>created_by:</strong></p>
+                    <pre class="bg-light p-2 rounded small mb-0">{{ d.integration.createdBy | json }}</pre>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="card border shadow-sm">
+                  <div class="card-header fw-semibold">M2M client</div>
+                  <div class="card-body small">
+                    @if (d.m2mClient; as m) {
+                      <p><strong>client_id:</strong> <code>{{ m.clientId }}</code></p>
+                      <p><strong>granted_scopes:</strong> {{ m.grantedScopes }}</p>
+                      <p><strong>Status:</strong> {{ m.statusName ?? m.statusId }}</p>
+                      <p><strong>updated_by:</strong></p>
+                      <pre class="bg-light p-2 rounded small mb-0">{{ m.updatedBy | json }}</pre>
+                    } @else {
+                      <p class="text-muted mb-0">No active M2M client row.</p>
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ng-template>
+        </li>
+        <li ngbNavItem="audit">
+          <a ngbNavLink>Activity / Audit</a>
+          <ng-template ngbNavContent>
+            <div class="pt-3">
+              <p class="text-muted small">
+                Successful mints from <code>m2m_token_issuance_log</code> (newest first). Default page size 50, max
+                200.
+              </p>
+              <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-3">
+                  <label class="form-label" for="iss-from">From (ISO)</label>
+                  <input id="iss-from" class="form-control form-control-sm" [(ngModel)]="fromDraft" />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label" for="iss-to">To (ISO)</label>
+                  <input id="iss-to" class="form-control form-control-sm" [(ngModel)]="toDraft" />
+                </div>
+                <div class="col-md-auto">
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    (click)="applyIssuanceFilters()"
+                    [disabled]="issuanceLoading()"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+
+              @if (issuanceLoading()) {
+                <div class="text-muted py-3">
+                  <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  Loading issuance…
+                </div>
+              } @else {
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover">
+                    <thead>
+                      <tr>
+                        <th>Issued</th>
+                        <th>jti</th>
+                        <th>Expires</th>
+                        <th>created_by</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of issuanceItems(); track row.id) {
+                        <tr>
+                          <td class="text-nowrap small">{{ row.issuedAt | date: 'medium' }}</td>
+                          <td><code class="small">{{ row.jti }}</code></td>
+                          <td class="text-nowrap small">{{ row.expiresAt | date: 'medium' }}</td>
+                          <td class="small"><pre class="mb-0 tiny-pre">{{ row.createdBy | json }}</pre></td>
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td colspan="4" class="text-muted">No issuance rows.</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                  <span class="text-muted small">Total {{ issuanceTotal() }}</span>
+                  <div class="btn-group btn-group-sm">
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      (click)="setIssuancePage(issuancePage() - 1)"
+                      [disabled]="issuanceLoading() || issuancePage() <= 1"
+                    >
+                      Prev
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" disabled>
+                      {{ issuancePage() }} / {{ issuanceTotalPages() }}
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      (click)="setIssuancePage(issuancePage() + 1)"
+                      [disabled]="issuanceLoading() || issuancePage() >= issuanceTotalPages()"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </ng-template>
+        </li>
+      </ul>
+      <div class="tab-content pt-2" [ngbNavOutlet]="nav"></div>
+    }
+  </div>
+</div>

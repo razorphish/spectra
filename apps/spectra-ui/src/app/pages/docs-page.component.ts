@@ -5,7 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { docsNavItems } from '../layout/site-nav';
 import { environment } from '../../environments/environment';
@@ -14,35 +14,8 @@ import { environment } from '../../environments/environment';
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
   selector: 'spectra-docs-page',
-  template: `
-    <div class="spectra-page docs-page">
-      <h1>API Documentation</h1>
-      <p class="lede">
-        Placeholder hub aligned with
-        <a href="https://bluebutton.cms.gov/" rel="noopener noreferrer" target="_blank">CMS Blue Button</a>
-        API Documentation navigation. Use the header menu to jump to a section.
-      </p>
-
-      @for (item of docsNavItems; track item.fragment) {
-        <section class="doc-section" [id]="item.fragment">
-          <h2>{{ item.label }}</h2>
-          @if (item.fragment === 'get-started-with-sandbox') {
-            @if (sandboxUiUrl) {
-              <p class="sandbox-lead">
-                <a [href]="sandboxUiUrl" class="sandbox-link" target="_blank" rel="noopener noreferrer"
-                  >Open Spectra Sandbox</a
-                >
-                — authenticated developer UI (<code>sandbox-ui</code>).
-              </p>
-            } @else {
-              <p class="stub">Configure <code>sandboxUiUrl</code> in this environment to enable the Sandbox link.</p>
-            }
-          }
-          <p class="stub">Content coming soon.</p>
-        </section>
-      }
-    </div>
-  `,
+  imports: [RouterLink],
+  templateUrl: './docs-page.component.html',
   styles: `
     .docs-page {
       padding-bottom: 4rem;
@@ -80,21 +53,59 @@ import { environment } from '../../environments/environment';
       text-decoration: none;
     }
 
-    .sandbox-link:hover {
+    .sandbox-link:hover:not(.disabled) {
       color: var(--spectra-color-accent-hover);
       text-decoration: underline;
+    }
+
+    .sandbox-link.disabled {
+      pointer-events: none;
+      color: var(--spectra-color-muted);
+      cursor: default;
     }
 
     .lede a {
       color: var(--spectra-color-link);
     }
+
+    .doc-steps {
+      margin: 0.5rem 0 1rem;
+      padding-left: 1.25rem;
+      color: var(--spectra-color-panel-text);
+      line-height: 1.55;
+    }
+
+    .meta-line {
+      margin: 0.75rem 0 0;
+      font-size: 0.9rem;
+      color: var(--spectra-color-text);
+    }
+
+    .meta-line .label {
+      display: block;
+      font-weight: 600;
+      color: var(--spectra-color-muted);
+      margin-bottom: 0.2rem;
+    }
   `,
 })
 export class DocsPageComponent implements AfterViewInit {
   protected readonly docsNavItems = docsNavItems;
-  protected readonly sandboxUiUrl = environment.sandboxUiUrl;
+  protected readonly sandboxUiUrl = environment.sandboxUiUrl?.trim() || '';
 
   private readonly router = inject(Router);
+
+  /** Non-empty when this build knows a gateway origin (e.g. local dev). */
+  protected apiGatewayOrigin(): string {
+    return environment.apiBaseUrl?.replace(/\/$/, '') ?? '';
+  }
+
+  /** OAuth 2.0 Authorization Server metadata on auth-api (RFC 8414). */
+  protected oauthMetadataUrl(): string | null {
+    const b = environment.authApiPublicBaseUrl?.trim();
+    if (!b) return null;
+    return `${b.replace(/\/$/, '')}/.well-known/oauth-authorization-server`;
+  }
 
   constructor() {
     this.router.events

@@ -1,8 +1,20 @@
-import { apiBaseUrlFromDotEnv, auth0FromDotEnv } from './environment.auth0.local';
+import {
+  apiBaseUrlFromDotEnv,
+  authApiPublicBaseUrlFromDotEnv,
+  auth0FromDotEnv,
+  publicApiDocsBaseUrlFromDotEnv,
+} from './environment.auth0.local';
 
 export const environment = {
   production: false,
+  /** When true, use the BFF (cookie session) instead of the in-browser Auth0 SPA. */
+  bffAuth: false,
   apiBaseUrl: apiBaseUrlFromDotEnv,
+  publicApiDocsBaseUrl: publicApiDocsBaseUrlFromDotEnv,
+  /** OAuth metadata / JWKS host for links in dashboard (see SANDBOX_UI_AUTH_API_PUBLIC_URL). */
+  authApiPublicBaseUrl: authApiPublicBaseUrlFromDotEnv,
+  /** Shown in dashboard for customer clarity. */
+  customerSandboxLabel: 'Local development',
   /** Local `nx serve spectra-ui` (port 4200). */
   spectraMarketingUrl: 'http://localhost:4200',
   auth0: {

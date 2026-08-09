@@ -19,7 +19,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "packages/upload/jest.config.cts"
+        "jestConfig": "packages/upload/jest.config.js"
       }
     }
   }

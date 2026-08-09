@@ -1,4 +1,9 @@
-import { apiBaseUrlFromDotEnv, auth0FromDotEnv, redirectUriFromDotEnv } from './environment.auth0.local';
+import {
+  apiBaseUrlFromDotEnv,
+  auth0FromDotEnv,
+  aviateSwaggerDocsUrlFromDotEnv,
+  redirectUriFromDotEnv,
+} from './environment.auth0.local';
 
 export const environment = {
   production: false,
@@ -19,4 +24,6 @@ export const environment = {
     enabled: false,
     dsn: undefined as string | undefined,
   },
+  /** Full merged OpenAPI (Swagger) — `/integration/docs` on aviate-api, not public `/docs`. */
+  aviateApiDocsUrl: aviateSwaggerDocsUrlFromDotEnv,
 };

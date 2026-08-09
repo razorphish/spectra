@@ -13,7 +13,7 @@ Spectra public APIs share URL layout and JSON contracts. Each service runs in it
 
 **Unified local entry:** [local-edge](../apps/local-edge) on **:3000** reverse-proxies to each upstream. [sandbox-ui](../apps/sandbox-ui) should use `apiBaseUrl` `http://127.0.0.1:3000`.
 
-**Merged API docs:** `GET http://127.0.0.1:3000/docs` (proxied to aviate-api) and `GET /openapi.json`.
+**Merged API docs:** `GET http://127.0.0.1:3000/docs` (proxied to aviate-api) and `GET /openapi.json`. For M2M scope-map parity across runtimes, see [api-polyglot-m2m.md](api-polyglot-m2m.md).
 
 ## Standard endpoints
 
@@ -108,4 +108,4 @@ Polyglot services are **not** in the Node lambda matrix once their native build 
 npx nx run openapi:merge
 ```
 
-Writes `packages/openapi/dist/spectra-public-api.json` and copies to aviate-api assets for `/docs`.
+Writes **`packages/openapi/dist/spectra-public-api.json`** (public limited) and **`spectra-integration-api.json`** (full catalog), copies both to **`apps/services/aviate-api/src/assets/`** for **`GET /openapi.json`** / **`/docs`** vs **`GET /integration/openapi.json`** / **`/integration/docs`** on aviate-api.

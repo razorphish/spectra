@@ -4,6 +4,8 @@ import { RouterModule } from '@angular/router';
 import { Auth0ClientService, AuthService } from '@auth0/auth0-angular';
 import { SpectraBrandBarComponent } from '@spectra/shared-ui';
 import { environment } from '../environments/environment';
+import { BffAuthService } from './core/bff-auth.service';
+import { buildPublicApiSwaggerUrl } from './public-api-docs-url';
 
 @Component({
   imports: [RouterModule, AsyncPipe, SpectraBrandBarComponent],
@@ -29,7 +31,10 @@ export class App {
     '/docs',
   );
   protected readonly supportUrl = joinExternal(environment.spectraMarketingUrl, '/support');
-  protected readonly apiDocsUrl = `${environment.apiBaseUrl.replace(/\/$/, '')}/docs`;
+  protected readonly apiDocsUrl = buildPublicApiSwaggerUrl(
+    environment.apiBaseUrl,
+    environment.publicApiDocsBaseUrl,
+  );
 
   protected readonly auth0Configured = Boolean(
     environment.auth0.enabled &&
@@ -39,8 +44,12 @@ export class App {
   protected readonly auth = inject(AuthService, { optional: true });
   /** SPA SDK instance (bypass AuthService Observable wrapper for reliable redirect). */
   protected readonly auth0 = inject(Auth0ClientService, { optional: true });
+  /** BFF cookie-session auth (used when environment.bffAuth is true). */
+  protected readonly bffMode = environment.bffAuth;
+  protected readonly bffAuth = inject(BffAuthService);
 
   constructor() {
+    if (this.bffMode) this.bffAuth.loadMe().subscribe();
     try {
       const raw = sessionStorage.getItem('spectra_sandbox_oauth_error');
       if (raw) {
@@ -63,6 +72,10 @@ export class App {
   }
 
   protected login(): void {
+    if (this.bffMode) {
+      this.bffAuth.login();
+      return;
+    }
     const c = this.auth0;
     if (!c) return;
     void c
@@ -75,6 +88,10 @@ export class App {
   }
 
   protected logout(): void {
+    if (this.bffMode) {
+      this.bffAuth.logout();
+      return;
+    }
     const c = this.auth0;
     if (!c) return;
     void c

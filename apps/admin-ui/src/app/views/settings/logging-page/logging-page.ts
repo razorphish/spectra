@@ -7,6 +7,10 @@ import { PageBreadcrumb } from '@app/components/page-breadcrumb';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
 import {
+  AdminIntegrationsApiService,
+  type M2mTokenActivityResponseDto,
+} from '@core/services/admin-integrations-api.service';
+import {
   AdminLoggingApiService,
   type AdminLogDto,
   type AdminLogsPagination,
@@ -31,6 +35,7 @@ const LOG_LEVELS = ['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'] as const;
 })
 export class LoggingPage implements OnInit {
   private readonly api = inject(AdminLoggingApiService);
+  private readonly integrationsApi = inject(AdminIntegrationsApiService);
   private readonly toastr = inject(ToastrService);
 
   activeId = 'logs';
@@ -53,9 +58,17 @@ export class LoggingPage implements OnInit {
   settingsLoading = signal(false);
   settingsError = signal<string | null>(null);
 
+  m2mLoading = signal(false);
+  m2mError = signal<string | null>(null);
+  m2mActivity = signal<M2mTokenActivityResponseDto | null>(null);
+  m2mWindowDays = 7;
+
   onNavChange(event: NgbNavChangeEvent): void {
     if (event.nextId === 'settings') {
       void this.loadSettings();
+    }
+    if (event.nextId === 'm2m') {
+      void this.loadM2mActivity();
     }
   }
 
@@ -143,6 +156,33 @@ export class LoggingPage implements OnInit {
       this.settingsError.set(msg);
     } finally {
       this.settingsLoading.set(false);
+    }
+  }
+
+  async loadM2mActivity(): Promise<void> {
+    this.m2mLoading.set(true);
+    this.m2mError.set(null);
+    try {
+      const res = await firstValueFrom(this.integrationsApi.getM2mTokenActivity(this.m2mWindowDays));
+      this.m2mActivity.set(res);
+    } catch (e: unknown) {
+      let msg = 'Failed to load M2M token activity';
+      if (e instanceof HttpErrorResponse) {
+        const body = e.error as { message?: string } | null;
+        msg = body?.message ?? e.message;
+      } else if (e instanceof Error) {
+        msg = e.message;
+      }
+      this.m2mError.set(msg);
+      this.m2mActivity.set(null);
+      if (e instanceof HttpErrorResponse && e.status === 403) {
+        this.toastr.error(
+          'Requires Auth0 API permission platform:integrations:read.',
+          'M2M activity',
+        );
+      }
+    } finally {
+      this.m2mLoading.set(false);
     }
   }
 

@@ -20,4 +20,5 @@ export const environment = {
     enabled: false,
     dsn: undefined as string | undefined,
   },
+  aviateApiDocsUrl: '',
 };

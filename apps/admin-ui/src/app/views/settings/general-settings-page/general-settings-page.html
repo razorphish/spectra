@@ -1,9 +1,9 @@
 <div class="main-content">
-  <div class="container-xl py-4">
+  <div class="container-fluid py-4">
     <app-page-breadcrumb
       title="General"
       subTitle1="Settings"
-      subText="Template sidebar sections and related routes (stored in spectra.platform_settings)."
+      subText="Template sidebar, Auth0 verification tuning, and developer sandbox portal visibility (stored in spectra.platform_settings)."
     />
 
     <ul
@@ -67,6 +67,326 @@
                 </div>
               </div>
             }
+          </div>
+        </ng-template>
+      </li>
+      <li ngbNavItem="platform">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#cpu"></use>
+          </svg>
+          Platform
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            @if (platformSaveError(); as pe) {
+              <div class="alert alert-danger" role="alert">{{ pe }}</div>
+            }
+            @if (platformLoading()) {
+              <div class="text-muted py-4">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Loading…
+              </div>
+            } @else {
+              <div class="card shadow-sm border">
+                <div class="card-body">
+                  <h6 class="fw-semibold mb-2">Developer sandbox — applications UI</h6>
+                  <p class="text-muted small mb-3">
+                    Controls <strong>Add an application</strong> and the <strong>My Sandbox Apps</strong> panel on the
+                    public developer dashboard (<code>sandbox-ui</code>, e.g.
+                    <code>/dashboard</code>). M2M integrations are unchanged. Stored in
+                    <code>spectra.platform_settings</code> key
+                    <code>sandbox_portal.developer_applications_ui_enabled</code>.
+                  </p>
+                  <div class="form-check form-switch mb-4">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="dev-apps-ui"
+                      [checked]="developerApplicationsUiDraft()"
+                      (change)="setDeveloperApplicationsUi($any($event.target).checked)"
+                    />
+                    <label class="form-check-label" for="dev-apps-ui">
+                      Show sandbox applications (add + list) in developer dashboard
+                    </label>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      (click)="saveDeveloperPortalUi()"
+                      [disabled]="platformLoading()"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      (click)="loadDeveloperPortalUi()"
+                      [disabled]="platformLoading()"
+                    >
+                      Reload
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="card shadow-sm border mt-4">
+                <div class="card-body">
+                  <h6 class="fw-semibold mb-2">Sandbox AI — custom endpoints</h6>
+                  <p class="text-muted small mb-3">
+                    Gates sandbox portal AI routes and tenant-runtime invoke. Keys
+                    <code>sandbox.ai.*</code> in <code>spectra.platform_settings</code>.
+                  </p>
+                  @if (sandboxAiSaveError(); as se) {
+                    <div class="alert alert-danger" role="alert">{{ se }}</div>
+                  }
+                  @if (sandboxAiLoading()) {
+                    <div class="text-muted py-2">
+                      <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                      Loading sandbox AI flags…
+                    </div>
+                  } @else {
+                    <div class="form-check form-switch mb-2">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="sandbox-ai-enabled"
+                        [checked]="sandboxAiEndpointsEnabled()"
+                        (change)="sandboxAiEndpointsEnabled.set($any($event.target).checked)"
+                      />
+                      <label class="form-check-label" for="sandbox-ai-enabled">Endpoints enabled</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="sandbox-ai-precheck"
+                        [checked]="sandboxAiPrecheckEnabled()"
+                        (change)="sandboxAiPrecheckEnabled.set($any($event.target).checked)"
+                      />
+                      <label class="form-check-label" for="sandbox-ai-precheck">Precheck enabled</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="sandbox-ai-auto"
+                        [checked]="sandboxAiAutomationEnabled()"
+                        (change)="sandboxAiAutomationEnabled.set($any($event.target).checked)"
+                      />
+                      <label class="form-check-label" for="sandbox-ai-auto">Approval automation enabled</label>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="sandbox-ai-machine"
+                        [checked]="sandboxAiMachineAutoApprove()"
+                        (change)="sandboxAiMachineAutoApprove.set($any($event.target).checked)"
+                      />
+                      <label class="form-check-label" for="sandbox-ai-machine">Machine auto-approve</label>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        class="btn btn-primary"
+                        (click)="saveSandboxAi()"
+                        [disabled]="sandboxAiLoading()"
+                      >
+                        Save sandbox AI flags
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        (click)="loadSandboxAi()"
+                        [disabled]="sandboxAiLoading()"
+                      >
+                        Reload
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </li>
+      <li ngbNavItem="auth">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#lock"></use>
+          </svg>
+          Auth
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            @if (authSaveError(); as ae) {
+              <div class="alert alert-danger" role="alert">{{ ae }}</div>
+            }
+            @if (authLoading()) {
+              <div class="text-muted py-4">
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                Loading…
+              </div>
+            } @else {
+              <div class="card shadow-sm border">
+                <div class="card-body">
+                  <h6 class="fw-semibold mb-2">JWT clock skew</h6>
+                  <p class="text-muted small mb-3">
+                    Leeway (seconds) for <code>iat</code> / <code>exp</code> when verifying access tokens (Auth0
+                    and M2M). Stored in <code>spectra.platform_settings</code> key
+                    <code>auth.jwt_clock_skew_seconds</code>.
+                  </p>
+                  <label class="form-label" for="jwt-skew">Seconds (0–300)</label>
+                  <input
+                    id="jwt-skew"
+                    type="number"
+                    class="form-control mb-3"
+                    style="max-width: 12rem"
+                    min="0"
+                    max="300"
+                    [ngModel]="jwtClockSkewDraft()"
+                    (ngModelChange)="setJwtSkew($event)"
+                  />
+                  <div class="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="btn btn-primary"
+                      (click)="saveAuthJwtSkew()"
+                      [disabled]="authLoading()"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      (click)="loadAuthJwtSkew()"
+                      [disabled]="authLoading()"
+                    >
+                      Reload
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </ng-template>
+      </li>
+      <li ngbNavItem="health">
+        <a ngbNavLink>
+          <svg class="sa-icon me-2">
+            <use href="/assets/icons/sprite.svg#activity"></use>
+          </svg>
+          API health
+        </a>
+        <ng-template ngbNavContent>
+          <div class="pt-4">
+            @if (healthError(); as he) {
+              <div class="alert alert-danger" role="alert">{{ he }}</div>
+            }
+            <div class="card shadow-sm border">
+              <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                  <h6 class="fw-semibold mb-0">Platform API health</h6>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    (click)="loadHealth()"
+                    [disabled]="healthLoading()"
+                  >
+                    @if (healthLoading()) {
+                      <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Refresh
+                  </button>
+                </div>
+                <p class="text-muted small mb-3">
+                  Live checks against the platform services. The admin API proxies
+                  <code>GET /healthz</code> on aviate-api server-side (set <code>AVIATE_API_URL</code> if it is not on
+                  <code>127.0.0.1:3001</code>).
+                </p>
+
+                @if (healthLoading() && !health()) {
+                  <div class="text-muted py-2">
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                    Checking…
+                  </div>
+                } @else if (health(); as h) {
+                  <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-2">
+                      <tbody>
+                        <tr>
+                          <td class="fw-semibold">Admin API</td>
+                          <td><span class="badge bg-success">Reachable</span></td>
+                        </tr>
+                        <tr>
+                          <td class="ps-3 text-muted">Database</td>
+                          <td>
+                            @if (!h.adminApi.database.configured) {
+                              <span class="badge bg-secondary">Not configured</span>
+                            } @else if (h.adminApi.database.ok) {
+                              <span class="badge bg-success">OK</span>
+                            } @else {
+                              <span class="badge bg-danger">Fail</span>
+                            }
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="fw-semibold">
+                            Aviate API
+                            <span class="d-block text-muted small fw-normal">{{ h.aviateApi.url }}</span>
+                          </td>
+                          <td>
+                            @if (h.aviateApi.reachable) {
+                              <span class="badge bg-success">Reachable</span>
+                            } @else {
+                              <span class="badge bg-danger">Unreachable</span>
+                              @if (h.aviateApi.error) {
+                                <span class="text-danger small ms-2">{{ h.aviateApi.error }}</span>
+                              }
+                            }
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="ps-3 text-muted">Database</td>
+                          <td>
+                            @if (h.aviateApi.database === true) {
+                              <span class="badge bg-success">OK</span>
+                            } @else if (h.aviateApi.database === false) {
+                              <span class="badge bg-danger">Fail</span>
+                            } @else {
+                              <span class="badge bg-secondary">Unknown</span>
+                            }
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="ps-3 text-muted">
+                            Custom AI generation
+                            <span class="d-block small">(ANTHROPIC_API_KEY)</span>
+                          </td>
+                          <td>
+                            @if (h.aviateApi.sandboxAi === true) {
+                              <span class="badge bg-success">Configured</span>
+                            } @else if (h.aviateApi.sandboxAi === false) {
+                              <span class="badge bg-warning text-dark">Not configured</span>
+                            } @else {
+                              <span class="badge bg-secondary">Unknown</span>
+                            }
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  @if (h.aviateApi.sandboxAi === false) {
+                    <p class="text-muted small mb-0">
+                      Custom AI endpoints (preview/generate) will return <strong>503</strong> until
+                      <code>ANTHROPIC_API_KEY</code> is set on aviate-api.
+                    </p>
+                  }
+                  <p class="text-muted small mb-0 mt-2">Last checked {{ h.checkedAt }}</p>
+                }
+              </div>
+            </div>
           </div>
         </ng-template>
       </li>

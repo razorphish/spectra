@@ -60,6 +60,8 @@ export class MigrationsUiState {
 
   runPendingBusy = signal(false);
   runAllBusy = signal(false);
+  runSeedsBusy = signal(false);
+  reconcileBusy = signal(false);
   refreshing = signal(false);
   loadError = signal<string | null>(null);
 
@@ -232,6 +234,47 @@ export class MigrationsUiState {
     }
   }
 
+  async reconcile(onSuccessClose?: () => void): Promise<void> {
+    if (this.reconcileBusy()) return;
+    this.reconcileBusy.set(true);
+    try {
+      try {
+        const res = await firstValueFrom(this.api.postReconcile());
+        this.applyInventory(res.inventory);
+        const parts: string[] = [];
+        if (res.deletedOrphanHashes.length > 0) {
+          parts.push(
+            `Removed ${res.deletedOrphanHashes.length} orphan row(s) from spectra.__drizzle_migrations.`,
+          );
+        }
+        if (res.hashRepairedTags.length > 0) {
+          parts.push(`Hash-order repair: ${res.hashRepairedTags.join(', ')}.`);
+        }
+        if (parts.length === 0) {
+          parts.push('Migration repair migrate completed.');
+        }
+        this.toastr.success(parts.join(' '), 'Reconcile');
+        onSuccessClose?.();
+      } catch (e) {
+        if (e instanceof HttpErrorResponse && e.status === 409) {
+          const body = e.error as { inventory?: MigrationsInventoryDto; message?: string } | null;
+          if (body?.inventory) {
+            this.applyInventory(body.inventory);
+          }
+          this.toastr.info(
+            body?.message ?? 'Journal and database already match — nothing to reconcile.',
+            'Reconcile',
+          );
+          onSuccessClose?.();
+          return;
+        }
+        this.toastr.error(this.errMessage(e), 'Reconcile');
+      }
+    } finally {
+      this.reconcileBusy.set(false);
+    }
+  }
+
   async runAll(): Promise<void> {
     if (this.runAllBusy()) return;
     this.runAllBusy.set(true);
@@ -250,6 +293,28 @@ export class MigrationsUiState {
       this.toastr.error(this.errMessage(e), 'Run All');
     } finally {
       this.runAllBusy.set(false);
+    }
+  }
+
+  /** Runs idempotent environment seed scripts (default model row + MRP fixture backfill). */
+  async runSeeds(): Promise<void> {
+    if (this.runSeedsBusy()) return;
+    this.runSeedsBusy.set(true);
+    try {
+      const { seeds } = await firstValueFrom(this.api.runSeeds());
+      const failed = seeds.filter((s) => s.status === 'error');
+      if (failed.length > 0) {
+        this.toastr.warning(
+          `Seeds completed with ${failed.length} failure(s): ${failed.map((f) => `${f.name} (${f.error ?? 'error'})`).join('; ')}.`,
+          'Run seeds',
+        );
+      } else {
+        this.toastr.success(`Ran ${seeds.length} seed(s): ${seeds.map((s) => s.name).join(', ')}.`, 'Run seeds');
+      }
+    } catch (e) {
+      this.toastr.error(this.errMessage(e), 'Run seeds');
+    } finally {
+      this.runSeedsBusy.set(false);
     }
   }
 

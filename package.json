@@ -14,9 +14,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx --tsconfig tsconfig.base.json scripts/run-seeds.ts",
     "db:verify": "node scripts/verify-neon.cjs",
     "dev:db": "docker compose up -d --wait postgres && DATABASE_URL=postgresql://spectra:spectra@localhost:5432/spectra DATABASE_DIRECT_URL=postgresql://spectra:spectra@localhost:5432/spectra DATABASE_DRIVER=pg drizzle-kit migrate",
-    "dev:apis": "concurrently -n edge,aviate,admin,seq,quantum,corridor,ml -c auto \"node scripts/run-with-require-esm.cjs serve local-edge\" \"node scripts/run-with-require-esm.cjs serve aviate-api\" \"node scripts/run-with-require-esm.cjs serve admin-ui-api\" \"node scripts/run-with-require-esm.cjs serve seq-api\" \"node scripts/run-with-require-esm.cjs serve quantum-api\" \"node scripts/run-with-require-esm.cjs serve corridor-api\" \"node scripts/run-with-require-esm.cjs serve ml-camp\"",
+    "dev:apis": "concurrently -n edge,auth,aviate,admin,seq,quantum,corridor,ml -c auto \"node scripts/run-with-require-esm.cjs serve local-edge\" \"node scripts/run-with-require-esm.cjs serve auth-api\" \"node scripts/run-with-require-esm.cjs serve aviate-api\" \"node scripts/run-with-require-esm.cjs serve admin-ui-api\" \"node scripts/run-with-require-esm.cjs serve seq-api\" \"node scripts/run-with-require-esm.cjs serve quantum-api\" \"node scripts/run-with-require-esm.cjs serve corridor-api\" \"node scripts/run-with-require-esm.cjs serve ml-camp\"",
     "dev:uis": "concurrently -n spectra,sandbox,admin,platform -c auto \"node scripts/run-with-require-esm.cjs serve spectra-ui\" \"node scripts/run-with-require-esm.cjs serve sandbox-ui\" \"node scripts/run-with-require-esm.cjs serve admin-ui\" \"npm --prefix apps/platform run web\"",
     "dev:all": "npm run dev:db && concurrently -n apis,uis -c auto \"npm run dev:apis\" \"npm run dev:uis\"",
     "dev:down": "docker compose down"
@@ -31,6 +32,7 @@
     "@angular/platform-browser": "21.2.11",
     "@angular/platform-browser-dynamic": "21.2.11",
     "@angular/router": "21.2.11",
+    "@anthropic-ai/sdk": "^0.106.0",
     "@auth0/auth0-angular": "^2.9.0",
     "@aws-sdk/client-s3": "^3.717.0",
     "@aws-sdk/s3-request-presigner": "^3.717.0",
@@ -141,6 +143,7 @@
     "ts-jest": "^29.4.0",
     "ts-node": "10.9.1",
     "tslib": "^2.3.0",
+    "tsx": "^4.21.0",
     "typescript": "5.9.3"
   },
   "overrides": {

@@ -1,5 +1,5 @@
 import {Component} from '@angular/core';
-import {appName, currentYear} from '@/app/constants';
+import {currentYear} from '@/app/constants';
 import {RouterLink} from '@angular/router';
 import {NgIcon} from '@ng-icons/core';
 
@@ -52,7 +52,7 @@ type FooterLinkType ={
           <div class="col-md-6">
             <div class="d-flex align-items-center flex-wrap">
               <small class="text-muted">
-                © {{ currentYear }} {{ appName }}. All rights reserved.
+                © {{ currentYear }} CAMP Systems International, Inc.
               </small>
               <div class="ms-4 d-flex flex-wrap">
                 <a [routerLink]="[]" class="text-muted text-decoration-none small me-3">Privacy Policy</a>
@@ -133,5 +133,4 @@ export class Footer {
     }
   ];
   protected readonly currentYear = currentYear;
-  protected readonly appName = appName;
 }

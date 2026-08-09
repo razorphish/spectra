@@ -1,3 +1,5 @@
+@import 'ngx-toastr/toastr';
+
 /* App-specific overrides (global tokens and patterns ship from @spectra/shared-ui). */
 
 /* Flat layout (no ng-content): matches spectra-ui sticky navy bar. */

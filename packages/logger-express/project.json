@@ -19,7 +19,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "packages/logger-express/jest.config.cts"
+        "jestConfig": "packages/logger-express/jest.config.js"
       }
     }
   }

@@ -28,6 +28,20 @@
   </svg>
 </button>
 
+@if (aviateApiDocsUrl) {
+  <a
+    class="btn btn-system"
+    [href]="aviateApiDocsUrl"
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Open full Aviate API documentation (Swagger, integration catalog) in a new tab"
+  >
+    <svg class="sa-icon sa-icon-2x" aria-hidden="true">
+      <use href="/assets/icons/sprite.svg#book-open"></use>
+    </svg>
+  </a>
+}
+
 <app-virtual-assistant class="d-none d-lg-block"/>
 
 <app-toggle-fullscreen class="d-none  d-lg-block"/>

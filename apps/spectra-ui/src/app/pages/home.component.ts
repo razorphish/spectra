@@ -21,7 +21,7 @@ import { environment } from '../../environments/environment';
         <div class="hero-actions">
           <a routerLink="/docs" class="btn btn-primary">API Documentation</a>
           @if (sandboxUiUrl) {
-            <a [href]="sandboxUiUrl" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">Open Sandbox</a>
+            <a [href]="sandboxUiUrl" class="btn btn-outline-light" target="_blank" rel="noopener noreferrer">Open Sandbox</a>
           }
         </div>
       </div>
@@ -116,34 +116,10 @@ import { environment } from '../../environments/environment';
       gap: 0.75rem;
     }
 
-    .btn {
-      display: inline-block;
+    .hero-actions .btn {
       padding: 0.55rem 1.15rem;
       border-radius: var(--spectra-radius-sm);
-      font-weight: 600;
-      text-decoration: none;
       font-size: 0.95rem;
-    }
-
-    .btn-primary {
-      background: var(--spectra-color-accent);
-      color: #fff !important;
-    }
-
-    .btn-primary:hover {
-      background: var(--spectra-color-accent-hover);
-      color: #fff !important;
-    }
-
-    .btn-secondary {
-      background: rgb(255 255 255 / 0.12);
-      color: #f8fafc !important;
-      border: 1px solid rgb(255 255 255 / 0.25);
-    }
-
-    .btn-secondary:hover {
-      background: rgb(255 255 255 / 0.2);
-      color: #fff !important;
     }
 
     .value-section h2 {

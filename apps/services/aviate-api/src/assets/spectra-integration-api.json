@@ -1,0 +1,1210 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Spectra API (full catalog)",
+    "version": "0.0.1",
+    "description": "Unified contract for platform, seq, quantum, and corridor segments. Local dev base URL: http://127.0.0.1:3000 (local-edge). Public `GET /openapi.json` serves a filtered catalog; full paths: `GET /integration/openapi.json`."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:3000",
+      "description": "Local unified edge (local-edge)"
+    },
+    {
+      "url": "https://api.example.spectra.inc",
+      "description": "Deployed public gateway (placeholder)"
+    }
+  ],
+  "paths": {
+    "/v1/platform/health": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/platform/ready": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Readiness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Dependency degraded"
+          }
+        }
+      }
+    },
+    "/v1/platform/info": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Service metadata",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/platform/stats": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Control-plane table row counts (MVP; authenticate in production)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Database unavailable"
+          }
+        }
+      }
+    },
+    "/v1/platform/hello": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Authenticated sandbox hello (platform segment)",
+        "description": "Proves Auth0 bearer tokens reach aviate-api. Requires a sandbox-ui (or Swagger UI)\naccess token with the **public** API audience. Use `/health` for unauthenticated probes.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated greeting with principal `sub`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Auth0 verifier not configured on the server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-spectra-testing": "curl -s -H \"Authorization: Bearer $ACCESS_TOKEN\" http://127.0.0.1:3000/v1/platform/hello\n"
+      }
+    },
+    "/v1/platform/tenant-runtime/endpoints/{slug}/invoke": {
+      "x-spectra-audience": "public",
+      "post": {
+        "tags": [
+          "Tenant runtime"
+        ],
+        "summary": "Invoke staff-approved custom endpoint (M2M)",
+        "description": "M2M access token with scope `custom_endpoints:invoke` and JWT claim `tenant_id`.\nProduction invoke enforces PAR (GAP-3), pinned revision (GAP-2), and pricing parity (GAP-5).\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invocation result"
+          },
+          "401": {
+            "description": "Missing or invalid bearer token"
+          },
+          "403": {
+            "description": "Insufficient scope or policy denial"
+          },
+          "404": {
+            "description": "Endpoint not found"
+          }
+        }
+      }
+    },
+    "/v1/platform/uploads/init": {
+      "x-spectra-audience": "internal",
+      "post": {
+        "tags": [
+          "Uploads"
+        ],
+        "summary": "Initialize an object upload (returns presigned PUT URL)",
+        "description": "Creates an `uploads` row in Neon and returns a single-part PUT URL\nscoped to the env's uploads bucket. The client must `PUT` the\npayload using the same `Content-Type` (and `Content-Length` if\nprovided) used in this request. Default cap: 1 GiB.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitUploadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upload initialized.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InitUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Uploads not configured (missing bucket env var).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/sandbox/session": {
+      "x-spectra-audience": "integration",
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Bootstrap developer session (user + personal org)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session identifiers for sandbox portal APIs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxSessionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or Auth0 not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/sandbox/applications": {
+      "x-spectra-audience": "integration",
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "List sandbox applications for the authenticated developer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "applications"
+                  ],
+                  "properties": {
+                    "applications": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SandboxApplicationSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Create sandbox application (returns client secret once)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SandboxApplicationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxApplicationCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Application name not globally unique",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/sandbox/applications/{id}/rotate-client-secret": {
+      "x-spectra-audience": "integration",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Rotate OAuth client secret (invalidates the previous secret)",
+        "description": "Returns the new client secret once. The previous secret stops working immediately. Use when the original secret was lost; secrets are stored hashed and cannot be read back.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "clientSecret"
+                  ],
+                  "properties": {
+                    "clientSecret": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/sandbox/applications/{id}": {
+      "x-spectra-audience": "integration",
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Get sandbox application",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SandboxApplicationDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Update sandbox application",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SandboxApplicationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Name conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Soft-delete sandbox application",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/seq/health": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/seq/ready": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Readiness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/seq/hello": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Authenticated sandbox hello (seq segment)",
+        "description": ".NET implementation of the shared hello contract. Token must include the public API audience.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Auth not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-spectra-testing": "curl -s -H \"Authorization: Bearer $ACCESS_TOKEN\" http://127.0.0.1:3000/v1/seq/hello\n"
+      }
+    },
+    "/v1/quantum/health": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/quantum/ready": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Readiness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/quantum/hello": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Authenticated sandbox hello (quantum segment)",
+        "description": "Python implementation of the shared hello contract. Token must include the public API audience.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Auth not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-spectra-testing": "curl -s -H \"Authorization: Bearer $ACCESS_TOKEN\" http://127.0.0.1:3000/v1/quantum/hello\n"
+      }
+    },
+    "/v1/corridor/health": {
+      "x-spectra-audience": "internal",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/corridor/ready": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Readiness",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/corridor/hello": {
+      "x-spectra-audience": "public",
+      "get": {
+        "tags": [
+          "Sandbox"
+        ],
+        "summary": "Authenticated sandbox hello (corridor segment)",
+        "description": "Go implementation of the shared hello contract. Token must include the public API audience.\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Auth not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-spectra-testing": "curl -s -H \"Authorization: Bearer $ACCESS_TOKEN\" http://127.0.0.1:3000/v1/corridor/hello\n"
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Auth0 access token (public/sandbox API audience)"
+      }
+    },
+    "schemas": {
+      "HelloResponse": {
+        "type": "object",
+        "required": [
+          "message",
+          "segment",
+          "service",
+          "authenticated",
+          "principal"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Hello from corridor-api"
+          },
+          "segment": {
+            "type": "string",
+            "example": "corridor"
+          },
+          "service": {
+            "type": "string",
+            "example": "corridor-api"
+          },
+          "authenticated": {
+            "type": "boolean",
+            "example": true
+          },
+          "principal": {
+            "type": "object",
+            "required": [
+              "sub"
+            ],
+            "properties": {
+              "sub": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "AuthErrorResponse": {
+        "type": "object",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "InitUploadRequest": {
+        "type": "object",
+        "required": [
+          "orgId",
+          "bytesExpected"
+        ],
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Organization that owns the upload."
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional developer application owning the upload."
+          },
+          "bytesExpected": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1073741824,
+            "description": "Expected byte size; capped at 1 GiB."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "MIME type the client will PUT."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Optional original filename (stored as metadata only)."
+          }
+        }
+      },
+      "InitUploadResponse": {
+        "type": "object",
+        "required": [
+          "uploadId",
+          "s3Bucket",
+          "s3Key",
+          "presignedPutUrl",
+          "expiresAt"
+        ],
+        "properties": {
+          "uploadId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "s3Bucket": {
+            "type": "string"
+          },
+          "s3Key": {
+            "type": "string"
+          },
+          "presignedPutUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "SandboxSessionResponse": {
+        "type": "object",
+        "required": [
+          "userId",
+          "orgId",
+          "email"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orgId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "SandboxApplicationSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "updatedAt",
+          "clientId",
+          "hasClientSecret",
+          "oauthClientType",
+          "oauthGrantType"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "hasClientSecret": {
+            "type": "boolean"
+          },
+          "oauthClientType": {
+            "type": "string"
+          },
+          "oauthGrantType": {
+            "type": "string"
+          }
+        }
+      },
+      "SandboxApplicationCreateRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "redirectUris",
+          "acceptSpectraTos"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "redirectUris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "acceptSpectraTos": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "companyWebsiteUrl": {
+            "type": "string"
+          },
+          "privacyPolicyUrl": {
+            "type": "string"
+          },
+          "applicationTosUrl": {
+            "type": "string"
+          },
+          "supportEmail": {
+            "type": "string"
+          },
+          "supportPhone": {
+            "type": "string"
+          },
+          "developmentContacts": {
+            "type": "string"
+          },
+          "logoUploadId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SandboxApplicationCreateResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "clientId",
+          "clientSecret",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientSecret": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SandboxApplicationDetail": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "updatedAt",
+          "clientId",
+          "hasClientSecret",
+          "oauthClientType",
+          "oauthGrantType",
+          "redirectUris"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "hasClientSecret": {
+            "type": "boolean"
+          },
+          "oauthClientType": {
+            "type": "string"
+          },
+          "oauthGrantType": {
+            "type": "string"
+          },
+          "redirectUris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "companyWebsiteUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "privacyPolicyUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "applicationTosUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "supportEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "supportPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "developmentContacts": {
+            "type": "string",
+            "nullable": true
+          },
+          "logoUploadId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "spectraTosAcceptedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

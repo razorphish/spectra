@@ -135,6 +135,28 @@
       ]
     },
     {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug auth-api with Nx",
+      "preLaunchTask": "kill-local-dev-ports",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "auth-api"],
+      "env": {
+        "NODE_OPTIONS": "--inspect=9236",
+        "NODE_ENV": "development",
+        "PORT": "9100",
+        "M2M_MINT_ENABLED": "true"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/apps/services/auth-api/dist/**/*.(m|c|)js",
+        "!**/node_modules/**"
+      ]
+    },
+    {
       "type": "node-terminal",
       "request": "launch",
       "name": "Serve spectra-ui",
@@ -224,6 +246,21 @@
       }
     },
     {
+      "name": "auth-api (Launch)",
+      "preLaunchTask": "kill-local-dev-ports",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nx", "serve", "auth-api"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "NODE_ENV": "development",
+        "PORT": "9100",
+        "M2M_MINT_ENABLED": "true"
+      }
+    },
+    {
       "name": "Expo Metro (apps/platform)",
       "preLaunchTask": "kill-local-dev-ports",
       "type": "node",
@@ -266,6 +303,7 @@
       "preLaunchTask": "ensure-postgres-local",
       "configurations": [
         "Backend (Launch)",
+        "auth-api (Launch)",
         "admin-ui-api (Launch)",
         "ml-camp (Launch)",
         "Serve admin-ui",
@@ -280,6 +318,7 @@
       "preLaunchTask": "ensure-postgres-local",
       "configurations": [
         "Backend (Debug)",
+        "Debug auth-api with Nx",
         "Debug admin-ui-api with Nx",
         "Debug ml-camp with Nx",
         "Serve admin-ui",
@@ -317,13 +356,13 @@
     {
       "name": "🛠 Launch Sandbox stack",
       "preLaunchTask": "db-migrate-local",
-      "configurations": ["Backend (Launch)", "Serve sandbox-ui"],
+      "configurations": ["Backend (Launch)", "auth-api (Launch)", "Serve sandbox-ui"],
       "presentation": { "group": "focused", "order": 3 }
     },
     {
       "name": "🐛 Debug Sandbox stack",
       "preLaunchTask": "db-migrate-local",
-      "configurations": ["Backend (Debug)", "Serve sandbox-ui"],
+      "configurations": ["Backend (Debug)", "Debug auth-api with Nx", "Serve sandbox-ui"],
       "presentation": { "group": "focused", "order": 4 }
     },
     {
@@ -344,6 +383,7 @@
       "configurations": [
         "Debug local-edge with Nx",
         "Debug aviate-api with Nx",
+        "Debug auth-api with Nx",
         "Debug admin-ui-api with Nx",
         "Debug seq-api with Nx",
         "Debug quantum-api with Nx",

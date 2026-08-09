@@ -154,6 +154,7 @@ components:
         spectraTosAcceptedAt: { type: string, format: date-time, nullable: true }
 paths:
   /v1/platform/health:
+    x-spectra-audience: internal
     get:
       tags: [System]
       summary: Liveness
@@ -161,6 +162,7 @@ paths:
         '200':
           description: OK
   /v1/platform/ready:
+    x-spectra-audience: public
     get:
       tags: [System]
       summary: Readiness
@@ -170,6 +172,7 @@ paths:
         '503':
           description: Dependency degraded
   /v1/platform/info:
+    x-spectra-audience: public
     get:
       tags: [System]
       summary: Service metadata
@@ -177,6 +180,7 @@ paths:
         '200':
           description: OK
   /v1/platform/stats:
+    x-spectra-audience: internal
     get:
       tags: [System]
       summary: Control-plane table row counts (MVP; authenticate in production)
@@ -186,6 +190,7 @@ paths:
         '503':
           description: Database unavailable
   /v1/platform/hello:
+    x-spectra-audience: public
     get:
       tags: [Sandbox]
       summary: Authenticated sandbox hello (platform segment)
@@ -216,7 +221,34 @@ paths:
       x-spectra-testing: |
         curl -s -H "Authorization: Bearer $ACCESS_TOKEN" http://127.0.0.1:3000/v1/platform/hello
 
+  /v1/platform/tenant-runtime/endpoints/{slug}/invoke:
+    x-spectra-audience: public
+    post:
+      tags: [Tenant runtime]
+      summary: Invoke staff-approved custom endpoint (M2M)
+      description: |
+        M2M access token with scope `custom_endpoints:invoke` and JWT claim `tenant_id`.
+        Production invoke enforces PAR (GAP-3), pinned revision (GAP-2), and pricing parity (GAP-5).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invocation result
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Insufficient scope or policy denial
+        '404':
+          description: Endpoint not found
+
   /v1/platform/uploads/init:
+    x-spectra-audience: internal
     post:
       tags: [Uploads]
       summary: Initialize an object upload (returns presigned PUT URL)
@@ -252,6 +284,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /v1/platform/sandbox/session:
+    x-spectra-audience: integration
     get:
       tags: [Sandbox]
       summary: Bootstrap developer session (user + personal org)
@@ -278,6 +311,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /v1/platform/sandbox/applications:
+    x-spectra-audience: integration
     get:
       tags: [Sandbox]
       summary: List sandbox applications for the authenticated developer
@@ -340,6 +374,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /v1/platform/sandbox/applications/{id}/rotate-client-secret:
+    x-spectra-audience: integration
     parameters:
       - name: id
         in: path
@@ -379,6 +414,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /v1/platform/sandbox/applications/{id}:
+    x-spectra-audience: integration
     parameters:
       - name: id
         in: path

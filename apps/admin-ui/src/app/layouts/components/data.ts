@@ -95,6 +95,19 @@ export const menuItems: MenuItemType[] = [
     ],
   },
   {
+    label: 'Platform',
+    isCollapsed: true,
+    icon: '/assets/icons/sprite.svg#cpu',
+    children: [
+      { label: 'Integrations', url: '/integrations' },
+      { label: 'Production access', url: '/platform/production-access' },
+      { label: 'Sandbox AI models', url: '/platform/sandbox-ai-models' },
+      { label: 'Pricing profiles', url: '/platform/pricing-profiles' },
+      { label: 'Runtime tenants', url: '/platform/runtime-tenants' },
+      { label: 'API Catalog & Scopes', url: '/platform/api-catalog' },
+    ],
+  },
+  {
     isCollapsed: true,
     icon: '/assets/icons/sprite.svg#settings',
     label: 'Settings',

@@ -7,7 +7,7 @@ const { execSync } = require('child_process');
 
 /** HTTP ports used by nx serve for this repo's stack (not Postgres 5432). */
 const PORTS = [
-  3000, 3001, 3002, 3003, 3004, 3005, 3006,
+  3000, 3001, 3002, 3003, 3004, 3005, 3006, 9100,
   4200, 4201, 4202,
   8081,
 ];

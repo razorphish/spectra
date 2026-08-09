@@ -20,6 +20,20 @@ npx drizzle-kit migrate
 
 Configuration lives in [`drizzle.config.ts`](../../drizzle.config.ts). Migrations are emitted under [`drizzle/`](./drizzle/) and tracked in [`drizzle/meta/_journal.json`](./drizzle/meta/_journal.json).
 
+### Sandbox AI / tenant-runtime migration order (§11.1 **GAP-12**)
+
+When adding tables for **sandbox AI custom endpoints** (`pricing_profiles`, `runtime_tenants`, `developer_ai_endpoints`, … per the internal *AI-assisted custom API endpoints* plan §1):
+
+Full product/architecture context: **[`docs/plans/ai-sandbox-custom-apis.md`](../../docs/plans/ai-sandbox-custom-apis.md)** (repository snapshot; **GAP-1–12**).
+
+1. Create **`pricing_profiles`** (and any tables it depends on that **do not** foreign-key to **`runtime_tenants`**) **first**.
+2. Create **`runtime_tenants`** only **after** `pricing_profiles` exists if the column **`default_pricing_profile_id`** references **`pricing_profiles.id`**.
+3. Create tables that foreign-key to **`runtime_tenants`** next (e.g. **`developer_ai_endpoints`**, **`developer_ai_endpoint_versions`**, **`ai_endpoint_production_requests`**, **`usage_events`**), then any remaining objects.
+
+Keep **one ordered journal sequence** per deploy (or multiple `.sql` files without circular FKs). The **first** migration that creates **`runtime_tenants`** should include a **top-of-file SQL comment** referencing **GAP-12**. Duplicate summary for integrators: [`docs/sandbox-ai-endpoints.md`](../../docs/sandbox-ai-endpoints.md) (*Migration order*).
+
+Staff **Settings → Migrations → Reconcile** calls `POST /v1/admin/migrations/reconcile`: it removes orphan rows in `spectra.__drizzle_migrations` (hashes not present on the current repo journal), then runs the same migration pass as **Run Pending** (hash-order repair + Drizzle `migrate()`).
+
 **Idempotency:** Prefer `IF NOT EXISTS` / guarded DML where re-runs are plausible (branches, journal repair). Cursor applies [`.cursor/rules/sql-migrations-idempotent.mdc`](../../.cursor/rules/sql-migrations-idempotent.mdc) to new `.sql` files. The admin **View migration SQL** modal shows a heuristic **Idempotent** flag (overridable with `-- @spectra-migration: idempotent` / `non-idempotent` in the file header); see `src/lib/migration-sql-metadata.ts`. Changing bytes in a migration that is **already recorded** in `spectra.__drizzle_migrations` changes its hash and will show as a mismatch until you repair the row (same hash as on disk) or follow the delete-record + re-apply flow in this README—avoid editing applied migrations in shared environments unless coordinated.
 
 ### Admin UI migration runner (`admin-ui-api`)

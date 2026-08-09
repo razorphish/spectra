@@ -1,6 +1,7 @@
 import {Component, inject} from '@angular/core';
 import {AppLogo} from '@app/components/app-logo';
 import {LayoutService} from '@core/services/layout-store.service';
+import { environment } from '../../../../environments/environment';
 import {VirtualAssistant} from '@layouts/components/topbar/components/virtual-assistant';
 import {ToggleSidenav} from '@layouts/components/topbar/components/toggle-sidenav';
 import {NotificationDropdown} from '@layouts/components/topbar/components/notification-dropdown';
@@ -24,6 +25,8 @@ import {ToggleFullscreen} from '@layouts/components/topbar/components/toggle-ful
 })
 export class Topbar {
   layoutStore = inject(LayoutService);
+
+  protected readonly aviateApiDocsUrl = environment.aviateApiDocsUrl?.trim() ?? '';
 
   toggleTheme() {
     this.layoutStore.changeTheme(this.layoutStore.theme === 'light' ? 'dark' : 'light')

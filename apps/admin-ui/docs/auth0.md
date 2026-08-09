@@ -57,6 +57,7 @@ Local admin UI reads **Auth0 and API base URL from dotenv**, not from hand-editi
 | Variable | Purpose |
 | --- | --- |
 | `ADMIN_UI_API_BASE_URL` | Optional. Default `http://127.0.0.1:3002`. |
+| `ADMIN_UI_AVIATE_SWAGGER_URL` | Optional. Full URL for the topbar **full** OpenAPI (Swagger) UI on aviate-api — default `http://127.0.0.1:3001/integration/docs/` (not public `/docs`). |
 | `ADMIN_UI_AUTH0_ENABLED` | `true` / `1` / `yes` when you want Universal Login (requires domain + client id). |
 | `ADMIN_UI_AUTH0_DOMAIN` | Auth0 tenant domain (no `https://`). |
 | `ADMIN_UI_AUTH0_CLIENT_ID` | SPA Client ID. |
@@ -79,6 +80,32 @@ Enable Auth0 in practice by setting `ADMIN_UI_AUTH0_ENABLED=true` plus non-empty
 - **Register entry:** Links use `/auth/register?auth0=signup` to open Universal Login with **`screen_hint: signup`** (Auth0 hosted sign-up). Enable **sign ups** on your Database connection (Authentication → Database → connection → **Disable Sign Ups** off). If `screen_hint` does not show sign-up in your tenant’s New Universal Login experience, verify Auth0 docs for your login flow version.
 - **Auth0 disabled (local only):** the email/password form sets a **`sessionStorage`** flag via `AdminSessionService`. Logout clears it. Use Auth0 for any shared or deployed environment; the dev session is not a real auth boundary.
 
+## Integrations audit API (RBAC)
+
+Staff endpoints under **`/v1/admin/integrations`** and **`/v1/admin/m2m/token-activity`** require Auth0 **API Authorization** permissions on the same custom API as the SPA audience (`AUTH0_AUDIENCE`):
+
+| Permission | Purpose |
+| --- | --- |
+| `platform:integrations:read` | List/search integrations, detail, token issuance log, M2M activity tab |
+| `platform:integrations:export` | Download JSON/CSV export for an integration |
+
+Enable **RBAC** on the Auth0 API, create these permissions, add them to a **Role**, assign the role to staff users (or via an Action). The access token must include a `permissions` array (Auth0 default for RBAC).
+
+### Sandbox AI & custom endpoints (RBAC — plan **GAP-10**)
+
+When **admin-ui-api** ships staff routes for sandbox AI models, pricing profiles, custom endpoint production approval, and per-endpoint pricing overrides, guard them with **`requireStaffPermission`** using the **same** Auth0 custom API and RBAC pattern as above. Normative permission strings (see internal plan *AI-assisted custom API endpoints* §11.1 **GAP-10** and [`docs/sandbox-ai-endpoints.md`](../../docs/sandbox-ai-endpoints.md) for related **GAP-11** client errors):
+
+| Permission | Purpose |
+| --- | --- |
+| `platform:sandbox_ai_models:manage` | CRUD staff catalog for **`ai_llm_models`** (provider / model metadata, secret refs). |
+| `platform:pricing_profiles:manage` | CRUD **`pricing_profiles`** and related catalog / default assignments. |
+| `platform:custom_endpoints:review` | **`ai_endpoint_production_requests`** queue: approve / reject / needs-information, **`approved_production_version_id`** transitions, **GAP-6** human-wait actions; **trust tier** and **`external_tenant_ref`** staff PATCH on **`runtime_tenants`** unless an ADR splits a finer permission. |
+| `platform:custom_endpoints:pricing_override` | Set or change **`pricing_profile_id`** (and equivalent per-endpoint commercial fields) from the **approval / ops** UI (**§6.6** in plan) without requiring **`platform:pricing_profiles:manage`**. |
+
+Register these in the **same** Auth0 API and attach them to staff roles when the corresponding **admin-ui-api** routes and **admin-ui** screens ship (same RBAC setup as the Integrations permissions above). **Client-facing API errors** for sandbox AI / tenant-runtime are cataloged separately in **[`docs/sandbox-ai-endpoints.md`](../../docs/sandbox-ai-endpoints.md)** (**GAP-11**).
+
+**Local dev without Auth0 RBAC:** with `AUTH0_VERIFY_DISABLED=true` on **admin-ui-api**, you may set `ADMIN_UI_API_DEV_GRANT_ALL_STAFF_PERMISSIONS=true` to bypass permission checks (never in shared environments).
+
 ## CI / staff deploy (`STAFF_API_URL`)
 
 The reusable workflow [.github/workflows/spectra-build-frontends.yml](../../../.github/workflows/spectra-build-frontends.yml) passes `STAFF_API_URL`. For **admin-ui** only, when the selected Angular configuration is `production`, the workflow:
@@ -90,6 +117,7 @@ Optional env vars for the same script (set in CI when you are ready):
 
 | Variable | Purpose |
 | --- | --- |
+| `STAFF_AVIATE_SWAGGER_URL` | Optional. Full URL to staff **full** OpenAPI (Swagger) on aviate-api, e.g. `https://aviate.internal.example.com/integration/docs/`. When empty, the topbar Swagger link is omitted in the generated bundle. |
 | `STAFF_AUTH0_ENABLED` | Set to `true` to enable Auth0 in the generated bundle |
 | `STAFF_AUTH0_DOMAIN` | Auth0 tenant domain |
 | `STAFF_AUTH0_CLIENT_ID` | SPA client ID |
@@ -108,6 +136,7 @@ export STAFF_API_URL='https://your-staff-api.example.com'
 # export STAFF_AUTH0_AUDIENCE='...'
 # export STAFF_AUTH0_REDIRECT_URI='https://admin.example.com/auth/callback'
 # export STAFF_AUTH0_LOGOUT_RETURN_TO='https://admin.example.com/auth/login'
+# export STAFF_AVIATE_SWAGGER_URL='https://aviate.internal.example.com/integration/docs/'
 node scripts/write-admin-ui-build-environment.mjs
 npx nx build admin-ui --configuration=ci-staff
 ```

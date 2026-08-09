@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import { resolveSpectraDatabaseUrl } from './packages/database/src/lib/connection';
+import { resolveSpectraDatabaseUrl } from './packages/database/src/lib/database-url';
 import { defineConfig } from 'drizzle-kit';
 
 /**

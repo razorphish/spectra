@@ -4,6 +4,8 @@ import { Router, RouterLink } from '@angular/router';
 import { Auth0ClientService, AuthService } from '@auth0/auth0-angular';
 import { filter, take } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import { BffAuthService } from '../core/bff-auth.service';
+import { buildPublicApiSwaggerUrl } from '../public-api-docs-url';
 
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -18,11 +20,18 @@ import { environment } from '../../environments/environment';
           <h1>Spectra developer sandbox</h1>
           <p class="sandbox-hero-lede">
             Register applications, manage OAuth-style client credentials, and explore the unified
-            OpenAPI platform behind Spectra’s public APIs — aligned with a CMS Blue Button–style
-            developer experience.
+            OpenAPI platform behind Spectra's public APIs — built for a clear, developer-first experience.
           </p>
           <div class="sandbox-hero-actions">
-            @if (environment.auth0.enabled) {
+            @if (bffMode) {
+              @if (bffAuth.user()) {
+                <a routerLink="/dashboard" class="sandbox-btn sandbox-btn-primary">Go to dashboard</a>
+              } @else if (bffAuth.user() === null) {
+                <button type="button" class="sandbox-btn sandbox-btn-primary" (click)="login()">
+                  Log in
+                </button>
+              }
+            } @else if (environment.auth0.enabled && auth) {
               @if (auth.isAuthenticated$ | async) {
                 <a routerLink="/dashboard" class="sandbox-btn sandbox-btn-primary">Go to dashboard</a>
               } @else {
@@ -169,14 +178,25 @@ import { environment } from '../../environments/environment';
 })
 export class LandingPageComponent {
   protected readonly environment = environment;
-  protected readonly auth = inject(AuthService);
-  private readonly auth0 = inject(Auth0ClientService);
+  protected readonly bffMode = environment.bffAuth;
+  protected readonly bffAuth = inject(BffAuthService);
+  protected readonly auth = inject(AuthService, { optional: true });
+  private readonly auth0 = inject(Auth0ClientService, { optional: true });
   private readonly router = inject(Router);
 
-  protected readonly swaggerUrl = `${environment.apiBaseUrl.replace(/\/$/, '')}/docs`;
+  protected readonly swaggerUrl = buildPublicApiSwaggerUrl(
+    environment.apiBaseUrl,
+    environment.publicApiDocsBaseUrl,
+  );
 
   constructor() {
-    if (!environment.auth0.enabled) return;
+    if (this.bffMode) {
+      this.bffAuth.loadMe().subscribe((u) => {
+        if (u) void this.router.navigateByUrl('/dashboard');
+      });
+      return;
+    }
+    if (!environment.auth0.enabled || !this.auth) return;
     this.auth.isAuthenticated$
       .pipe(
         filter(Boolean),
@@ -192,8 +212,12 @@ export class LandingPageComponent {
   }
 
   login(): void {
+    if (this.bffMode) {
+      this.bffAuth.login();
+      return;
+    }
     void this.auth0
-      .loginWithRedirect({
+      ?.loginWithRedirect({
         openUrl: (url) => {
           window.location.replace(url);
         },

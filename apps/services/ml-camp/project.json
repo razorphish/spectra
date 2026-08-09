@@ -86,7 +86,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "apps/services/ml-camp/jest.config.cts",
+        "jestConfig": "apps/services/ml-camp/jest.config.js",
         "passWithNoTests": true
       }
     }

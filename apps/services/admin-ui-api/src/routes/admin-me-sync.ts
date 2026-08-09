@@ -152,7 +152,12 @@ export function createAdminMeSyncHandler(): RequestHandler {
 
       const insertedRows = await db
         .insert(users)
-        .values({ email, authSubject: sub, statusId: activeId })
+        .values({
+          email,
+          authSubject: sub,
+          statusId: activeId,
+          principalKindId: CATALOG_IDS.userPrincipal.staff,
+        })
         .returning();
       const inserted = insertedRows[0];
       if (!inserted) {

@@ -138,7 +138,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "apps/admin-ui/jest.config.cts",
+        "jestConfig": "apps/admin-ui/jest.config.js",
         "tsConfig": "apps/admin-ui/tsconfig.spec.json"
       }
     },

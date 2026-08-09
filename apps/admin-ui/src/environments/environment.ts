@@ -16,4 +16,9 @@ export const environment = {
     enabled: false,
     dsn: '' as string | undefined,
   },
+  /**
+   * Empty = hide topbar link. Staff should open **full** catalog: `{aviate-origin}/integration/docs/`
+   * (not `/docs`, which is the public limited spec). Set at deploy time, e.g. `STAFF_AVIATE_SWAGGER_URL` in CI.
+   */
+  aviateApiDocsUrl: '',
 };

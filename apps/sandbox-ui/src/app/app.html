@@ -5,12 +5,21 @@
       <nav class="sandbox-nav-main">
         <a [href]="documentationUrl" target="_blank" rel="noopener noreferrer">Documentation</a>
         <a [href]="supportUrl" target="_blank" rel="noopener noreferrer">Support</a>
-        @if (auth0Configured && auth && (auth.isAuthenticated$ | async)) {
+        @if (bffMode ? !!bffAuth.user() : (auth0Configured && auth && (auth.isAuthenticated$ | async))) {
           <a [href]="apiDocsUrl" target="_blank" rel="noopener noreferrer">API reference</a>
         }
       </nav>
       <div class="sandbox-nav-actions">
-        @if (auth0Configured && auth) {
+        @if (bffMode) {
+          @if (bffAuth.user(); as user) {
+            <a routerLink="/account" class="user-email" title="Account profile">{{
+              user.email || user.name || 'Profile'
+            }}</a>
+            <button type="button" class="spectra-sandbox-logout" (click)="logout()">Log out</button>
+          } @else if (bffAuth.user() === null) {
+            <button type="button" class="btn-login" (click)="login()">Log in</button>
+          }
+        } @else if (auth0Configured && auth) {
           @if (auth.isLoading$ | async) {
             <span class="muted">Signing in…</span>
           } @else if (auth.isAuthenticated$ | async) {

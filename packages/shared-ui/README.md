@@ -5,7 +5,8 @@ Shared **design tokens**, **CSS patterns**, **binary assets** (under `src/assets
 ## CSS
 
 - `src/styles/spectra-tokens.css` — `:root` variables and global base styles.
-- `src/styles/spectra-patterns.css` — `.spectra-page`, `.spectra-probe`, `.spectra-auth-shell`, `.spectra-shell-header`, skip link, etc.
+- `src/styles/spectra-patterns.css` — `.spectra-page`, `.spectra-probe`, `.spectra-auth-shell`, `.spectra-shell-header`, skip link, **`.spectra-doc-layout`** (side nav + main + in-page TOC for long-form pages), etc.
+- `src/styles/spectra-forms.css` — Bootstrap-inspired **buttons** (`.btn`, `.btn-primary`, `.btn-danger`, `.btn-outline-secondary`, `.btn-outline-light`, `.btn-link`), **forms** (`.form-control`, `.form-label`, `.form-check`, …), **tabs** (`.int-card`, `.nav-tab`, `.tab-panels`), **alerts**, **modals**, and small layout utilities. Used by `spectra-ui` and `sandbox-ui` for consistent developer-portal UI.
 
 Apps list these files first in `project.json` `build.options.styles`, then app-local `styles.css`.
 

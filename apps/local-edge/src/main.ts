@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import express from 'express';
+import { mountBff } from './bff';
 import { mountServiceProxies } from './proxy';
 
 function workspaceRoot(): string {
@@ -29,7 +30,7 @@ for (const [p, o] of [
 }
 
 /** Local dev only — CORS + optional passthrough. Not deployed. Production edge is AWS HTTP API (Terraform api_http). */
-const host = process.env.HOST ?? 'localhost';
+const host = process.env.HOST ?? '127.0.0.1';
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
 const app = express();
@@ -61,6 +62,9 @@ app.get(`/v1/${SEGMENT}/ready`, (_req, res) => {
   res.status(200).json({ status: 'ok', checks: { local_edge: 'ok' } });
 });
 
+// BFF token-handler (dev spike, behind BFF_ENABLED). No-op unless configured.
+mountBff(app);
+
 mountServiceProxies(app);
 
 app.get('/', (_req, res) => {
@@ -72,6 +76,7 @@ app.get('/', (_req, res) => {
       seq: process.env['SEQ_API_URL'] ?? 'http://127.0.0.1:3003',
       quantum: process.env['QUANTUM_API_URL'] ?? 'http://127.0.0.1:3004',
       corridor: process.env['CORRIDOR_API_URL'] ?? 'http://127.0.0.1:3005',
+      auth: process.env['SPECTRA_AUTH_API_URL'] ?? 'http://127.0.0.1:9100',
     },
   });
 });

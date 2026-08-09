@@ -1,0 +1,17 @@
+---
+description: Admin UI data tables — row actions use icon-only buttons (with aria-label/title), not text-only links.
+globs: apps/admin-ui/**/*.html
+alwaysApply: false
+---
+
+# Admin UI — data list row actions
+
+For **tables and data lists** in **apps/admin-ui** (integrations, platform screens, settings grids, etc.):
+
+- **Row actions** (view, edit, delete, export, overflow menu, etc.) should be **icon-only controls**, not plain text such as “View” / “Edit”.
+- **Style reference (staff tables):** match **Settings → Migrations** ([`migrations-list-panel`](apps/admin-ui/src/app/views/settings/migrations-list-panel/)): table `st-table table table-hover table-striped mb-0 align-middle`, thead `bg-light align-middle bg-opacity-25 thead-sm`, actions column header **Actions** with `text-end text-nowrap migration-actions-col`, cell wrapper `migration-tn-actions d-flex gap-1 align-items-center justify-content-end flex-nowrap` and `role="group"` + `aria-label` per row; buttons **`btn … waves-effect btn-xs d-inline-flex align-items-center justify-content-center`** (semantic variant: `btn-primary` for open/view, `btn-danger` + `delete-btn` for delete, etc.); icons **Spectra Admin** `<i class="sa sa-…" aria-hidden="true"></i>` (e.g. `sa-doc` for view/detail, `sa-trash` for delete — see migrations panel).
+- **Accessibility:** every icon-only control needs a concise **`aria-label`** (and usually **`title`** for hover). Use **`aria-hidden="true"`** on decorative icons.
+- **Component styles:** icon sizing / `btn-xs` hit targets are defined locally on the migrations list panel — **copy the same `i.sa` + `.migration-tn-actions .btn-xs` rules** under a page wrapper class when adding a new list (see [`integrations-list-page.ts`](apps/admin-ui/src/app/views/integrations/integrations-list-page/integrations-list-page.ts) `integrations-list-styled`).
+- **Other UI:** marketing/dashboard areas may still use **`NgIcon`** + Font Awesome; staff **data tables** prefer **`sa`** + **`waves-effect`** for consistency with migrations.
+
+When adding new list pages, default to this pattern unless product explicitly requires visible text on every action.
